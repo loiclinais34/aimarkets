@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # Base de données PostgreSQL
+  postgres:
+    image: postgres:15
+    container_name: aimarkets_postgres
+    environment:
+      POSTGRES_DB: aimarkets
+      POSTGRES_USER: aimarkets_user
+      POSTGRES_PASSWORD: aimarkets_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - aimarkets_network
+
+  # Redis pour le cache
+  redis:
+    image: redis:7-alpine
+    container_name: aimarkets_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - aimarkets_network
+
+  # Backend FastAPI
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aimarkets_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://aimarkets_user:aimarkets_password@postgres:5432/aimarkets
+      - REDIS_URL=redis://redis:6379
+      - ENVIRONMENT=development
+    volumes:
+      - ./backend:/app
+      - ./historical_data.csv:/app/data/historical_data.csv
+      - ./historcial_sentiment.csv:/app/data/historical_sentiment.csv
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - aimarkets_network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Frontend Next.js
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: aimarkets_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - aimarkets_network
+    command: npm run dev
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  aimarkets_network:
+    driver: bridge
