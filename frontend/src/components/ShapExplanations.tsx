@@ -119,7 +119,7 @@ const ShapExplanations: React.FC<ShapExplanationsProps> = ({
       {activeTab === 'shap' && (
         <div>
           {shapLoading && <LoadingSpinner />}
-          {shapError && <ErrorMessage message="Erreur lors du chargement des explications SHAP" />}
+          {!!shapError && <ErrorMessage message="Erreur lors du chargement des explications SHAP" />}
           
           {shapData && (
             <div className="space-y-6">
@@ -202,7 +202,7 @@ const ShapExplanations: React.FC<ShapExplanationsProps> = ({
       {activeTab === 'importance' && (
         <div>
           {importanceLoading && <LoadingSpinner />}
-          {importanceError && <ErrorMessage message="Erreur lors du chargement de l'importance des features" />}
+          {!!importanceError && <ErrorMessage message="Erreur lors du chargement de l'importance des features" />}
           
           {importanceData && (
             <div className="space-y-6">

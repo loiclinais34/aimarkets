@@ -670,20 +670,21 @@ class MLService:
             "feature_importance": dict(zip(feature_names, model.feature_importances_))
         }
     
-    def predict(self, symbol: str, model_id: int, date: datetime, db: Session = None, screener_run_id: int = None) -> Dict:
+    def predict(self, symbol: str, model_id: int, date: datetime, db: Session = None) -> Dict:
         """Faire une prédiction avec un modèle entraîné"""
-        # Utiliser la session passée en paramètre ou celle de l'instance
-        session = db or self.db
-        
-        # Récupérer le modèle
-        ml_model = session.query(MLModels).filter(MLModels.id == model_id).first()
-        if not ml_model:
-            return {"error": "Modèle non trouvé"}
-        
-        # Charger le modèle et le scaler
-        model = joblib.load(ml_model.model_path)
-        scaler_path = ml_model.model_path.replace('.joblib', '_scaler.joblib')
-        scaler = joblib.load(scaler_path)
+        try:
+            # Utiliser la session passée en paramètre ou celle de l'instance
+            session = db or self.db
+            
+            # Récupérer le modèle
+            ml_model = session.query(MLModels).filter(MLModels.id == model_id).first()
+            if not ml_model:
+                return {"error": "Modèle non trouvé"}
+            
+            # Charger le modèle et le scaler
+            model = joblib.load(ml_model.model_path)
+            scaler_path = ml_model.model_path.replace('.joblib', '_scaler.joblib')
+            scaler = joblib.load(scaler_path)
         
         # Récupérer les données du jour avec SQLAlchemy ORM
         # D'abord essayer la date exacte
@@ -878,7 +879,6 @@ class MLService:
             prediction_value=float(prediction),
             confidence=float(confidence),
             data_date_used=date,
-            screener_run_id=screener_run_id,
             created_by="ml_service"
         )
         self.db.add(ml_prediction)
@@ -893,6 +893,13 @@ class MLService:
             "model_name": ml_model.model_name,
             "data_date_used": date  # Indiquer la date réellement utilisée
         }
+        
+        except Exception as e:
+            print(f"❌ [PREDICT] Erreur prédiction {symbol}: {str(e)}")
+            print(f"❌ [PREDICT] Type d'erreur: {type(e).__name__}")
+            import traceback
+            print(f"❌ [PREDICT] Traceback: {traceback.format_exc()}")
+            return {"error": f"Erreur lors de la prédiction: {str(e)}"}
     
     def get_model_performance(self, model_id: int) -> Dict:
         """Récupérer les performances d'un modèle"""

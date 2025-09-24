@@ -373,15 +373,17 @@ export const apiService = {
 
   // Statistiques des données
   getDataStats: async (): Promise<{
-    historical_data: {
-      total_records: number
-      unique_symbols: number
-      unique_dates: number
-    }
-    sentiment_data: {
-      total_records: number
-      unique_symbols: number
-      unique_dates: number
+    total_symbols: number
+    total_historical_records: number
+    total_technical_indicators: number
+    total_sentiment_indicators: number
+    total_ml_models: number
+    total_predictions: number
+    data_coverage: {
+      symbols_with_technical: number
+      symbols_with_sentiment: number
+      technical_coverage_percentage: number
+      sentiment_coverage_percentage: number
     }
     last_updated: string
   }> => {
@@ -623,6 +625,91 @@ export const symbolMetadataAPI = {
   // Récupérer la liste des secteurs
   getSectors: async (): Promise<string[]> => {
     const response = await apiClient.get('/api/v1/symbol-metadata/sectors/list')
+    return response.data
+  },
+}
+
+// API Screener
+export const screenerApi = {
+  // Lancer un screener synchrone
+  runScreener: async (params: {
+    target_return_percentage: number
+    time_horizon_days: number
+    risk_tolerance: number
+  }): Promise<any> => {
+    const response = await apiClient.post('/api/v1/screener/run', params)
+    return response.data
+  },
+
+  // Lancer un screener asynchrone
+  runScreenerAsync: async (params: {
+    target_return_percentage: number
+    time_horizon_days: number
+    risk_tolerance: number
+  }): Promise<{ task_id: string; status: string; message: string }> => {
+    const response = await apiClient.post('/api/v1/screener/run-async', params)
+    return response.data
+  },
+
+  // Récupérer le statut d'une tâche
+  getTaskStatus: async (taskId: string): Promise<{
+    state: string
+    status: string
+    progress: number
+    meta?: any
+    result?: any
+  }> => {
+    const response = await apiClient.get(`/api/v1/screener/task/${taskId}/status`)
+    return response.data
+  },
+
+  // Récupérer l'historique des screeners
+  getHistory: async (limit?: number): Promise<any[]> => {
+    const response = await apiClient.get('/api/v1/screener/history', {
+      params: { limit }
+    })
+    return response.data
+  },
+
+  // Récupérer les statistiques des screeners
+  getStats: async (): Promise<any> => {
+    const response = await apiClient.get('/api/v1/screener/stats')
+    return response.data
+  },
+
+  // Récupérer les résultats d'un screener
+  getResults: async (screenerRunId: number): Promise<any[]> => {
+    const response = await apiClient.get(`/api/v1/screener/results/${screenerRunId}`)
+    return response.data
+  },
+
+  // Lancer un screener de démonstration
+  runDemoScreener: async (params: {
+    target_return_percentage: number
+    time_horizon_days: number
+    risk_tolerance: number
+  }): Promise<{ task_id: string; status: string; message: string }> => {
+    const response = await apiClient.post('/api/v1/screener/run-demo', params)
+    return response.data
+  },
+
+  // Lancer un screener réel
+  runRealScreener: async (params: {
+    target_return_percentage: number
+    time_horizon_days: number
+    risk_tolerance: number
+  }): Promise<{ task_id: string; status: string; message: string }> => {
+    const response = await apiClient.post('/api/v1/screener/run-real', params)
+    return response.data
+  },
+
+  // Lancer un screener complet
+  runFullScreener: async (params: {
+    target_return_percentage: number
+    time_horizon_days: number
+    risk_tolerance: number
+  }): Promise<{ task_id: string; status: string; message: string }> => {
+    const response = await apiClient.post('/api/v1/screener/run-full-ml-web', params)
     return response.data
   },
 }
