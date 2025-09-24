@@ -492,3 +492,91 @@ def get_data_statistics(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erreur lors du calcul des statistiques: {str(e)}"
         )
+
+
+# === ENDPOINTS POUR GÉNÉRER LES INDICATEURS ===
+
+@router.post("/generate-technical/{symbol}", response_model=MessageResponse)
+def generate_technical_indicators(symbol: str, db: Session = Depends(get_db)):
+    """Générer les indicateurs techniques pour un symbole"""
+    try:
+        from app.services.technical_indicators import TechnicalIndicatorsCalculator
+        
+        technical_service = TechnicalIndicatorsCalculator(db)
+        success = technical_service.calculate_all_indicators(symbol)
+        result = {"success": success, "count": 1 if success else 0}
+        
+        if result.get("success"):
+            return MessageResponse(
+                message=f"Indicateurs techniques générés avec succès pour {symbol}",
+                details=f"Nombre d'indicateurs créés: {result.get('count', 0)}"
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Erreur lors de la génération des indicateurs techniques: {result.get('error', 'Erreur inconnue')}"
+            )
+            
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la génération des indicateurs techniques pour {symbol}: {str(e)}"
+        )
+
+
+@router.post("/generate-sentiment/{symbol}", response_model=MessageResponse)
+def generate_sentiment_indicators(symbol: str, db: Session = Depends(get_db)):
+    """Générer les indicateurs de sentiment pour un symbole"""
+    try:
+        from app.services.sentiment_service import SentimentIndicatorService
+        
+        sentiment_service = SentimentIndicatorService()
+        result = sentiment_service.calculate_and_store_indicators(symbol, db)
+        
+        if result.get("success"):
+            return MessageResponse(
+                message=f"Indicateurs de sentiment générés avec succès pour {symbol}",
+                details=f"Nombre d'indicateurs créés: {result.get('count', 0)}"
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Erreur lors de la génération des indicateurs de sentiment: {result.get('error', 'Erreur inconnue')}"
+            )
+            
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la génération des indicateurs de sentiment pour {symbol}: {str(e)}"
+        )
+
+
+@router.post("/generate-all-indicators/{symbol}", response_model=MessageResponse)
+def generate_all_indicators(symbol: str, db: Session = Depends(get_db)):
+    """Générer tous les indicateurs (techniques et sentiment) pour un symbole"""
+    try:
+        from app.services.technical_indicators import TechnicalIndicatorsCalculator
+        from app.services.sentiment_service import SentimentIndicatorService
+        
+        # Générer les indicateurs techniques
+        technical_service = TechnicalIndicatorsCalculator(db)
+        tech_success = technical_service.calculate_all_indicators(symbol)
+        tech_result = {"success": tech_success, "count": 1 if tech_success else 0}
+        
+        # Générer les indicateurs de sentiment
+        sentiment_service = SentimentIndicatorService()
+        sent_result = sentiment_service.calculate_and_store_indicators(symbol, db)
+        
+        tech_count = tech_result.get('count', 0) if tech_result.get('success') else 0
+        sent_count = sent_result.get('count', 0) if sent_result.get('success') else 0
+        
+        return MessageResponse(
+            message=f"Tous les indicateurs générés avec succès pour {symbol}",
+            details=f"Indicateurs techniques: {tech_count}, Indicateurs de sentiment: {sent_count}"
+        )
+            
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la génération des indicateurs pour {symbol}: {str(e)}"
+        )

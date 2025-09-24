@@ -7,6 +7,7 @@ import {
   CpuChipIcon, 
   ChartBarSquareIcon, 
   ArrowTrendingUpIcon,
+  MagnifyingGlassIcon,
   InformationCircleIcon,
   PlayIcon,
   StopIcon
@@ -61,7 +62,7 @@ export default function Dashboard() {
 
   // Gestion des erreurs
   if (symbolsLoading || statsLoading) {
-    return <LoadingSpinner message="Chargement des données..." />
+    return <LoadingSpinner message="Chargement des données..." />;
   }
 
   return (
@@ -98,19 +99,37 @@ export default function Dashboard() {
               { id: 'targets', name: 'Paramètres de Cible', icon: ChartBarSquareIcon },
               { id: 'models', name: 'Modèles ML', icon: CpuChipIcon },
               { id: 'predictions', name: 'Prédictions', icon: ArrowTrendingUpIcon },
+              { id: 'screener', name: 'Screener', icon: MagnifyingGlassIcon, href: '/screener' },
             ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <tab.icon className="h-5 w-5 mr-2" />
-                {tab.name}
-              </button>
+              tab.href ? (
+                <a
+                  key={tab.id}
+                  href={tab.href}
+                  className="flex items-center py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                >
+                  {(() => {
+                    const IconComponent = tab.icon
+                    return <IconComponent className="h-5 w-5 mr-2" />
+                  })()}
+                  {tab.name}
+                </a>
+              ) : (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === tab.id
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  {(() => {
+                    const IconComponent = tab.icon
+                    return <IconComponent className="h-5 w-5 mr-2" />
+                  })()}
+                  {tab.name}
+                </button>
+              )
             ))}
           </div>
         </div>

@@ -123,6 +123,7 @@ class MLPredictionBase(BaseModel):
     prediction_value: float = Field(..., description="Valeur de la prédiction")
     confidence: float = Field(..., ge=0, le=1, description="Niveau de confiance")
     features_used: Optional[List[str]] = Field(None, description="Features utilisées")
+    screener_run_id: Optional[int] = Field(None, description="ID du run de screener qui a généré cette prédiction")
 
 
 class MLPredictionCreate(MLPredictionBase):
@@ -381,3 +382,87 @@ class StatisticsResponse(BaseModel):
     total_predictions: int
     data_coverage: Dict[str, Any]
     last_updated: datetime
+
+
+# Schemas pour les Screeners
+class ScreenerConfigBase(BaseModel):
+    name: str = Field(..., description="Nom de la configuration du screener")
+    target_return_percentage: float = Field(..., description="Rendement attendu en pourcentage")
+    time_horizon_days: int = Field(..., description="Horizon temporel en jours")
+    risk_tolerance: float = Field(..., description="Tolérance au risque (0.1 à 1.0)")
+    confidence_threshold: float = Field(..., description="Seuil de confiance calculé")
+    created_by: str = Field(..., description="Utilisateur créateur")
+
+class ScreenerConfigCreate(ScreenerConfigBase):
+    pass
+
+class ScreenerConfigUpdate(BaseModel):
+    name: Optional[str] = None
+    target_return_percentage: Optional[float] = None
+    time_horizon_days: Optional[int] = None
+    risk_tolerance: Optional[float] = None
+    confidence_threshold: Optional[float] = None
+    is_active: Optional[bool] = None
+
+class ScreenerConfig(ScreenerConfigBase):
+    id: int
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ScreenerRunBase(BaseModel):
+    screener_config_id: int = Field(..., description="ID de la configuration du screener")
+    run_date: date = Field(..., description="Date d'exécution")
+    total_symbols: int = Field(..., description="Nombre total de symboles analysés")
+    successful_models: int = Field(..., description="Nombre de modèles entraînés avec succès")
+    opportunities_found: int = Field(..., description="Nombre d'opportunités trouvées")
+    execution_time_seconds: int = Field(..., description="Temps d'exécution en secondes")
+    status: str = Field(..., description="Statut de l'exécution")
+
+class ScreenerRunCreate(ScreenerRunBase):
+    pass
+
+class ScreenerRun(ScreenerRunBase):
+    id: int
+    error_message: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ScreenerResultBase(BaseModel):
+    screener_run_id: int = Field(..., description="ID de l'exécution du screener")
+    symbol: str = Field(..., description="Symbole de l'actif")
+    model_id: int = Field(..., description="ID du modèle utilisé")
+    prediction: float = Field(..., description="Valeur de la prédiction")
+    confidence: float = Field(..., description="Niveau de confiance")
+    rank: int = Field(..., description="Rang dans les résultats")
+
+class ScreenerResultCreate(ScreenerResultBase):
+    pass
+
+class ScreenerResult(ScreenerResultBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ScreenerRequest(BaseModel):
+    target_return_percentage: float = Field(..., description="Rendement attendu en pourcentage")
+    time_horizon_days: int = Field(..., description="Horizon temporel en jours")
+    risk_tolerance: float = Field(..., description="Tolérance au risque (0.1 à 1.0)")
+
+class ScreenerResponse(BaseModel):
+    screener_run_id: int
+    total_symbols: int
+    successful_models: int
+    opportunities_found: int
+    execution_time_seconds: int
+    results: List[Dict[str, Any]]
