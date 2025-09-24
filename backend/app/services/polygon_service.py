@@ -35,17 +35,25 @@ class PolygonService:
             
             data = response.json()
             
-            if data.get('status') == 'OK':
+            if data.get('status') in ['OK', 'DELAYED']:
                 return data
             else:
-                logger.error(f"Erreur API Polygon: {data.get('message', 'Unknown error')}")
+                error_msg = data.get('message', 'Unknown error')
+                logger.error(f"Erreur API Polygon: {error_msg}")
+                logger.error(f"Endpoint: {endpoint}")
+                logger.error(f"Params: {params}")
+                logger.error(f"Response: {data}")
                 return {}
                 
         except requests.exceptions.RequestException as e:
             logger.error(f"Erreur de requête vers Polygon.io: {e}")
+            logger.error(f"Endpoint: {endpoint}")
+            logger.error(f"Params: {params}")
             return {}
         except Exception as e:
             logger.error(f"Erreur inattendue lors de la requête Polygon: {e}")
+            logger.error(f"Endpoint: {endpoint}")
+            logger.error(f"Params: {params}")
             return {}
     
     def get_ticker_details(self, symbol: str) -> Dict[str, Any]:
