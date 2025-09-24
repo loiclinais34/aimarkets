@@ -770,4 +770,123 @@ export const screenerApi = {
   },
 }
 
+// Types pour la mise à jour des données
+export interface DataFreshnessStatus {
+  last_trading_day: string
+  historical_data: {
+    latest_date: string | null
+    is_fresh: boolean
+    days_behind: number | null
+    needs_update: boolean
+  }
+  sentiment_data: {
+    latest_date: string | null
+    is_fresh: boolean
+    days_behind: number | null
+    needs_update: boolean
+  }
+  overall_status: 'fresh' | 'needs_update' | 'error'
+  market_is_open: boolean
+  current_time: string
+}
+
+export interface MarketStatus {
+  is_open: boolean
+  last_trading_day: string
+  current_date: string
+  timezone_info: {
+    market_timezone: string
+    server_timezone: string
+    note: string
+  }
+}
+
+export interface UpdateResult {
+  symbol: string
+  status: 'success' | 'error' | 'skipped' | 'no_data'
+  message: string
+  records_inserted?: number
+  records_updated?: number
+  total_records?: number
+  start_date?: string
+  end_date?: string
+}
+
+export interface SymbolsStatus {
+  total_symbols: number
+  sample_results: Array<{
+    symbol: string
+    should_update: boolean
+    db_latest_date: string | null
+    polygon_latest_date: string | null
+    days_behind: number | null
+  }>
+  last_trading_day: string
+  market_is_open: boolean
+}
+
+// API pour la mise à jour des données
+export const dataUpdateApi = {
+  // Récupérer le statut de fraîcheur des données
+  getDataFreshnessStatus: async (): Promise<DataFreshnessStatus> => {
+    const response = await apiClient.get('/api/v1/data-update/data-freshness')
+    return response.data.data
+  },
+
+  // Récupérer le statut du marché
+  getMarketStatus: async (): Promise<MarketStatus> => {
+    const response = await apiClient.get('/api/v1/data-update/market-status')
+    return response.data.data
+  },
+
+  // Récupérer le statut des symboles
+  getSymbolsStatus: async (): Promise<SymbolsStatus> => {
+    const response = await apiClient.get('/api/v1/data-update/symbols-status')
+    return response.data.data
+  },
+
+  // Mettre à jour les données historiques pour un symbole
+  updateHistoricalData: async (symbol: string, forceUpdate: boolean = false): Promise<UpdateResult> => {
+    const response = await apiClient.post(`/api/v1/data-update/update-historical/${symbol}`, {
+      force_update: forceUpdate
+    })
+    return response.data.data
+  },
+
+  // Mettre à jour les données de sentiment pour un symbole
+  updateSentimentData: async (symbol: string, forceUpdate: boolean = false): Promise<UpdateResult> => {
+    const response = await apiClient.post(`/api/v1/data-update/update-sentiment/${symbol}`, {
+      force_update: forceUpdate
+    })
+    return response.data.data
+  },
+
+  // Mettre à jour toutes les données historiques
+  updateAllHistoricalData: async (forceUpdate: boolean = false, maxSymbols?: number): Promise<any> => {
+    const response = await apiClient.post('/api/v1/data-update/update-all-historical', {
+      force_update: forceUpdate,
+      max_symbols: maxSymbols
+    })
+    return response.data
+  },
+
+  // Mettre à jour toutes les données de sentiment
+  updateAllSentimentData: async (forceUpdate: boolean = false, maxSymbols?: number): Promise<any> => {
+    const response = await apiClient.post('/api/v1/data-update/update-all-sentiment', {
+      force_update: forceUpdate,
+      max_symbols: maxSymbols
+    })
+    return response.data
+  },
+
+  // Mettre à jour toutes les données
+  updateAllData: async (forceUpdate: boolean = false, maxSymbols?: number): Promise<any> => {
+    const response = await apiClient.post('/api/v1/data-update/update-all-data', {
+      force_update: forceUpdate,
+      max_symbols: maxSymbols
+    })
+    return response.data
+  },
+}
+
 export default apiService

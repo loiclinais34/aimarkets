@@ -107,6 +107,15 @@ app.include_router(
     tags=["Screener"]
 )
 
+# Import du router data_update
+from app.api.endpoints import data_update
+
+app.include_router(
+    data_update.router,
+    prefix="/api/v1/data-update",
+    tags=["Mise à jour des Données"]
+)
+
 # Endpoints LightGBM temporairement désactivés à cause de problèmes de stabilité
 # app.include_router(
 #     lightgbm_models.router,

@@ -16,6 +16,7 @@ import ErrorMessage from '@/components/ErrorMessage'
 import ScreenerProgress from '@/components/ScreenerProgress'
 import ScreenerResults from '@/components/ScreenerResults'
 import AnalysisModal from '@/components/AnalysisModal'
+import DataFreshnessIndicator from '@/components/DataFreshnessIndicator'
 import { toast } from 'react-hot-toast'
 
 interface ScreenerParameters {
@@ -224,6 +225,11 @@ export default function ScreenerPage() {
             </div>
           </div>
         )}
+
+        {/* Indicateur de fraîcheur des données */}
+        <div className="mb-8">
+          <DataFreshnessIndicator showDetails={true} />
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Paramètres du Screener */}
