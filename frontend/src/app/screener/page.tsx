@@ -8,7 +8,9 @@ import {
   ClockIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
-  XCircleIcon
+  XCircleIcon,
+  HomeIcon,
+  ArrowLeftIcon
 } from '@heroicons/react/24/outline'
 import { apiService, screenerApi } from '@/services/api'
 import LoadingSpinner from '@/components/LoadingSpinner'
@@ -166,19 +168,56 @@ export default function ScreenerPage() {
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center py-6">
-              <MagnifyingGlassIcon className="h-8 w-8 text-blue-600 mr-3" />
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  Screener ML
-                </h1>
-                <p className="text-sm text-gray-500">
-                  Analyse complète avec modèles ML réels sur tous les symboles
-                </p>
+            <div className="flex items-center justify-between py-6">
+              <div className="flex items-center">
+                <MagnifyingGlassIcon className="h-8 w-8 text-blue-600 mr-3" />
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">
+                    Screener ML
+                  </h1>
+                  <p className="text-sm text-gray-500">
+                    Analyse complète avec modèles ML réels sur tous les symboles
+                  </p>
+                </div>
               </div>
+              
+              {/* Bouton retour */}
+              <a
+                href="/"
+                className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <ArrowLeftIcon className="h-4 w-4 mr-2" />
+                Retour au Dashboard
+              </a>
             </div>
         </div>
       </div>
+
+      {/* Navigation */}
+      <nav className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center">
+            <div className="flex space-x-8">
+              <a
+                href="/"
+                className="flex items-center py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              >
+                <HomeIcon className="h-5 w-5 mr-2" />
+                Dashboard
+              </a>
+              <div className="flex items-center py-4 px-1 border-b-2 font-medium text-sm border-blue-500 text-blue-600">
+                <MagnifyingGlassIcon className="h-5 w-5 mr-2" />
+                Screener
+              </div>
+            </div>
+            
+            {/* Indicateur de fraîcheur des données compact */}
+            <div className="py-2">
+              <DataFreshnessIndicator compact={true} />
+            </div>
+          </div>
+        </div>
+      </nav>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Dernières Opportunités */}
