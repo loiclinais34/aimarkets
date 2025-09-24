@@ -33,7 +33,7 @@ export default function DataFreshnessIndicator({
   } = useQuery({
     queryKey: ['data-freshness'],
     queryFn: dataUpdateApi.getDataFreshnessStatus,
-    refetchInterval: 30000, // Rafraîchir toutes les 30 secondes
+    refetchInterval: 3600000, // Rafraîchir toutes les heures (1h = 3600000ms)
     retry: 3
   })
 
@@ -45,7 +45,7 @@ export default function DataFreshnessIndicator({
   } = useQuery({
     queryKey: ['market-status'],
     queryFn: dataUpdateApi.getMarketStatus,
-    refetchInterval: 60000, // Rafraîchir toutes les minutes
+    refetchInterval: 3600000, // Rafraîchir toutes les heures (1h = 3600000ms)
     retry: 3
   })
 
