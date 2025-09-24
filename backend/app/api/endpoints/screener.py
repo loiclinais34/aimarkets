@@ -9,9 +9,25 @@ from ...models.schemas import (
     ScreenerConfig, ScreenerConfigCreate, ScreenerConfigUpdate
 )
 from ...services.screener_service import ScreenerService
+from ...services.celery_manager import CeleryManager
 from ...tasks.screener_tasks import get_task_status
 
 router = APIRouter()
+
+def ensure_celery_ready():
+    """
+    S'assure que Celery est prêt avant de lancer une tâche
+    """
+    celery_manager = CeleryManager()
+    result = celery_manager.ensure_celery_running()
+    
+    if not result['success']:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Celery n'est pas disponible: {result['error']}"
+        )
+    
+    return result
 
 @router.post("/run", response_model=ScreenerResponse)
 async def run_screener(
@@ -69,6 +85,9 @@ def run_demo_screener_endpoint(
 ):
     """Lancer un screener de démonstration de manière asynchrone"""
     try:
+        # Vérifier et démarrer Celery si nécessaire
+        celery_result = ensure_celery_ready()
+        
         from app.tasks.demo_screener_tasks import run_demo_screener
         
         # Conversion de la requête en dictionnaire pour la tâche
@@ -84,8 +103,11 @@ def run_demo_screener_endpoint(
         return {
             "task_id": task.id,
             "status": "started",
-            "message": "Screener de démonstration lancé en arrière-plan"
+            "message": "Screener de démonstration lancé en arrière-plan",
+            "celery_status": celery_result['status']
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -100,6 +122,9 @@ def run_real_screener_endpoint(
 ):
     """Lancer un screener réel de manière asynchrone"""
     try:
+        # Vérifier et démarrer Celery si nécessaire
+        celery_result = ensure_celery_ready()
+        
         from app.tasks.real_screener_tasks import run_real_screener
         
         # Conversion de la requête en dictionnaire pour la tâche
@@ -115,8 +140,11 @@ def run_real_screener_endpoint(
         return {
             "task_id": task.id,
             "status": "started",
-            "message": "Screener réel lancé en arrière-plan"
+            "message": "Screener réel lancé en arrière-plan",
+            "celery_status": celery_result['status']
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -273,6 +301,9 @@ def run_full_screener_ml_web_endpoint(
 ):
     """Lancer un screener ML complet avec service web robuste"""
     try:
+        # Vérifier et démarrer Celery si nécessaire
+        celery_result = ensure_celery_ready()
+        
         from app.tasks.full_screener_ml_web_tasks import run_full_screener_ml_web
         
         # Conversion de la requête en dictionnaire pour la tâche
@@ -288,8 +319,11 @@ def run_full_screener_ml_web_endpoint(
         return {
             "task_id": task.id,
             "status": "started",
-            "message": f"Screener ML complet lancé en arrière-plan{' (limité à ' + str(max_symbols) + ' symboles)' if max_symbols else ''}"
+            "message": f"Screener ML complet lancé en arrière-plan{' (limité à ' + str(max_symbols) + ' symboles)' if max_symbols else ''}",
+            "celery_status": celery_result['status']
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

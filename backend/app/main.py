@@ -116,6 +116,15 @@ app.include_router(
     tags=["Mise à jour des Données"]
 )
 
+# Import du router celery_management
+from app.api.endpoints import celery_management
+
+app.include_router(
+    celery_management.router,
+    prefix="/api/v1",
+    tags=["Gestion de Celery"]
+)
+
 # Endpoints LightGBM temporairement désactivés à cause de problèmes de stabilité
 # app.include_router(
 #     lightgbm_models.router,
