@@ -107,7 +107,7 @@ class TechnicalIndicators(Base):
     bb_middle = Column(DECIMAL(10, 4))
     bb_lower = Column(DECIMAL(10, 4))
     bb_width = Column(DECIMAL(10, 4))
-    bb_position = Column(DECIMAL(5, 4))
+    bb_position = Column(DECIMAL(10, 4))
     
     # Volume
     obv = Column(DECIMAL(20, 0))

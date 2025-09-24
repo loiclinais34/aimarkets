@@ -330,18 +330,27 @@ export default function AnalysisModal({
                               {/* Indicateurs de Sentiment */}
                               <div className="bg-gray-50 rounded-lg p-4">
                                 <h4 className="text-md font-medium text-gray-900 mb-3">Indicateurs de Sentiment</h4>
-                                <div className="space-y-3">
-                                  {Object.entries(analysisData.sentiment_indicators).map(([key, value]) => (
-                                    <div key={key} className="flex justify-between items-center">
-                                      <span className="text-sm font-medium">
-                                        {formatFeatureName(key)}
-                                      </span>
-                                      <span className="text-sm text-gray-600">
-                                        {value !== null && value !== undefined ? value.toFixed(4) : 'N/A'}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
+                                {analysisData.sentiment_indicators && Object.keys(analysisData.sentiment_indicators).length > 0 ? (
+                                  <div className="space-y-3">
+                                    {Object.entries(analysisData.sentiment_indicators).map(([key, value]) => (
+                                      <div key={key} className="flex justify-between items-center">
+                                        <span className="text-sm font-medium">
+                                          {formatFeatureName(key)}
+                                        </span>
+                                        <span className="text-sm text-gray-600">
+                                          {value !== null && value !== undefined ? value.toFixed(4) : 'N/A'}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="text-center py-4">
+                                    <p className="text-gray-500 text-sm">Aucun indicateur de sentiment disponible</p>
+                                    <p className="text-gray-400 text-xs mt-1">
+                                      Les données de sentiment peuvent être en cours de calcul
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                             </div>
 

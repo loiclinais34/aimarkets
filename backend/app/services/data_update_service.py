@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 
 from ..models.database import HistoricalData, SentimentData, SymbolMetadata
 from .polygon_service import PolygonService
+from .indicators_recalculation_service import IndicatorsRecalculationService
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class DataUpdateService:
     def __init__(self, db: Session):
         self.db = db
         self.polygon_service = PolygonService()
+        self.indicators_service = IndicatorsRecalculationService(db)
     
     def update_historical_data_for_symbol(self, symbol: str, force_update: bool = False) -> Dict[str, Any]:
         """
@@ -127,6 +129,20 @@ class DataUpdateService:
             
             logger.info(f"Mise à jour terminée pour {symbol}: {records_inserted} nouveaux enregistrements, {records_updated} mises à jour")
             
+            # Recalculer les indicateurs techniques après la mise à jour des données historiques
+            indicators_result = None
+            if records_inserted > 0 or records_updated > 0:
+                logger.info(f"Recalcul des indicateurs techniques pour {symbol}...")
+                try:
+                    indicators_result = self.indicators_service.recalculate_technical_indicators(symbol)
+                    if indicators_result['success']:
+                        logger.info(f"Indicateurs techniques recalculés pour {symbol}: {indicators_result['processed_dates']} dates")
+                    else:
+                        logger.error(f"Erreur lors du recalcul des indicateurs techniques pour {symbol}: {indicators_result['error']}")
+                except Exception as e:
+                    logger.error(f"Exception lors du recalcul des indicateurs techniques pour {symbol}: {e}")
+                    indicators_result = {'success': False, 'error': str(e)}
+            
             return {
                 'symbol': symbol,
                 'status': 'success',
@@ -135,7 +151,10 @@ class DataUpdateService:
                 'records_updated': records_updated,
                 'total_records': records_inserted + records_updated,
                 'start_date': start_date.isoformat(),
-                'end_date': end_date.isoformat()
+                'end_date': end_date.isoformat(),
+                'indicators_recalculated': indicators_result['success'] if indicators_result else False,
+                'indicators_processed_dates': indicators_result['processed_dates'] if indicators_result and indicators_result['success'] else 0,
+                'indicators_error': indicators_result['error'] if indicators_result and not indicators_result['success'] else None
             }
             
         except Exception as e:
@@ -303,6 +322,20 @@ class DataUpdateService:
             
             logger.info(f"Mise à jour des données de sentiment terminée pour {symbol}: {records_inserted} nouveaux enregistrements, {records_updated} mises à jour")
             
+            # Recalculer les indicateurs de sentiment après la mise à jour des données de sentiment
+            sentiment_indicators_result = None
+            if records_inserted > 0 or records_updated > 0:
+                logger.info(f"Recalcul des indicateurs de sentiment pour {symbol}...")
+                try:
+                    sentiment_indicators_result = self.indicators_service.recalculate_sentiment_indicators(symbol)
+                    if sentiment_indicators_result['success']:
+                        logger.info(f"Indicateurs de sentiment recalculés pour {symbol}: {sentiment_indicators_result['processed_dates']} dates")
+                    else:
+                        logger.error(f"Erreur lors du recalcul des indicateurs de sentiment pour {symbol}: {sentiment_indicators_result['error']}")
+                except Exception as e:
+                    logger.error(f"Exception lors du recalcul des indicateurs de sentiment pour {symbol}: {e}")
+                    sentiment_indicators_result = {'success': False, 'error': str(e)}
+            
             return {
                 'symbol': symbol,
                 'status': 'success',
@@ -311,7 +344,10 @@ class DataUpdateService:
                 'records_updated': records_updated,
                 'total_records': records_inserted + records_updated,
                 'start_date': start_date.isoformat(),
-                'end_date': end_date.isoformat()
+                'end_date': end_date.isoformat(),
+                'sentiment_indicators_recalculated': sentiment_indicators_result['success'] if sentiment_indicators_result else False,
+                'sentiment_indicators_processed_dates': sentiment_indicators_result['processed_dates'] if sentiment_indicators_result and sentiment_indicators_result['success'] else 0,
+                'sentiment_indicators_error': sentiment_indicators_result['error'] if sentiment_indicators_result and not sentiment_indicators_result['success'] else None
             }
             
         except Exception as e:
@@ -397,9 +433,32 @@ class DataUpdateService:
         results['end_time'] = end_time.isoformat()
         results['duration_seconds'] = duration
         
+        # Recalculer les corrélations après toutes les mises à jour
+        correlations_result = None
+        if results['historical_data']['success'] > 0 or results['sentiment_data']['success'] > 0:
+            logger.info("Recalcul des corrélations après mise à jour des données...")
+            try:
+                correlations_result = self.indicators_service.recalculate_correlations(symbols)
+                if correlations_result['success']:
+                    logger.info(f"Corrélations recalculées: {correlations_result['processed_correlations']} corrélations")
+                else:
+                    logger.error(f"Erreur lors du recalcul des corrélations: {correlations_result['error']}")
+            except Exception as e:
+                logger.error(f"Exception lors du recalcul des corrélations: {e}")
+                correlations_result = {'success': False, 'error': str(e)}
+        
+        # Ajouter les résultats des corrélations
+        results['correlations'] = {
+            'recalculated': correlations_result['success'] if correlations_result else False,
+            'processed_correlations': correlations_result['processed_correlations'] if correlations_result and correlations_result['success'] else 0,
+            'error': correlations_result['error'] if correlations_result and not correlations_result['success'] else None
+        }
+        
         logger.info(f"Mise à jour terminée en {duration:.2f} secondes")
         logger.info(f"Données historiques: {results['historical_data']['success']} succès, {results['historical_data']['error']} erreurs, {results['historical_data']['skipped']} ignorés")
         logger.info(f"Données de sentiment: {results['sentiment_data']['success']} succès, {results['sentiment_data']['error']} erreurs, {results['sentiment_data']['skipped']} ignorés")
+        if correlations_result and correlations_result['success']:
+            logger.info(f"Corrélations: {correlations_result['processed_correlations']} corrélations recalculées")
         
         return results
     

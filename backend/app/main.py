@@ -125,6 +125,15 @@ app.include_router(
     tags=["Gestion de Celery"]
 )
 
+# Import du router indicators_recalculation
+from app.api.endpoints import indicators_recalculation
+
+app.include_router(
+    indicators_recalculation.router,
+    prefix="/api/v1",
+    tags=["Recalcul des Indicateurs"]
+)
+
 # Endpoints LightGBM temporairement désactivés à cause de problèmes de stabilité
 # app.include_router(
 #     lightgbm_models.router,

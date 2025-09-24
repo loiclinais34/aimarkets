@@ -106,7 +106,80 @@ export default function TechnicalChart({
     })
   }, [chartData])
 
-  // Calculer les statistiques
+  // Fonction pour calculer les niveaux de support et résistance
+  const calculateSupportResistance = (data: CandlestickData[]) => {
+    if (data.length < 20) return { support: [], resistance: [] }
+    
+    // Prendre les 20 dernières périodes pour le calcul
+    const recentData = data.slice(-20)
+    
+    // Trouver les plus hauts et plus bas locaux
+    const highs: number[] = []
+    const lows: number[] = []
+    
+    for (let i = 1; i < recentData.length - 1; i++) {
+      const current = recentData[i]
+      const prev = recentData[i - 1]
+      const next = recentData[i + 1]
+      
+      // Plus haut local (pivot haut)
+      if (current.high > prev.high && current.high > next.high) {
+        highs.push(current.high)
+      }
+      
+      // Plus bas local (pivot bas)
+      if (current.low < prev.low && current.low < next.low) {
+        lows.push(current.low)
+      }
+    }
+    
+    // Calculer les niveaux de résistance (plus hauts significatifs)
+    const resistanceLevels = highs
+      .sort((a, b) => b - a)
+      .slice(0, 3) // Top 3
+      .filter(level => level > data[data.length - 1].close) // Au-dessus du prix actuel
+    
+    // Calculer les niveaux de support (plus bas significatifs)
+    const supportLevels = lows
+      .sort((a, b) => a - b)
+      .slice(0, 3) // Top 3
+      .filter(level => level < data[data.length - 1].close) // En-dessous du prix actuel
+    
+    // Ajouter des niveaux psychologiques basés sur le prix actuel
+    const currentPrice = data[data.length - 1].close
+    const psychologicalLevels = []
+    
+    // Niveaux psychologiques (arrondis)
+    const roundToNearest = (price: number, roundTo: number) => {
+      return Math.round(price / roundTo) * roundTo
+    }
+    
+    // Niveaux de résistance psychologiques
+    const resistance50 = roundToNearest(currentPrice + (currentPrice * 0.05), 5) // +5%
+    const resistance100 = roundToNearest(currentPrice + (currentPrice * 0.10), 10) // +10%
+    
+    // Niveaux de support psychologiques
+    const support50 = roundToNearest(currentPrice - (currentPrice * 0.05), 5) // -5%
+    const support100 = roundToNearest(currentPrice - (currentPrice * 0.10), 10) // -10%
+    
+    // Combiner et dédupliquer les niveaux
+    const allResistance = [...resistanceLevels, resistance50, resistance100]
+      .filter((level, index, arr) => arr.indexOf(level) === index) // Dédupliquer
+      .sort((a, b) => a - b)
+      .slice(0, 3) // Garder les 3 plus proches
+    
+    const allSupport = [...supportLevels, support50, support100]
+      .filter((level, index, arr) => arr.indexOf(level) === index) // Dédupliquer
+      .sort((a, b) => b - a)
+      .slice(0, 3) // Garder les 3 plus proches
+    
+    return {
+      support: allSupport,
+      resistance: allResistance
+    }
+  }
+
+  // Calculer les statistiques et les niveaux de support/résistance
   const stats = useMemo(() => {
     if (candlestickData.length === 0) return null
     
@@ -118,6 +191,9 @@ export default function TechnicalChart({
     
     const avgVolume = candlestickData.reduce((sum, item) => sum + item.volume, 0) / candlestickData.length
     
+    // Calculer les niveaux de support et résistance
+    const supportResistanceLevels = calculateSupportResistance(candlestickData)
+    
     return {
       currentPrice: latest.close,
       priceChange,
@@ -125,7 +201,8 @@ export default function TechnicalChart({
       currentVolume: latest.volume,
       avgVolume,
       volumeChange: latest.volume - avgVolume,
-      volumeChangePercent: ((latest.volume - avgVolume) / avgVolume) * 100
+      volumeChangePercent: ((latest.volume - avgVolume) / avgVolume) * 100,
+      supportResistance: supportResistanceLevels
     }
   }, [candlestickData])
 
@@ -289,6 +366,43 @@ export default function TechnicalChart({
                 dot={false}
                 name="Prix de clôture"
               />
+              
+              {/* Support and Resistance Lines */}
+              {stats?.supportResistance && (
+                <>
+                  {/* Support Lines */}
+                  {stats.supportResistance.support.map((level, index) => (
+                    <ReferenceLine
+                      key={`support-${index}`}
+                      y={level}
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      label={{ 
+                        value: `Support ${formatPrice(level)}`, 
+                        position: "topLeft",
+                        style: { fontSize: '10px', fill: '#10b981' }
+                      }}
+                    />
+                  ))}
+                  
+                  {/* Resistance Lines */}
+                  {stats.supportResistance.resistance.map((level, index) => (
+                    <ReferenceLine
+                      key={`resistance-${index}`}
+                      y={level}
+                      stroke="#ef4444"
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      label={{ 
+                        value: `Résistance ${formatPrice(level)}`, 
+                        position: "topRight",
+                        style: { fontSize: '10px', fill: '#ef4444' }
+                      }}
+                    />
+                  ))}
+                </>
+              )}
             </ComposedChart>
           </ResponsiveContainer>
         )
@@ -450,6 +564,17 @@ export default function TechnicalChart({
             <p className={`text-sm ${stats.priceChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               {formatPercent(stats.priceChangePercent)}
             </p>
+            {/* Distance aux niveaux clés */}
+            {stats.supportResistance && (
+              <div className="mt-2 text-xs text-gray-500">
+                {stats.supportResistance.support.length > 0 && (
+                  <p>Proche support: {formatPrice(stats.supportResistance.support[0])}</p>
+                )}
+                {stats.supportResistance.resistance.length > 0 && (
+                  <p>Proche résistance: {formatPrice(stats.supportResistance.resistance[0])}</p>
+                )}
+              </div>
+            )}
           </div>
           
           <div className="bg-white p-3 rounded-lg border">
@@ -504,6 +629,51 @@ export default function TechnicalChart({
                 (technicalIndicators.macd > technicalIndicators.macd_signal ? 'Haussier' : 'Baissier') : 
                 'N/A'}
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Niveaux de Support et Résistance */}
+      {stats?.supportResistance && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Support Levels */}
+          <div className="bg-white p-4 rounded-lg border">
+            <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
+              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+              Niveaux de Support
+            </h4>
+            <div className="space-y-2">
+              {stats.supportResistance.support.length > 0 ? (
+                stats.supportResistance.support.map((level, index) => (
+                  <div key={index} className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Support {index + 1}</span>
+                    <span className="text-sm font-medium text-green-600">{formatPrice(level)}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500">Aucun niveau de support identifié</p>
+              )}
+            </div>
+          </div>
+
+          {/* Resistance Levels */}
+          <div className="bg-white p-4 rounded-lg border">
+            <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
+              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+              Niveaux de Résistance
+            </h4>
+            <div className="space-y-2">
+              {stats.supportResistance.resistance.length > 0 ? (
+                stats.supportResistance.resistance.map((level, index) => (
+                  <div key={index} className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Résistance {index + 1}</span>
+                    <span className="text-sm font-medium text-red-600">{formatPrice(level)}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500">Aucun niveau de résistance identifié</p>
+              )}
+            </div>
           </div>
         </div>
       )}

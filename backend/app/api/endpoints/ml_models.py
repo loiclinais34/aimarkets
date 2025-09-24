@@ -577,11 +577,10 @@ def get_detailed_analysis(symbol: str, model_id: int, db: Session = Depends(get_
             TechnicalIndicators.date == latest_date
         ).first()
         
-        # 4. Récupérer les indicateurs de sentiment récents
+        # 4. Récupérer les indicateurs de sentiment récents (les plus récents disponibles)
         sentiment_indicators = db.query(SentimentIndicators).filter(
-            SentimentIndicators.symbol == symbol,
-            SentimentIndicators.date == latest_date
-        ).first()
+            SentimentIndicators.symbol == symbol
+        ).order_by(SentimentIndicators.date.desc()).first()
         
         # 5. Récupérer les indicateurs techniques historiques pour les graphiques (30 derniers jours)
         technical_indicators_history = db.query(TechnicalIndicators).filter(
