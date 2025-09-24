@@ -1,8 +1,9 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import { CheckCircleIcon, ChartBarIcon } from '@heroicons/react/24/outline'
 import { formatTime, formatPercentage } from '@/utils/formatters'
+import AnalysisModal from './AnalysisModal'
 
 interface ScreenerResult {
   symbol: string
@@ -29,6 +30,9 @@ export default function ScreenerResults({
   successfulModels, 
   executionTime 
 }: ScreenerResultsProps) {
+  const [selectedResult, setSelectedResult] = useState<ScreenerResult | null>(null)
+  const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false)
+
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 0.8) return 'text-green-600 bg-green-100'
     if (confidence >= 0.6) return 'text-yellow-600 bg-yellow-100'
@@ -39,6 +43,16 @@ export default function ScreenerResults({
     if (confidence >= 0.8) return 'Très élevée'
     if (confidence >= 0.6) return 'Élevée'
     return 'Moyenne'
+  }
+
+  const handleAnalyzeResult = (result: ScreenerResult) => {
+    setSelectedResult(result)
+    setIsAnalysisModalOpen(true)
+  }
+
+  const handleCloseAnalysisModal = () => {
+    setIsAnalysisModalOpen(false)
+    setSelectedResult(null)
   }
 
   return (
@@ -127,6 +141,15 @@ export default function ScreenerResults({
                       {result.target_return}% sur {result.time_horizon}j
                     </div>
                   </div>
+
+                  <div className="flex-shrink-0">
+                    <button
+                      onClick={() => handleAnalyzeResult(result)}
+                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      📈 Analyser
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -145,12 +168,22 @@ export default function ScreenerResults({
               <button className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                 📊 Exporter
               </button>
-              <button className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                📈 Analyser
-              </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal d'analyse */}
+      {selectedResult && (
+        <AnalysisModal
+          isOpen={isAnalysisModalOpen}
+          onClose={handleCloseAnalysisModal}
+          symbol={selectedResult.symbol}
+          modelId={selectedResult.model_id}
+          companyName={selectedResult.company_name}
+          prediction={selectedResult.prediction}
+          confidence={selectedResult.confidence}
+        />
       )}
     </div>
   )

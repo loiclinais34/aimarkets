@@ -593,6 +593,56 @@ export const apiService = {
     const response = await apiClient.get(`/api/v1/ml-models/${model_id}/feature-importance`)
     return response.data
   },
+
+  // Analyse détaillée complète
+  getDetailedAnalysis: async (symbol: string, model_id: number): Promise<{
+    symbol: string
+    model_info: {
+      id: number
+      name: string
+      version: string
+      type: string
+      target_return?: number
+      time_horizon?: number
+      created_at: string
+    }
+    chart_data: Array<{
+      date: string
+      open: number
+      high: number
+      low: number
+      close: number
+      volume: number
+      vwap?: number
+    }>
+    technical_indicators: {
+      sma_20?: number
+      ema_20?: number
+      rsi_14?: number
+      macd?: number
+      macd_signal?: number
+      bb_upper?: number
+      bb_middle?: number
+      bb_lower?: number
+      atr_14?: number
+      obv?: number
+    }
+    sentiment_indicators: {
+      sentiment_score_normalized?: number
+      sentiment_momentum_7d?: number
+      sentiment_volatility_14d?: number
+      news_positive_ratio?: number
+      news_negative_ratio?: number
+    }
+    shap_explanations: ShapExplanationsResponse
+    analysis_date: string
+    data_points: number
+  }> => {
+    const response = await apiClient.get(`/api/v1/ml-models/analysis/${symbol}`, {
+      params: { model_id }
+    })
+    return response.data
+  },
 }
 
 // API pour les métadonnées des symboles
@@ -710,6 +760,12 @@ export const screenerApi = {
     risk_tolerance: number
   }): Promise<{ task_id: string; status: string; message: string }> => {
     const response = await apiClient.post('/api/v1/screener/run-full-ml-web', params)
+    return response.data
+  },
+
+  // Récupérer les dernières opportunités
+  getLatestOpportunities: async (): Promise<any[]> => {
+    const response = await apiClient.get('/api/v1/screener/latest-opportunities')
     return response.data
   },
 }
