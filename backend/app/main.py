@@ -98,6 +98,15 @@ app.include_router(
     tags=["Métadonnées des Symboles"]
 )
 
+# Import du router screener
+from app.api.endpoints import screener
+
+app.include_router(
+    screener.router,
+    prefix="/api/v1/screener",
+    tags=["Screener"]
+)
+
 # Endpoints LightGBM temporairement désactivés à cause de problèmes de stabilité
 # app.include_router(
 #     lightgbm_models.router,

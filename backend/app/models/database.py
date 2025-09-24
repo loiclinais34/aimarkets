@@ -304,6 +304,7 @@ class MLPredictions(Base):
     prediction_class = Column(String(50), nullable=True)
     confidence = Column(DECIMAL(5, 4), nullable=False)
     data_date_used = Column(Date, nullable=True)
+    screener_run_id = Column(Integer, ForeignKey('public.screener_runs.id'), nullable=True, index=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
     created_by = Column(String(100), nullable=True)
     
@@ -341,6 +342,55 @@ class CorrelationAlerts(Base):
     threshold_value = Column(DECIMAL(5, 4))
     severity = Column(String(20), default='medium', index=True)
     is_resolved = Column(BOOLEAN, default=False, index=True)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    
+    __table_args__ = ({"schema": "public"},)
+
+
+class ScreenerConfig(Base):
+    __tablename__ = "screener_configs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    target_return_percentage = Column(DECIMAL(5, 2), nullable=False)
+    time_horizon_days = Column(Integer, nullable=False)
+    risk_tolerance = Column(DECIMAL(3, 2), nullable=False)  # 0.1 to 1.0
+    confidence_threshold = Column(DECIMAL(3, 2), nullable=False)  # Calculated from risk_tolerance
+    is_active = Column(BOOLEAN, default=True)
+    created_by = Column(String(100), nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+    
+    __table_args__ = ({"schema": "public"},)
+
+
+class ScreenerRun(Base):
+    __tablename__ = "screener_runs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    screener_config_id = Column(Integer, ForeignKey('public.screener_configs.id'), nullable=False)
+    run_date = Column(Date, nullable=False, index=True)
+    total_symbols = Column(Integer, nullable=False)
+    successful_models = Column(Integer, nullable=False)
+    opportunities_found = Column(Integer, nullable=False)
+    execution_time_seconds = Column(Integer, nullable=False)
+    status = Column(String(50), nullable=False)  # 'running', 'completed', 'failed'
+    error_message = Column(TEXT)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    
+    __table_args__ = ({"schema": "public"},)
+
+
+class ScreenerResult(Base):
+    __tablename__ = "screener_results"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    screener_run_id = Column(Integer, ForeignKey('public.screener_runs.id'), nullable=False)
+    symbol = Column(String(10), nullable=False, index=True)
+    model_id = Column(Integer, ForeignKey('public.ml_models.id'), nullable=False)
+    prediction = Column(DECIMAL(10, 6), nullable=False)
+    confidence = Column(DECIMAL(5, 4), nullable=False)
+    rank = Column(Integer, nullable=False)
     created_at = Column(TIMESTAMP, server_default=func.now())
     
     __table_args__ = ({"schema": "public"},)

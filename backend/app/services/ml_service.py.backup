@@ -23,35 +23,81 @@ from app.core.config import settings
 
 class MLService:
     def __init__(self, db: Session = None):
-        self.db = db
-        self.models_path = settings.ml_models_path
+        if db is None:
+            from app.core.database import SessionLocal
+            self.db = SessionLocal()
+            self.should_close_db = True
+        else:
+            self.db = db
+            self.should_close_db = False
+        
+        # Correction du chemin des modèles - utiliser un chemin absolu
+        self.models_path = os.path.abspath(settings.ml_models_path)
+        print(f"🔧 [ML_SERVICE] Chemin des modèles: {self.models_path}")
         os.makedirs(self.models_path, exist_ok=True)
+        print(f"🔧 [ML_SERVICE] Répertoire des modèles créé/vérifié: {self.models_path}")
+    
+    def close(self):
+        """Fermer la session DB si elle a été créée par le service"""
+        if self.should_close_db and self.db:
+            self.db.close()
     
     def create_target_parameter(self, user_id: str, parameter_name: str, 
                               target_return_percentage: float, time_horizon_days: int,
                               risk_tolerance: str = 'medium', min_confidence_threshold: float = 0.7,
-                              max_drawdown_percentage: float = 5.0) -> TargetParameters:
+                              max_drawdown_percentage: float = 5.0, db: Session = None) -> TargetParameters:
         """Créer un nouveau paramètre de cible de rentabilité"""
-        target_param = TargetParameters(
-            user_id=user_id,
-            parameter_name=parameter_name,
-            target_return_percentage=target_return_percentage,
-            time_horizon_days=time_horizon_days,
-            risk_tolerance=risk_tolerance,
-            min_confidence_threshold=min_confidence_threshold,
-            max_drawdown_percentage=max_drawdown_percentage
-        )
-        self.db.add(target_param)
-        self.db.commit()
-        self.db.refresh(target_param)
-        return target_param
+        print(f"🔧 [CREATE_TARGET] Création paramètre pour {user_id}")
+        
+        # Utiliser la session passée en paramètre ou celle de l'instance
+        session = db or self.db
+        if session is None:
+            from app.core.database import SessionLocal
+            session = SessionLocal()
+            should_close_session = True
+            print(f"🔧 [CREATE_TARGET] Session DB créée: {type(session)}")
+        else:
+            should_close_session = False
+            print(f"🔧 [CREATE_TARGET] Session DB utilisée: {type(session)}")
+        
+        try:
+            target_param = TargetParameters(
+                user_id=user_id,
+                parameter_name=parameter_name,
+                target_return_percentage=target_return_percentage,
+                time_horizon_days=time_horizon_days,
+                risk_tolerance=risk_tolerance,
+                min_confidence_threshold=min_confidence_threshold,
+                max_drawdown_percentage=max_drawdown_percentage
+            )
+            session.add(target_param)
+            session.commit()
+            session.refresh(target_param)
+            print(f"🔧 [CREATE_TARGET] Paramètre créé avec ID: {target_param.id}")
+            return target_param
+        finally:
+            if should_close_session:
+                session.close()
     
-    def get_target_parameters(self, user_id: str) -> List[TargetParameters]:
+    def get_target_parameters(self, user_id: str, db: Session = None) -> List[TargetParameters]:
         """Récupérer les paramètres de cible pour un utilisateur"""
-        return self.db.query(TargetParameters).filter(
-            TargetParameters.user_id == user_id,
-            TargetParameters.is_active == True
-        ).all()
+        # Utiliser la session passée en paramètre ou celle de l'instance
+        session = db or self.db
+        if session is None:
+            from app.core.database import SessionLocal
+            session = SessionLocal()
+            should_close_session = True
+        else:
+            should_close_session = False
+        
+        try:
+            return session.query(TargetParameters).filter(
+                TargetParameters.user_id == user_id,
+                TargetParameters.is_active == True
+            ).all()
+        finally:
+            if should_close_session:
+                session.close()
     
     def calculate_target_price(self, current_price: float, target_return_percentage: float, 
                              time_horizon_days: int) -> float:
@@ -456,8 +502,19 @@ class MLService:
     
     def train_classification_model(self, symbol: str, target_param: TargetParameters, db: Session = None) -> Dict:
         """Entraîner un modèle de classification pour prédire si la cible sera atteinte"""
-        # Utiliser la session passée en paramètre ou celle de l'instance
-        session = db or self.db
+        print(f"🔧 [TRAIN_CLASS] Début entraînement classification pour {symbol}")
+        print(f"🔧 [TRAIN_CLASS] Target param: {target_param.id}, DB session: {type(db)}")
+        
+        # Utiliser la session passée en paramètre ou créer une nouvelle session
+        if db is None:
+            from app.core.database import SessionLocal
+            session = SessionLocal()
+            should_close_session = True
+            print(f"🔧 [TRAIN_CLASS] Session DB créée: {type(session)}")
+        else:
+            session = db
+            should_close_session = False
+            print(f"🔧 [TRAIN_CLASS] Session DB utilisée: {type(session)}")
         
         # Créer les données d'entraînement
         df = self.create_labels_for_training(symbol, target_param, session)
@@ -549,10 +606,15 @@ class MLService:
             is_active=True,
             created_by="ml_service"
         )
-        self.db.add(ml_model)
-        self.db.commit()
+        session.add(ml_model)
+        session.commit()
+        
+        # Fermer la session si on l'a créée
+        if should_close_session:
+            session.close()
         
         return {
+            "success": True,
             "model_id": ml_model.id,
             "model_name": model_name,
             "accuracy": accuracy,
@@ -566,8 +628,14 @@ class MLService:
     
     def train_regression_model(self, symbol: str, target_param: TargetParameters, db: Session = None) -> Dict:
         """Entraîner un modèle de régression pour prédire le rendement exact"""
-        # Utiliser la session passée en paramètre ou celle de l'instance
-        session = db or self.db
+        # Utiliser la session passée en paramètre ou créer une nouvelle session
+        if db is None:
+            from app.core.database import SessionLocal
+            session = SessionLocal()
+            should_close_session = True
+        else:
+            session = db
+            should_close_session = False
         
         # Créer les données d'entraînement
         df = self.create_labels_for_training(symbol, target_param, session)
@@ -656,10 +724,15 @@ class MLService:
             is_active=True,
             created_by="ml_service"
         )
-        self.db.add(ml_model)
-        self.db.commit()
+        session.add(ml_model)
+        session.commit()
+        
+        # Fermer la session si on l'a créée
+        if should_close_session:
+            session.close()
         
         return {
+            "success": True,
             "model_id": ml_model.id,
             "model_name": model_name,
             "mse": mse,
@@ -670,61 +743,73 @@ class MLService:
             "feature_importance": dict(zip(feature_names, model.feature_importances_))
         }
     
-    def predict(self, symbol: str, model_id: int, date: datetime, db: Session = None, screener_run_id: int = None) -> Dict:
+    def predict(self, symbol: str, model_id: int, date: datetime, db: Session = None) -> Dict:
         """Faire une prédiction avec un modèle entraîné"""
-        # Utiliser la session passée en paramètre ou celle de l'instance
-        session = db or self.db
+        print(f"🔮 [PREDICT] Début prédiction pour {symbol}, model_id: {model_id}")
+        print(f"🔮 [PREDICT] Date: {date}, DB session: {type(db)}")
         
-        # Récupérer le modèle
-        ml_model = session.query(MLModels).filter(MLModels.id == model_id).first()
-        if not ml_model:
-            return {"error": "Modèle non trouvé"}
+        # Utiliser la session passée en paramètre ou créer une nouvelle session
+        if db is None:
+            from app.core.database import SessionLocal
+            session = SessionLocal()
+            should_close_session = True
+            print(f"🔮 [PREDICT] Session DB créée: {type(session)}")
+        else:
+            session = db
+            should_close_session = False
+            print(f"🔮 [PREDICT] Session DB utilisée: {type(session)}")
         
-        # Charger le modèle et le scaler
-        model = joblib.load(ml_model.model_path)
-        scaler_path = ml_model.model_path.replace('.joblib', '_scaler.joblib')
-        scaler = joblib.load(scaler_path)
-        
-        # Récupérer les données du jour avec SQLAlchemy ORM
-        # D'abord essayer la date exacte
-        historical_data = session.query(HistoricalData).filter(
-            HistoricalData.symbol == symbol,
-            HistoricalData.date == date
-        ).first()
-        
-        # Si pas de données pour cette date, prendre la plus récente disponible
-        if not historical_data:
+        try:
+            # Récupérer le modèle
+            ml_model = session.query(MLModels).filter(MLModels.id == model_id).first()
+            if not ml_model:
+                return {"error": "Modèle non trouvé"}
+            
+            # Charger le modèle et le scaler
+            model = joblib.load(ml_model.model_path)
+            scaler_path = ml_model.model_path.replace('.joblib', '_scaler.joblib')
+            scaler = joblib.load(scaler_path)
+            
+            # Récupérer les données du jour avec SQLAlchemy ORM
+            # D'abord essayer la date exacte
             historical_data = session.query(HistoricalData).filter(
-                HistoricalData.symbol == symbol
-            ).order_by(HistoricalData.date.desc()).first()
+                HistoricalData.symbol == symbol,
+                HistoricalData.date == date
+            ).first()
             
+            # Si pas de données pour cette date, prendre la plus récente disponible
             if not historical_data:
-                return {"error": "Aucune donnée historique trouvée pour ce symbole"}
+                historical_data = session.query(HistoricalData).filter(
+                    HistoricalData.symbol == symbol
+                ).order_by(HistoricalData.date.desc()).first()
+                
+                if not historical_data:
+                    return {"error": "Aucune donnée historique trouvée pour ce symbole"}
+                
+                # Utiliser la date la plus récente trouvée
+                date = historical_data.date
             
-            # Utiliser la date la plus récente trouvée
-            date = historical_data.date
-        
-        # Récupérer les indicateurs techniques
-        tech = session.query(TechnicalIndicators).filter(
-            TechnicalIndicators.symbol == symbol,
-            TechnicalIndicators.date == date
-        ).first()
-        
-        # Récupérer les indicateurs de sentiment
-        sent = session.query(SentimentIndicators).filter(
-            SentimentIndicators.symbol == symbol,
-            SentimentIndicators.date == date
-        ).first()
-        
-        # Créer le DataFrame avec toutes les dimensions enrichies
-        row_data = {
-            'close': float(historical_data.close),
-            'volume': historical_data.volume,
-            'vwap': float(historical_data.vwap) if historical_data.vwap else None,
-        }
-        
-        # Ajouter tous les indicateurs techniques disponibles
-        if tech:
+            # Récupérer les indicateurs techniques
+            tech = session.query(TechnicalIndicators).filter(
+                TechnicalIndicators.symbol == symbol,
+                TechnicalIndicators.date == date
+            ).first()
+            
+            # Récupérer les indicateurs de sentiment
+            sent = session.query(SentimentIndicators).filter(
+                SentimentIndicators.symbol == symbol,
+                SentimentIndicators.date == date
+            ).first()
+            
+            # Créer le DataFrame avec toutes les dimensions enrichies
+            row_data = {
+                'close': float(historical_data.close),
+                'volume': historical_data.volume,
+                'vwap': float(historical_data.vwap) if historical_data.vwap else None,
+            }
+            
+            # Ajouter tous les indicateurs techniques disponibles
+            if tech:
             tech_indicators = {
                 # Moyennes mobiles
                 'sma_5': float(tech.sma_5) if tech.sma_5 else None,
@@ -878,11 +963,14 @@ class MLService:
             prediction_value=float(prediction),
             confidence=float(confidence),
             data_date_used=date,
-            screener_run_id=screener_run_id,
             created_by="ml_service"
         )
-        self.db.add(ml_prediction)
-        self.db.commit()
+        session.add(ml_prediction)
+        session.commit()
+        
+        # Fermer la session si on l'a créée
+        if should_close_session:
+            session.close()
         
         return {
             "symbol": symbol,
@@ -893,15 +981,30 @@ class MLService:
             "model_name": ml_model.model_name,
             "data_date_used": date  # Indiquer la date réellement utilisée
         }
+        
+        except Exception as e:
+            print(f"❌ [PREDICT] Erreur prédiction {symbol}: {str(e)}")
+            print(f"❌ [PREDICT] Type d'erreur: {type(e).__name__}")
+            import traceback
+            print(f"❌ [PREDICT] Traceback: {traceback.format_exc()}")
+            
+            # Fermer la session si on l'a créée
+            if should_close_session:
+                session.close()
+            
+            return {"error": f"Erreur lors de la prédiction: {str(e)}"}
     
-    def get_model_performance(self, model_id: int) -> Dict:
+    def get_model_performance(self, model_id: int, db: Session = None) -> Dict:
         """Récupérer les performances d'un modèle"""
-        ml_model = self.db.query(MLModels).filter(MLModels.id == model_id).first()
+        # Utiliser la session passée en paramètre ou celle de l'instance
+        session = db or self.db
+        
+        ml_model = session.query(MLModels).filter(MLModels.id == model_id).first()
         if not ml_model:
             return {"error": "Modèle non trouvé"}
         
         # Récupérer les prédictions récentes
-        recent_predictions = self.db.query(MLPredictions).filter(
+        recent_predictions = session.query(MLPredictions).filter(
             MLPredictions.model_id == model_id
         ).order_by(MLPredictions.prediction_date.desc()).limit(100).all()
         
