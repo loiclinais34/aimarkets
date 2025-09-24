@@ -206,11 +206,11 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Indicateur de fraîcheur des données */}
+            {/* Indicateur de fraîcheur des données historiques */}
             <div className="bg-white p-6 rounded-lg shadow">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                 <InformationCircleIcon className="h-5 w-5 mr-2 text-blue-600" />
-                État des Données
+                État des Données Historiques
               </h2>
               <DataFreshnessIndicator showDetails={true} />
             </div>

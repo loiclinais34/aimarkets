@@ -72,37 +72,36 @@ export default function DataFreshnessIndicator({
     })
   }
 
-  // Fonction pour obtenir le statut et la couleur
-  const getStatusInfo = (status: string) => {
-    switch (status) {
-      case 'fresh':
-        return {
-          color: 'text-green-600',
-          bgColor: 'bg-green-50',
-          icon: CheckCircleIcon,
-          text: 'À jour'
-        }
-      case 'needs_update':
-        return {
-          color: 'text-yellow-600',
-          bgColor: 'bg-yellow-50',
-          icon: ExclamationTriangleIcon,
-          text: 'Mise à jour nécessaire'
-        }
-      case 'error':
-        return {
-          color: 'text-red-600',
-          bgColor: 'bg-red-50',
-          icon: ExclamationTriangleIcon,
-          text: 'Erreur'
-        }
-      default:
-        return {
-          color: 'text-gray-600',
-          bgColor: 'bg-gray-50',
-          icon: ClockIcon,
-          text: 'Inconnu'
-        }
+  // Fonction pour obtenir le statut et la couleur basé sur les données historiques uniquement
+  const getStatusInfo = (historicalStatus: boolean, daysBehind: number | null) => {
+    if (historicalStatus) {
+      return {
+        color: 'text-green-600',
+        bgColor: 'bg-green-50',
+        icon: CheckCircleIcon,
+        text: 'À jour'
+      }
+    } else if (daysBehind !== null && daysBehind <= 1) {
+      return {
+        color: 'text-yellow-600',
+        bgColor: 'bg-yellow-50',
+        icon: ExclamationTriangleIcon,
+        text: 'Mise à jour recommandée'
+      }
+    } else if (daysBehind !== null && daysBehind <= 3) {
+      return {
+        color: 'text-orange-600',
+        bgColor: 'bg-orange-50',
+        icon: ExclamationTriangleIcon,
+        text: 'Mise à jour nécessaire'
+      }
+    } else {
+      return {
+        color: 'text-red-600',
+        bgColor: 'bg-red-50',
+        icon: ExclamationTriangleIcon,
+        text: 'Mise à jour urgente'
+      }
     }
   }
 
@@ -124,7 +123,10 @@ export default function DataFreshnessIndicator({
     )
   }
 
-  const statusInfo = getStatusInfo(freshnessStatus?.overall_status || 'error')
+  const statusInfo = getStatusInfo(
+    freshnessStatus?.historical_data?.is_fresh || false,
+    freshnessStatus?.historical_data?.days_behind || null
+  )
   const StatusIcon = statusInfo.icon
 
   // Version compacte
@@ -134,7 +136,7 @@ export default function DataFreshnessIndicator({
         <div className="flex items-center space-x-2">
           <StatusIcon className={`h-4 w-4 ${statusInfo.color}`} />
           <span className={`text-sm font-medium ${statusInfo.color}`}>
-            Données {statusInfo.text}
+            Données historiques {statusInfo.text}
           </span>
         </div>
         
@@ -165,11 +167,16 @@ export default function DataFreshnessIndicator({
           <StatusIcon className={`h-5 w-5 ${statusInfo.color}`} />
           <div>
             <p className={`text-sm font-medium ${statusInfo.color}`}>
-              Données {statusInfo.text}
+              Données historiques {statusInfo.text}
             </p>
             {freshnessStatus && (
               <p className="text-xs text-gray-500">
                 Dernier trading: {formatDate(freshnessStatus.last_trading_day)}
+                {freshnessStatus.historical_data.days_behind !== null && (
+                  <span className="ml-2">
+                    ({freshnessStatus.historical_data.days_behind} jour{freshnessStatus.historical_data.days_behind > 1 ? 's' : ''} de retard)
+                  </span>
+                )}
               </p>
             )}
           </div>
@@ -203,10 +210,10 @@ export default function DataFreshnessIndicator({
         <div className="bg-white border rounded-lg p-4 space-y-3">
           <h4 className="text-sm font-medium text-gray-900 flex items-center">
             <ChartBarIcon className="h-4 w-4 mr-2" />
-            Détails des données
+            Détails des Données Historiques
           </h4>
           
-          {/* Données historiques */}
+          {/* Données historiques - Focus principal */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Données historiques:</span>
@@ -219,25 +226,7 @@ export default function DataFreshnessIndicator({
             <div className="text-xs text-gray-500 space-y-1">
               <p>Dernière date: {formatDate(freshnessStatus.historical_data.latest_date)}</p>
               {freshnessStatus.historical_data.days_behind !== null && (
-                <p>Retard: {freshnessStatus.historical_data.days_behind} jour(s)</p>
-              )}
-            </div>
-          </div>
-
-          {/* Données de sentiment */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Données de sentiment:</span>
-              <span className={`text-sm font-medium ${
-                freshnessStatus.sentiment_data.is_fresh ? 'text-green-600' : 'text-yellow-600'
-              }`}>
-                {freshnessStatus.sentiment_data.is_fresh ? 'À jour' : 'Mise à jour nécessaire'}
-              </span>
-            </div>
-            <div className="text-xs text-gray-500 space-y-1">
-              <p>Dernière date: {formatDate(freshnessStatus.sentiment_data.latest_date)}</p>
-              {freshnessStatus.sentiment_data.days_behind !== null && (
-                <p>Retard: {freshnessStatus.sentiment_data.days_behind} jour(s)</p>
+                <p>Retard: {freshnessStatus.historical_data.days_behind} jour{freshnessStatus.historical_data.days_behind > 1 ? 's' : ''}</p>
               )}
             </div>
           </div>
