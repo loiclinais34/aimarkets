@@ -583,12 +583,21 @@ def get_detailed_analysis(symbol: str, model_id: int, db: Session = Depends(get_
             SentimentIndicators.date == latest_date
         ).first()
         
-        # 5. Calculer les explications SHAP
+        # 5. Récupérer les indicateurs techniques historiques pour les graphiques (30 derniers jours)
+        technical_indicators_history = db.query(TechnicalIndicators).filter(
+            TechnicalIndicators.symbol == symbol,
+            TechnicalIndicators.date >= historical_data[-1].date  # Depuis la date la plus ancienne
+        ).order_by(TechnicalIndicators.date.asc()).all()
+        
+        # 6. Calculer les explications SHAP
         shap_explanations = ml_service.calculate_shap_explanations(model_id, symbol, latest_date, db)
         
-        # 6. Préparer les données historiques pour les graphiques
+        # 7. Préparer les données historiques pour les graphiques avec indicateurs techniques
         chart_data = []
+        tech_dict = {tech.date: tech for tech in technical_indicators_history}
+        
         for data in reversed(historical_data):  # Inverser pour avoir l'ordre chronologique
+            tech_data = tech_dict.get(data.date)
             chart_data.append({
                 "date": data.date.isoformat(),
                 "open": float(data.open),
@@ -596,7 +605,16 @@ def get_detailed_analysis(symbol: str, model_id: int, db: Session = Depends(get_
                 "low": float(data.low),
                 "close": float(data.close),
                 "volume": data.volume,
-                "vwap": float(data.vwap) if data.vwap else None
+                "vwap": float(data.vwap) if data.vwap else None,
+                "sma_20": float(tech_data.sma_20) if tech_data and tech_data.sma_20 else None,
+                "sma_50": float(tech_data.sma_50) if tech_data and tech_data.sma_50 else None,
+                "ema_20": float(tech_data.ema_20) if tech_data and tech_data.ema_20 else None,
+                "bb_upper": float(tech_data.bb_upper) if tech_data and tech_data.bb_upper else None,
+                "bb_middle": float(tech_data.bb_middle) if tech_data and tech_data.bb_middle else None,
+                "bb_lower": float(tech_data.bb_lower) if tech_data and tech_data.bb_lower else None,
+                "rsi_14": float(tech_data.rsi_14) if tech_data and tech_data.rsi_14 else None,
+                "macd": float(tech_data.macd) if tech_data and tech_data.macd else None,
+                "macd_signal": float(tech_data.macd_signal) if tech_data and tech_data.macd_signal else None
             })
         
         # 7. Préparer les indicateurs techniques pour les graphiques
@@ -604,6 +622,7 @@ def get_detailed_analysis(symbol: str, model_id: int, db: Session = Depends(get_
         if technical_indicators:
             technical_data = {
                 "sma_20": float(technical_indicators.sma_20) if technical_indicators.sma_20 else None,
+                "sma_50": float(technical_indicators.sma_50) if technical_indicators.sma_50 else None,
                 "ema_20": float(technical_indicators.ema_20) if technical_indicators.ema_20 else None,
                 "rsi_14": float(technical_indicators.rsi_14) if technical_indicators.rsi_14 else None,
                 "macd": float(technical_indicators.macd) if technical_indicators.macd else None,

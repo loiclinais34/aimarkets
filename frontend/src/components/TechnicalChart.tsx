@@ -24,6 +24,7 @@ interface ChartData {
   volume: number
   vwap?: number
   sma_20?: number
+  sma_50?: number
   ema_20?: number
   bb_upper?: number
   bb_middle?: number
@@ -35,6 +36,7 @@ interface ChartData {
 
 interface TechnicalIndicators {
   sma_20?: number
+  sma_50?: number
   ema_20?: number
   rsi_14?: number
   macd?: number
@@ -92,6 +94,7 @@ export default function TechnicalChart({
         change,
         changePercent,
         sma_20: item.sma_20,
+        sma_50: item.sma_50,
         ema_20: item.ema_20,
         bb_upper: item.bb_upper,
         bb_middle: item.bb_middle,
@@ -217,9 +220,10 @@ export default function TechnicalChart({
                     type="monotone"
                     dataKey="bb_upper"
                     stroke="#ff6b6b"
-                    strokeWidth={1}
+                    strokeWidth={1.5}
                     dot={false}
                     name="BB Upper"
+                    strokeDasharray="3 3"
                   />
                   <Line
                     type="monotone"
@@ -227,15 +231,16 @@ export default function TechnicalChart({
                     stroke="#4ecdc4"
                     strokeWidth={2}
                     dot={false}
-                    name="BB Middle (SMA)"
+                    name="BB Middle (SMA 20)"
                   />
                   <Line
                     type="monotone"
                     dataKey="bb_lower"
                     stroke="#ff6b6b"
-                    strokeWidth={1}
+                    strokeWidth={1.5}
                     dot={false}
                     name="BB Lower"
+                    strokeDasharray="3 3"
                   />
                 </>
               )}
@@ -246,9 +251,20 @@ export default function TechnicalChart({
                   type="monotone"
                   dataKey="sma_20"
                   stroke="#3b82f6"
-                  strokeWidth={2}
+                  strokeWidth={2.5}
                   dot={false}
                   name="SMA 20"
+                />
+              )}
+              
+              {candlestickData[0]?.sma_50 && (
+                <Line
+                  type="monotone"
+                  dataKey="sma_50"
+                  stroke="#f59e0b"
+                  strokeWidth={2.5}
+                  dot={false}
+                  name="SMA 50"
                 />
               )}
               
@@ -260,6 +276,7 @@ export default function TechnicalChart({
                   strokeWidth={2}
                   dot={false}
                   name="EMA 20"
+                  strokeDasharray="5 5"
                 />
               )}
               
@@ -443,6 +460,20 @@ export default function TechnicalChart({
             <p className="text-lg font-bold text-gray-900">{formatVolume(stats.currentVolume)}</p>
             <p className={`text-sm ${stats.volumeChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               {formatPercent(stats.volumeChangePercent)}
+            </p>
+          </div>
+          
+          <div className="bg-white p-3 rounded-lg border">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">SMA 50</span>
+            </div>
+            <p className="text-lg font-bold text-gray-900">
+              {technicalIndicators.sma_50 ? formatPrice(technicalIndicators.sma_50) : 'N/A'}
+            </p>
+            <p className="text-sm text-gray-500">
+              {technicalIndicators.sma_50 && stats ? 
+                (stats.currentPrice > technicalIndicators.sma_50 ? 'Au-dessus' : 'En-dessous') : 
+                'N/A'}
             </p>
           </div>
           

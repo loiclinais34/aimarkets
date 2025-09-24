@@ -38,6 +38,7 @@ interface AnalysisData {
   }>
   technical_indicators: {
     sma_20?: number
+    sma_50?: number
     ema_20?: number
     rsi_14?: number
     macd?: number
