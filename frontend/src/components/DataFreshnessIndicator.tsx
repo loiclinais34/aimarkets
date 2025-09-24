@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery } from 'react-query'
 import { dataUpdateApi, DataFreshnessStatus, MarketStatus } from '@/services/api'
 import { 
   ClockIcon, 
@@ -14,11 +14,13 @@ import {
 interface DataFreshnessIndicatorProps {
   className?: string
   showDetails?: boolean
+  compact?: boolean
 }
 
 export default function DataFreshnessIndicator({ 
   className = '', 
-  showDetails = false 
+  showDetails = false,
+  compact = false
 }: DataFreshnessIndicatorProps) {
   const [isUpdating, setIsUpdating] = useState(false)
 
@@ -124,6 +126,36 @@ export default function DataFreshnessIndicator({
 
   const statusInfo = getStatusInfo(freshnessStatus?.overall_status || 'error')
   const StatusIcon = statusInfo.icon
+
+  // Version compacte
+  if (compact) {
+    return (
+      <div className={`flex items-center justify-between ${className}`}>
+        <div className="flex items-center space-x-2">
+          <StatusIcon className={`h-4 w-4 ${statusInfo.color}`} />
+          <span className={`text-sm font-medium ${statusInfo.color}`}>
+            Données {statusInfo.text}
+          </span>
+        </div>
+        
+        <button
+          onClick={handleUpdateData}
+          disabled={isUpdating}
+          className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+            isUpdating 
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          {isUpdating ? (
+            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+          ) : (
+            <ArrowPathIcon className="h-3 w-3" />
+          )}
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className={`space-y-2 ${className}`}>
