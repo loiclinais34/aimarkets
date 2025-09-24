@@ -216,6 +216,55 @@ def run_ultra_simple_real_screener_endpoint(
             detail=f"Erreur lors du lancement du screener ultra-simple réel: {str(e)}"
         )
 
+@router.get("/latest-opportunities", response_model=List[Dict[str, Any]])
+def get_latest_opportunities(db: Session = Depends(get_db)):
+    """Récupérer les dernières opportunités (prediction_value=1) du screener le plus récent"""
+    try:
+        from app.models.database import MLPredictions, MLModels, SymbolMetadata, ScreenerRun
+        
+        # Trouver le screener_run_id le plus récent
+        latest_screener_run = db.query(ScreenerRun).order_by(ScreenerRun.created_at.desc()).first()
+        
+        if not latest_screener_run:
+            return []
+        
+        # Récupérer les prédictions avec prediction_value=1 pour ce screener_run_id
+        predictions = db.query(MLPredictions).join(MLModels).join(SymbolMetadata, SymbolMetadata.symbol == MLPredictions.symbol).filter(
+            MLPredictions.screener_run_id == latest_screener_run.id,
+            MLPredictions.prediction_value == 1.0
+        ).order_by(MLPredictions.confidence.desc()).all()
+        
+        results = []
+        for pred in predictions:
+            # Récupérer les métadonnées du symbole
+            symbol_metadata = db.query(SymbolMetadata).filter(SymbolMetadata.symbol == pred.symbol).first()
+            
+            # Récupérer les informations du modèle
+            model = db.query(MLModels).filter(MLModels.id == pred.model_id).first()
+            
+            results.append({
+                "symbol": pred.symbol,
+                "company_name": symbol_metadata.company_name if symbol_metadata else pred.symbol,
+                "prediction": float(pred.prediction_value),
+                "confidence": float(pred.confidence),
+                "model_id": pred.model_id,
+                "model_name": model.model_name if model else "Unknown",
+                "target_return": float(model.target_parameter.target_return_percentage) if model and model.target_parameter else None,
+                "time_horizon": model.target_parameter.time_horizon_days if model and model.target_parameter else None,
+                "prediction_date": pred.prediction_date.isoformat() if pred.prediction_date else None,
+                "screener_run_id": pred.screener_run_id,
+                "rank": len(results) + 1
+            })
+        
+        return results
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la récupération des dernières opportunités: {str(e)}"
+        )
+
+
 @router.post("/run-full-ml-web", response_model=Dict[str, Any])
 def run_full_screener_ml_web_endpoint(
     request: ScreenerRequest,
