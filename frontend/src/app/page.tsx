@@ -10,7 +10,9 @@ import {
   MagnifyingGlassIcon,
   InformationCircleIcon,
   PlayIcon,
-  StopIcon
+  StopIcon,
+  ChevronDownIcon,
+  ChevronUpIcon
 } from '@heroicons/react/24/outline'
 import { apiService, SymbolWithMetadata } from '@/services/api'
 import TargetParameterForm from '@/components/TargetParameterForm'
@@ -29,6 +31,7 @@ export default function Dashboard() {
   const [selectedSymbol, setSelectedSymbol] = useState<string>('AAPL')
   const [activeTab, setActiveTab] = useState<'overview' | 'targets' | 'models' | 'predictions'>('overview')
   const [userId] = useState<string>('demo_user')
+  const [showDataDetails, setShowDataDetails] = useState<boolean>(false)
 
   // Queries pour les données
   const { data: symbols, isLoading: symbolsLoading } = useQuery<SymbolWithMetadata[]>(
@@ -208,11 +211,29 @@ export default function Dashboard() {
 
             {/* Indicateur de fraîcheur des données historiques */}
             <div className="bg-white p-6 rounded-lg shadow">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <InformationCircleIcon className="h-5 w-5 mr-2 text-blue-600" />
-                État des Données Historiques
-              </h2>
-              <DataFreshnessIndicator showDetails={true} />
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <InformationCircleIcon className="h-5 w-5 mr-2 text-blue-600" />
+                  État des Données Historiques
+                </h2>
+                <button
+                  onClick={() => setShowDataDetails(!showDataDetails)}
+                  className="flex items-center text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  {showDataDetails ? (
+                    <>
+                      <span className="mr-1">Masquer les détails</span>
+                      <ChevronUpIcon className="h-4 w-4" />
+                    </>
+                  ) : (
+                    <>
+                      <span className="mr-1">Afficher les détails</span>
+                      <ChevronDownIcon className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+              <DataFreshnessIndicator showDetails={showDataDetails} />
             </div>
 
             {/* Graphique des prix */}
