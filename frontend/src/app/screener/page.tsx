@@ -15,6 +15,7 @@ import LoadingSpinner from '@/components/LoadingSpinner'
 import ErrorMessage from '@/components/ErrorMessage'
 import ScreenerProgress from '@/components/ScreenerProgress'
 import ScreenerResults from '@/components/ScreenerResults'
+import AnalysisModal from '@/components/AnalysisModal'
 import { toast } from 'react-hot-toast'
 
 interface ScreenerParameters {
@@ -51,7 +52,22 @@ export default function ScreenerPage() {
     execution_time_seconds: number
   } | null>(null)
   
+  // États pour le modal d'analyse
+  const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false)
+  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null)
+  const [selectedModelId, setSelectedModelId] = useState<number | null>(null)
+  
   const queryClient = useQueryClient()
+
+  // Récupérer les dernières opportunités
+  const { data: latestOpportunities, isLoading: opportunitiesLoading } = useQuery(
+    'latest-opportunities',
+    () => screenerApi.getLatestOpportunities(),
+    { 
+      staleTime: 2 * 60 * 1000, // 2 minutes
+      refetchInterval: 5 * 60 * 1000 // Refetch every 5 minutes
+    }
+  )
 
   // Récupérer la liste des symboles disponibles
   const { data: symbols, isLoading: symbolsLoading } = useQuery(
@@ -111,6 +127,18 @@ export default function ScreenerPage() {
     toast.error(errorMessage)
   }
 
+  const handleAnalyzeOpportunity = (symbol: string, modelId: number) => {
+    setSelectedSymbol(symbol)
+    setSelectedModelId(modelId)
+    setIsAnalysisModalOpen(true)
+  }
+
+  const handleCloseAnalysisModal = () => {
+    setIsAnalysisModalOpen(false)
+    setSelectedSymbol(null)
+    setSelectedModelId(null)
+  }
+
   const getRiskToleranceLabel = (value: number) => {
     if (value <= 0.3) return 'Très conservateur'
     if (value <= 0.5) return 'Conservateur'
@@ -127,9 +155,10 @@ export default function ScreenerPage() {
     return 'text-red-600'
   }
 
-  if (symbolsLoading) {
-    return <LoadingSpinner message="Chargement des données..." />
-  }
+  // Supprimer la condition de chargement pour permettre l'affichage
+  // if (symbolsLoading && !latestOpportunities) {
+  //   return <LoadingSpinner message="Chargement des données..." />
+  // }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -151,6 +180,51 @@ export default function ScreenerPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Dernières Opportunités */}
+        {latestOpportunities && Array.isArray(latestOpportunities) && latestOpportunities.length > 0 && (
+          <div className="mb-8">
+            <div className="bg-white p-6 rounded-lg shadow">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Dernières Opportunités
+                </h2>
+                <span className="text-sm text-gray-500">
+                  Screener Run #{latestOpportunities[0]?.screener_run_id}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {latestOpportunities.map((opportunity, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center">
+                        <span className="text-lg font-bold text-gray-900">{opportunity.symbol}</span>
+                        <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          #{opportunity.rank}
+                        </span>
+                      </div>
+                      <span className="text-sm font-medium text-green-600">
+                        {(opportunity.confidence * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-2">{opportunity.company_name}</p>
+                    <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
+                      <span>{opportunity.target_return}% en {opportunity.time_horizon}j</span>
+                      <span>{opportunity.prediction_date}</span>
+                    </div>
+                    <button
+                      onClick={() => handleAnalyzeOpportunity(opportunity.symbol, opportunity.model_id)}
+                      className="w-full bg-blue-600 text-white py-2 px-3 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium transition-colors"
+                    >
+                      <ChartBarIcon className="h-4 w-4 inline mr-1" />
+                      Analyser
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Paramètres du Screener */}
           <div className="lg:col-span-1">
@@ -296,6 +370,16 @@ export default function ScreenerPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal d'analyse */}
+      {isAnalysisModalOpen && selectedSymbol && selectedModelId && (
+        <AnalysisModal
+          isOpen={isAnalysisModalOpen}
+          onClose={handleCloseAnalysisModal}
+          symbol={selectedSymbol}
+          modelId={selectedModelId}
+        />
+      )}
     </div>
   )
 }

@@ -270,6 +270,9 @@ class TargetParameters(Base):
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
     
+    # Relation avec MLModels
+    ml_models = relationship("MLModels", back_populates="target_parameter")
+    
     __table_args__ = ({"schema": "public"},)
 
 
@@ -289,6 +292,9 @@ class MLModels(Base):
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
     created_by = Column(String(100), nullable=True)
+    
+    # Relation avec TargetParameters
+    target_parameter = relationship("TargetParameters", back_populates="ml_models")
     
     __table_args__ = ({"schema": "public"},)
 

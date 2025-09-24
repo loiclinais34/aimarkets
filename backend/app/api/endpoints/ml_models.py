@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 from app.core.database import get_db
@@ -539,4 +539,119 @@ def get_model_feature_importance(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erreur lors de la récupération de l'importance des features: {str(e)}"
+        )
+
+
+@router.get("/analysis/{symbol}", response_model=Dict[str, Any])
+def get_detailed_analysis(symbol: str, model_id: int, db: Session = Depends(get_db)):
+    """Récupérer l'analyse détaillée complète pour un symbole"""
+    try:
+        from app.services.ml_service import MLService
+        from app.models.database import HistoricalData, TechnicalIndicators, SentimentIndicators, MLModels
+        
+        ml_service = MLService(db)
+        
+        # 1. Récupérer le modèle
+        model = db.query(MLModels).filter(MLModels.id == model_id).first()
+        if not model:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Modèle non trouvé"
+            )
+        
+        # 2. Récupérer les données historiques récentes (30 derniers jours)
+        historical_data = db.query(HistoricalData).filter(
+            HistoricalData.symbol == symbol
+        ).order_by(HistoricalData.date.desc()).limit(30).all()
+        
+        if not historical_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Aucune donnée historique trouvée pour {symbol}"
+            )
+        
+        # 3. Récupérer les indicateurs techniques récents
+        latest_date = historical_data[0].date
+        technical_indicators = db.query(TechnicalIndicators).filter(
+            TechnicalIndicators.symbol == symbol,
+            TechnicalIndicators.date == latest_date
+        ).first()
+        
+        # 4. Récupérer les indicateurs de sentiment récents
+        sentiment_indicators = db.query(SentimentIndicators).filter(
+            SentimentIndicators.symbol == symbol,
+            SentimentIndicators.date == latest_date
+        ).first()
+        
+        # 5. Calculer les explications SHAP
+        shap_explanations = ml_service.calculate_shap_explanations(model_id, symbol, latest_date, db)
+        
+        # 6. Préparer les données historiques pour les graphiques
+        chart_data = []
+        for data in reversed(historical_data):  # Inverser pour avoir l'ordre chronologique
+            chart_data.append({
+                "date": data.date.isoformat(),
+                "open": float(data.open),
+                "high": float(data.high),
+                "low": float(data.low),
+                "close": float(data.close),
+                "volume": data.volume,
+                "vwap": float(data.vwap) if data.vwap else None
+            })
+        
+        # 7. Préparer les indicateurs techniques pour les graphiques
+        technical_data = {}
+        if technical_indicators:
+            technical_data = {
+                "sma_20": float(technical_indicators.sma_20) if technical_indicators.sma_20 else None,
+                "ema_20": float(technical_indicators.ema_20) if technical_indicators.ema_20 else None,
+                "rsi_14": float(technical_indicators.rsi_14) if technical_indicators.rsi_14 else None,
+                "macd": float(technical_indicators.macd) if technical_indicators.macd else None,
+                "macd_signal": float(technical_indicators.macd_signal) if technical_indicators.macd_signal else None,
+                "bb_upper": float(technical_indicators.bb_upper) if technical_indicators.bb_upper else None,
+                "bb_middle": float(technical_indicators.bb_middle) if technical_indicators.bb_middle else None,
+                "bb_lower": float(technical_indicators.bb_lower) if technical_indicators.bb_lower else None,
+                "atr_14": float(technical_indicators.atr_14) if technical_indicators.atr_14 else None,
+                "obv": float(technical_indicators.obv) if technical_indicators.obv else None,
+            }
+        
+        # 8. Préparer les indicateurs de sentiment
+        sentiment_data = {}
+        if sentiment_indicators:
+            sentiment_data = {
+                "sentiment_score_normalized": float(sentiment_indicators.sentiment_score_normalized) if sentiment_indicators.sentiment_score_normalized else None,
+                "sentiment_momentum_7d": float(sentiment_indicators.sentiment_momentum_7d) if sentiment_indicators.sentiment_momentum_7d else None,
+                "sentiment_volatility_14d": float(sentiment_indicators.sentiment_volatility_14d) if sentiment_indicators.sentiment_volatility_14d else None,
+                "news_positive_ratio": float(sentiment_indicators.news_positive_ratio) if sentiment_indicators.news_positive_ratio else None,
+                "news_negative_ratio": float(sentiment_indicators.news_negative_ratio) if sentiment_indicators.news_negative_ratio else None,
+            }
+        
+        # 9. Informations sur le modèle
+        model_info = {
+            "id": model.id,
+            "name": model.model_name,
+            "version": model.model_version,
+            "type": model.model_type,
+            "target_return": float(model.target_parameter.target_return_percentage) if model.target_parameter else None,
+            "time_horizon": model.target_parameter.time_horizon_days if model.target_parameter else None,
+            "created_at": model.created_at.isoformat() if model.created_at else None,
+        }
+        
+        return {
+            "symbol": symbol,
+            "model_info": model_info,
+            "chart_data": chart_data,
+            "technical_indicators": technical_data,
+            "sentiment_indicators": sentiment_data,
+            "shap_explanations": shap_explanations,
+            "analysis_date": latest_date.isoformat(),
+            "data_points": len(chart_data)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de l'analyse détaillée: {str(e)}"
         )
