@@ -7,6 +7,60 @@
 
 import { apiClient } from './api';
 
+// Nouvelle interface pour les interprétations
+export interface MetricInterpretation {
+  value: number;
+  grade: string;
+  interpretation: string;
+  recommendation: string;
+  risk_level: string;
+  color: string;
+}
+
+export interface ModelAnalysis {
+  model_name: string;
+  overall_grade: string;
+  risk_level: string;
+  is_tradable: boolean;
+  confidence_score: number;
+  key_strengths: string[];
+  key_weaknesses: string[];
+  recommendations: string[];
+  warnings: string[];
+  metrics_analysis: Record<string, MetricInterpretation>;
+}
+
+export interface GlobalRecommendations {
+  trading_recommendation: string;
+  risk_level: string;
+  confidence: number;
+  action_items: string[];
+  warnings: string[];
+  next_steps: string[];
+}
+
+export interface Summary {
+  total_models: number;
+  tradable_models: number;
+  critical_models: number;
+  average_confidence: number;
+  best_model: string;
+  overall_assessment: string;
+}
+
+export interface EnrichedComparisonResult {
+  success: boolean;
+  symbol: string;
+  timestamp: string;
+  results: {
+    model_analyses: Record<string, { analysis: ModelAnalysis }>;
+    best_model: string;
+    best_model_score: number;
+    global_recommendations: GlobalRecommendations;
+    summary: Summary;
+  };
+}
+
 // Interfaces TypeScript
 export interface ModelInfo {
   name: string;
@@ -154,6 +208,14 @@ export const modelComparisonApi = {
    */
   async compareMultipleSymbols(request: MultiSymbolRequest): Promise<MultiSymbolResult> {
     const response = await apiClient.post('/api/v1/model-comparison/compare-multiple', request);
+    return response.data;
+  },
+
+  /**
+   * Comparer les modèles avec interprétations intelligentes
+   */
+  async compareWithInterpretations(request: ComparisonRequest): Promise<EnrichedComparisonResult> {
+    const response = await apiClient.post('/api/v1/model-comparison/compare-with-interpretations', request);
     return response.data;
   },
 

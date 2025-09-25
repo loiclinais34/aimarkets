@@ -125,6 +125,57 @@ def get_available_symbols(db: Session = Depends(get_db)):
             detail=f"Erreur lors de la récupération des symboles: {str(e)}"
         )
 
+@router.post("/compare-with-interpretations", response_model=Dict[str, Any])
+def compare_models_with_interpretations(
+    request: ModelComparisonRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Comparer les modèles avec des interprétations intelligentes et des recommandations
+    
+    Cette endpoint fournit une analyse complète avec:
+    - Interprétations détaillées de chaque métrique
+    - Recommandations spécifiques par modèle
+    - Évaluation globale de la tradabilité
+    - Alertes de risque
+    """
+    try:
+        service = ModelComparisonService(db)
+        
+        # Effectuer la comparaison standard
+        result = service.compare_models_for_symbol(
+            symbol=request.symbol,
+            models_to_test=request.models_to_test,
+            start_date=request.start_date,
+            end_date=request.end_date
+        )
+        
+        if not result['success']:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get('error', 'Erreur lors de la comparaison')
+            )
+        
+        # Enrichir avec les interprétations
+        # Les résultats bruts sont dans result['results']
+        enriched_results = service.analyze_results_with_interpretations(result['results'])
+        
+        return {
+            "success": True,
+            "symbol": request.symbol,
+            "timestamp": datetime.now().isoformat(),
+            "results": enriched_results
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur lors de la comparaison avec interprétations: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la comparaison: {str(e)}"
+        )
+
 @router.post("/compare-single", response_model=Dict[str, Any])
 def compare_models_single_symbol(
     request: ModelComparisonRequest,

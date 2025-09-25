@@ -21,15 +21,20 @@ import {
   modelComparisonUtils,
   type ComparisonRequest,
   type ComparisonResult,
+  type EnrichedComparisonResult,
   type ModelRecommendation,
   type ModelInfo
 } from '../../services/modelComparisonApi';
+
+import InterpretationsDisplay from '../../components/model-comparison/InterpretationsDisplay';
 
 export default function ModelComparisonPage() {
   const [selectedSymbol, setSelectedSymbol] = useState<string>('');
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
+  const [enrichedResult, setEnrichedResult] = useState<EnrichedComparisonResult | null>(null);
   const [isComparing, setIsComparing] = useState(false);
+  const [useInterpretations, setUseInterpretations] = useState(true);
 
   const queryClient = useQueryClient();
 
@@ -66,6 +71,18 @@ export default function ModelComparisonPage() {
     },
   });
 
+  const compareWithInterpretationsMutation = useMutation({
+    mutationFn: (request: ComparisonRequest) => modelComparisonApi.compareWithInterpretations(request),
+    onSuccess: (data) => {
+      setEnrichedResult(data);
+      setIsComparing(false);
+    },
+    onError: (error) => {
+      console.error('Erreur lors de la comparaison avec interprétations:', error);
+      setIsComparing(false);
+    },
+  });
+
   // Handlers
   const handleSymbolChange = (symbol: string) => {
     setSelectedSymbol(symbol);
@@ -85,10 +102,19 @@ export default function ModelComparisonPage() {
     if (!selectedSymbol || selectedModels.length === 0) return;
     
     setIsComparing(true);
-    compareModelsMutation.mutate({
+    setComparisonResult(null);
+    setEnrichedResult(null);
+    
+    const request: ComparisonRequest = {
       symbol: selectedSymbol,
       models_to_test: selectedModels,
-    });
+    };
+    
+    if (useInterpretations) {
+      compareWithInterpretationsMutation.mutate(request);
+    } else {
+      compareModelsMutation.mutate(request);
+    }
   };
 
   const handleUseRecommendations = () => {
@@ -150,6 +176,43 @@ export default function ModelComparisonPage() {
                 {symbolsLoading && (
                   <p className="text-sm text-gray-500 mt-1">Chargement des symboles...</p>
                 )}
+              </div>
+
+              {/* Mode de comparaison */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Mode d'analyse
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      checked={useInterpretations}
+                      onChange={() => setUseInterpretations(true)}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">
+                      🧠 Analyse intelligente avec interprétations
+                    </span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      checked={!useInterpretations}
+                      onChange={() => setUseInterpretations(false)}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">
+                      📊 Comparaison standard
+                    </span>
+                  </label>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {useInterpretations 
+                    ? "Inclut des interprétations détaillées, recommandations et alertes de risque"
+                    : "Affichage classique des métriques de performance"
+                  }
+                </p>
               </div>
 
               {/* Model Selection */}
@@ -227,7 +290,15 @@ export default function ModelComparisonPage() {
 
           {/* Results Panel */}
           <div className="lg:col-span-2">
-            {comparisonResult ? (
+            {/* Affichage des résultats enrichis */}
+            {enrichedResult && useInterpretations ? (
+              <InterpretationsDisplay
+                modelAnalyses={enrichedResult.results.model_analyses}
+                globalRecommendations={enrichedResult.results.global_recommendations}
+                summary={enrichedResult.results.summary}
+                bestModel={enrichedResult.results.best_model}
+              />
+            ) : comparisonResult ? (
               <div className="space-y-6">
                 {/* Best Model Summary */}
                 <div className="bg-white rounded-lg shadow p-6">

@@ -21,6 +21,7 @@ from .model_comparison_framework import (
     LightGBMModel, 
     NeuralNetworkModel
 )
+from .trading_metrics_interpreter import TradingMetricsInterpreter
 from ..models.database import (
     MLModels, MLPredictions, HistoricalData, 
     TechnicalIndicators, SentimentIndicators, SymbolMetadata
@@ -34,6 +35,7 @@ class ModelComparisonService:
     def __init__(self, db: Session):
         self.db = db
         self.framework = ModelComparisonFramework()
+        self.interpreter = TradingMetricsInterpreter()
         
     def prepare_training_data(
         self, 
@@ -566,3 +568,212 @@ class ModelComparisonService:
         recommendations['avoid'] = list(set(recommendations['avoid']))
         
         return recommendations
+    
+    def analyze_results_with_interpretations(self, results: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Analyser les résultats de comparaison avec des interprétations intelligentes
+        
+        Args:
+            results: Résultats de la comparaison de modèles
+            
+        Returns:
+            Résultats enrichis avec interprétations et recommandations
+        """
+        try:
+            enriched_results = results.copy()
+            
+            logger.info(f"Analyse enrichie - Structure des résultats: {list(results.keys())}")
+            
+            # Analyser chaque modèle
+            model_analyses = {}
+            
+            # Les résultats sont directement dans results, pas dans model_results
+            for model_name, model_results in results.items():
+                logger.info(f"Traitement du modèle: {model_name}, type: {type(model_results)}")
+                
+                # Ignorer les clés qui ne sont pas des modèles
+                if model_name in ['model_analyses', 'best_model', 'best_model_score', 'global_recommendations', 'summary', 'report', 'data_info']:
+                    continue
+                    
+                # Les métriques sont directement dans model_results
+                if hasattr(model_results, '__dict__') or isinstance(model_results, dict):
+                    # Convertir en dictionnaire si c'est un objet
+                    if hasattr(model_results, '__dict__'):
+                        metrics_dict = model_results.__dict__
+                    else:
+                        metrics_dict = model_results
+                    
+                    # Vérifier si c'est un objet ModelMetrics ou un dictionnaire avec des métriques
+                    if any(key in metrics_dict for key in ['accuracy', 'f1_score', 'sharpe_ratio', 'total_return']):
+                        logger.info(f"Analyse du modèle {model_name} avec métriques: {list(metrics_dict.keys())}")
+                        
+                        # Analyser le modèle avec l'interpréteur
+                        analysis = self.interpreter.analyze_model(
+                            model_name=model_name,
+                            metrics=metrics_dict
+                        )
+                        
+                        model_analyses[model_name] = {
+                            'analysis': analysis,
+                            'original_results': metrics_dict
+                        }
+                        
+                        logger.info(f"Analyse terminée pour {model_name}")
+                    else:
+                        logger.info(f"Modèle {model_name} ignoré - pas de métriques valides")
+                else:
+                    logger.info(f"Modèle {model_name} ignoré - type non supporté: {type(model_results)}")
+            
+            # Déterminer le meilleur modèle
+            best_model = None
+            best_score = -float('inf')
+            
+            for model_name, analysis_data in model_analyses.items():
+                analysis = analysis_data['analysis']
+                if analysis.is_tradable and analysis.confidence_score > best_score:
+                    best_model = model_name
+                    best_score = analysis.confidence_score
+            
+            # Générer des recommandations globales
+            global_recommendations = self._generate_global_recommendations(model_analyses, best_model)
+            
+            # Enrichir les résultats
+            enriched_results.update({
+                'model_analyses': model_analyses,
+                'best_model': best_model,
+                'best_model_score': best_score,
+                'global_recommendations': global_recommendations,
+                'summary': self._generate_summary(model_analyses, best_model)
+            })
+            
+            logger.info(f"Analyse enrichie terminée. Meilleur modèle: {best_model}")
+            return enriched_results
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de l'analyse enrichie: {e}")
+            raise
+    
+    def _generate_global_recommendations(self, model_analyses: Dict[str, Any], best_model: str) -> Dict[str, Any]:
+        """Générer des recommandations globales basées sur toutes les analyses"""
+        
+        recommendations = {
+            'trading_recommendation': 'HOLD',
+            'risk_level': 'UNKNOWN',
+            'confidence': 0.0,
+            'action_items': [],
+            'warnings': [],
+            'next_steps': []
+        }
+        
+        if not model_analyses:
+            recommendations['trading_recommendation'] = 'AVOID'
+            recommendations['risk_level'] = 'CRITICAL'
+            recommendations['warnings'].append("Aucun modèle analysable trouvé")
+            return recommendations
+        
+        # Analyser les niveaux de risque
+        risk_levels = []
+        tradable_models = []
+        
+        for model_name, analysis_data in model_analyses.items():
+            analysis = analysis_data['analysis']
+            risk_levels.append(analysis.risk_level.value)
+            
+            if analysis.is_tradable:
+                tradable_models.append(model_name)
+        
+        # Déterminer la recommandation globale
+        if best_model and best_model in tradable_models:
+            best_analysis = model_analyses[best_model]['analysis']
+            
+            if best_analysis.overall_grade.value in ['A+', 'A']:
+                recommendations['trading_recommendation'] = 'STRONG_BUY'
+                recommendations['confidence'] = best_analysis.confidence_score
+            elif best_analysis.overall_grade.value == 'B':
+                recommendations['trading_recommendation'] = 'BUY'
+                recommendations['confidence'] = best_analysis.confidence_score
+            elif best_analysis.overall_grade.value == 'C':
+                recommendations['trading_recommendation'] = 'HOLD'
+                recommendations['confidence'] = best_analysis.confidence_score
+            else:
+                recommendations['trading_recommendation'] = 'AVOID'
+                recommendations['confidence'] = best_analysis.confidence_score
+        else:
+            recommendations['trading_recommendation'] = 'AVOID'
+            recommendations['confidence'] = 0.0
+        
+        # Déterminer le niveau de risque global
+        if 'critical' in risk_levels:
+            recommendations['risk_level'] = 'CRITICAL'
+        elif 'high' in risk_levels:
+            recommendations['risk_level'] = 'HIGH'
+        elif 'medium' in risk_levels:
+            recommendations['risk_level'] = 'MEDIUM'
+        else:
+            recommendations['risk_level'] = 'LOW'
+        
+        # Générer les actions recommandées
+        if recommendations['trading_recommendation'] in ['STRONG_BUY', 'BUY']:
+            recommendations['action_items'].append(f"Utiliser le modèle {best_model} pour le trading")
+            recommendations['action_items'].append("Surveiller les performances quotidiennes")
+            recommendations['next_steps'].append("Implémenter le modèle en production")
+        elif recommendations['trading_recommendation'] == 'HOLD':
+            recommendations['action_items'].append("Continuer à surveiller les modèles")
+            recommendations['action_items'].append("Recueillir plus de données")
+            recommendations['next_steps'].append("Réévaluer dans 1-2 semaines")
+        else:
+            recommendations['action_items'].append("Arrêter l'utilisation des modèles actuels")
+            recommendations['action_items'].append("Revoir la stratégie de trading")
+            recommendations['next_steps'].append("Refaire l'entraînement avec de nouvelles données")
+        
+        # Ajouter les avertissements globaux
+        critical_models = [name for name, data in model_analyses.items() 
+                         if data['analysis'].risk_level.value == 'critical']
+        
+        if critical_models:
+            recommendations['warnings'].append(f"Modèles critiques détectés: {', '.join(critical_models)}")
+            recommendations['warnings'].append("Ne pas utiliser ces modèles pour du trading réel")
+        
+        return recommendations
+    
+    def _generate_summary(self, model_analyses: Dict[str, Any], best_model: str) -> Dict[str, Any]:
+        """Générer un résumé des analyses"""
+        
+        summary = {
+            'total_models': len(model_analyses),
+            'tradable_models': 0,
+            'critical_models': 0,
+            'average_confidence': 0.0,
+            'best_model': best_model,
+            'overall_assessment': 'UNKNOWN'
+        }
+        
+        if not model_analyses:
+            return summary
+        
+        confidences = []
+        
+        for model_name, analysis_data in model_analyses.items():
+            analysis = analysis_data['analysis']
+            
+            if analysis.is_tradable:
+                summary['tradable_models'] += 1
+            
+            if analysis.risk_level.value == 'critical':
+                summary['critical_models'] += 1
+            
+            confidences.append(analysis.confidence_score)
+        
+        summary['average_confidence'] = sum(confidences) / len(confidences) if confidences else 0.0
+        
+        # Déterminer l'évaluation globale
+        if summary['tradable_models'] == 0:
+            summary['overall_assessment'] = 'CRITICAL'
+        elif summary['tradable_models'] == len(model_analyses):
+            summary['overall_assessment'] = 'EXCELLENT'
+        elif summary['tradable_models'] >= len(model_analyses) // 2:
+            summary['overall_assessment'] = 'GOOD'
+        else:
+            summary['overall_assessment'] = 'POOR'
+        
+        return summary
