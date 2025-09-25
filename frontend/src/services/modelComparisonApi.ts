@@ -5,7 +5,7 @@
  * Ce service gère toutes les interactions avec l'API de comparaison de modèles
  */
 
-import { api } from './api';
+import { apiService } from './api';
 
 // Interfaces TypeScript
 export interface ModelInfo {
@@ -129,7 +129,7 @@ export const modelComparisonApi = {
    * Obtenir la liste des modèles disponibles
    */
   async getAvailableModels(): Promise<{ success: boolean; available_models: Record<string, ModelInfo>; total: number }> {
-    const response = await api.get('/model-comparison/available-models');
+    const response = await apiService.get('/api/v1/model-comparison/available-models');
     return response.data;
   },
 
@@ -137,7 +137,7 @@ export const modelComparisonApi = {
    * Obtenir la liste des symboles disponibles
    */
   async getAvailableSymbols(): Promise<{ success: boolean; symbols: string[]; total: number }> {
-    const response = await api.get('/model-comparison/available-symbols');
+    const response = await apiService.get('/api/v1/model-comparison/available-symbols');
     return response.data;
   },
 
@@ -145,7 +145,7 @@ export const modelComparisonApi = {
    * Comparer les modèles pour un symbole donné
    */
   async compareSingleSymbol(request: ComparisonRequest): Promise<ComparisonResult> {
-    const response = await api.post('/model-comparison/compare-single', request);
+    const response = await apiService.post('/api/v1/model-comparison/compare-single', request);
     return response.data;
   },
 
@@ -153,7 +153,7 @@ export const modelComparisonApi = {
    * Comparer les modèles pour plusieurs symboles
    */
   async compareMultipleSymbols(request: MultiSymbolRequest): Promise<MultiSymbolResult> {
-    const response = await api.post('/model-comparison/compare-multiple', request);
+    const response = await apiService.post('/api/v1/model-comparison/compare-multiple', request);
     return response.data;
   },
 
@@ -161,7 +161,7 @@ export const modelComparisonApi = {
    * Obtenir des recommandations de modèles pour un symbole
    */
   async getModelRecommendations(request: RecommendationRequest): Promise<ModelRecommendation> {
-    const response = await api.post('/model-comparison/recommendations', request);
+    const response = await apiService.post('/api/v1/model-comparison/recommendations', request);
     return response.data;
   },
 
@@ -169,7 +169,7 @@ export const modelComparisonApi = {
    * Analyser les caractéristiques d'un symbole
    */
   async analyzeSymbol(symbol: string): Promise<SymbolAnalysis> {
-    const response = await api.get(`/model-comparison/symbols/${symbol}/analysis`);
+    const response = await apiService.get(`/api/v1/model-comparison/symbols/${symbol}/analysis`);
     return response.data;
   },
 
@@ -183,7 +183,7 @@ export const modelComparisonApi = {
     limit: number;
     offset: number;
   }> {
-    const response = await api.get(`/model-comparison/results?limit=${limit}&offset=${offset}`);
+    const response = await apiService.get(`/api/v1/model-comparison/results?limit=${limit}&offset=${offset}`);
     return response.data;
   },
 
@@ -197,7 +197,7 @@ export const modelComparisonApi = {
     timestamp: string;
     version: string;
   }> {
-    const response = await api.get('/model-comparison/health');
+    const response = await apiService.get('/api/v1/model-comparison/health');
     return response.data;
   }
 };
