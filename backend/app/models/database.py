@@ -296,6 +296,9 @@ class MLModels(Base):
     # Relation avec TargetParameters
     target_parameter = relationship("TargetParameters", back_populates="ml_models")
     
+    # Relation avec BacktestRun
+    backtest_runs = relationship("BacktestRun", back_populates="model")
+    
     __table_args__ = ({"schema": "public"},)
 
 
@@ -398,5 +401,221 @@ class ScreenerResult(Base):
     confidence = Column(DECIMAL(5, 4), nullable=False)
     rank = Column(Integer, nullable=False)
     created_at = Column(TIMESTAMP, server_default=func.now())
+    
+    __table_args__ = ({"schema": "public"},)
+
+
+# ==================== BACKTESTING MODELS ====================
+
+class BacktestRun(Base):
+    __tablename__ = "backtest_runs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(TEXT)
+    model_id = Column(Integer, ForeignKey('public.ml_models.id'), nullable=False)
+    strategy_id = Column(Integer, ForeignKey('public.trading_strategies.id'), nullable=True)
+    start_date = Column(Date, nullable=False, index=True)
+    end_date = Column(Date, nullable=False, index=True)
+    initial_capital = Column(DECIMAL(15, 2), nullable=False, default=100000.00)
+    position_size_percentage = Column(DECIMAL(5, 2), nullable=False, default=10.00)  # % of capital per trade
+    commission_rate = Column(DECIMAL(5, 4), nullable=False, default=0.001)  # 0.1% commission
+    slippage_rate = Column(DECIMAL(5, 4), nullable=False, default=0.0005)  # 0.05% slippage
+    confidence_threshold = Column(DECIMAL(3, 2), nullable=False, default=0.60)  # Minimum confidence for trades
+    max_positions = Column(Integer, nullable=False, default=10)  # Maximum concurrent positions
+    status = Column(String(50), nullable=False, default='pending')  # 'pending', 'running', 'completed', 'failed'
+    created_by = Column(String(100), nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    started_at = Column(TIMESTAMP)
+    completed_at = Column(TIMESTAMP)
+    error_message = Column(TEXT)
+    
+    # Relationships
+    model = relationship("MLModels", back_populates="backtest_runs")
+    trades = relationship("BacktestTrade", back_populates="backtest_run")
+    metrics = relationship("BacktestMetrics", back_populates="backtest_run")
+    strategy = relationship("TradingStrategy", back_populates="backtest_runs")
+    strategy_performance = relationship("StrategyPerformance", back_populates="backtest_run")
+    
+    __table_args__ = ({"schema": "public"},)
+
+
+class BacktestTrade(Base):
+    __tablename__ = "backtest_trades"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    backtest_run_id = Column(Integer, ForeignKey('public.backtest_runs.id'), nullable=False)
+    symbol = Column(String(10), nullable=False, index=True)
+    entry_date = Column(Date, nullable=False, index=True)
+    exit_date = Column(Date, nullable=False, index=True)
+    entry_price = Column(DECIMAL(10, 4), nullable=False)
+    exit_price = Column(DECIMAL(10, 4), nullable=False)
+    quantity = Column(Integer, nullable=False)
+    position_type = Column(String(10), nullable=False)  # 'long', 'short'
+    entry_confidence = Column(DECIMAL(5, 4), nullable=False)
+    exit_reason = Column(String(50), nullable=False)  # 'target_hit', 'stop_loss', 'timeout', 'signal_reversal'
+    gross_pnl = Column(DECIMAL(15, 2), nullable=False)
+    commission = Column(DECIMAL(10, 2), nullable=False)
+    slippage = Column(DECIMAL(10, 2), nullable=False)
+    net_pnl = Column(DECIMAL(15, 2), nullable=False)
+    return_percentage = Column(DECIMAL(8, 4), nullable=False)
+    holding_days = Column(Integer, nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    
+    # Relationships
+    backtest_run = relationship("BacktestRun", back_populates="trades")
+    
+    __table_args__ = ({"schema": "public"},)
+
+
+class BacktestMetrics(Base):
+    __tablename__ = "backtest_metrics"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    backtest_run_id = Column(Integer, ForeignKey('public.backtest_runs.id'), nullable=False, unique=True)
+    
+    # Performance Metrics
+    total_return = Column(DECIMAL(10, 4), nullable=False)  # Total return percentage
+    annualized_return = Column(DECIMAL(10, 4), nullable=False)
+    total_trades = Column(Integer, nullable=False)
+    winning_trades = Column(Integer, nullable=False)
+    losing_trades = Column(Integer, nullable=False)
+    win_rate = Column(DECIMAL(10, 4), nullable=False)  # Percentage of winning trades
+    
+    # Risk Metrics
+    max_drawdown = Column(DECIMAL(10, 4), nullable=False)  # Maximum drawdown percentage
+    max_drawdown_duration = Column(Integer, nullable=False)  # Days in max drawdown
+    volatility = Column(DECIMAL(10, 4), nullable=False)  # Annualized volatility
+    sharpe_ratio = Column(DECIMAL(10, 4), nullable=False)
+    sortino_ratio = Column(DECIMAL(10, 4), nullable=False)
+    
+    # Trade Metrics
+    avg_return_per_trade = Column(DECIMAL(10, 4), nullable=False)
+    avg_winning_trade = Column(DECIMAL(10, 4), nullable=False)
+    avg_losing_trade = Column(DECIMAL(10, 4), nullable=False)
+    profit_factor = Column(DECIMAL(15, 4), nullable=False)  # Gross profit / Gross loss
+    avg_holding_period = Column(DECIMAL(10, 2), nullable=False)  # Average days per trade
+    
+    # Capital Metrics
+    final_capital = Column(DECIMAL(15, 2), nullable=False)
+    max_capital = Column(DECIMAL(15, 2), nullable=False)
+    min_capital = Column(DECIMAL(15, 2), nullable=False)
+    
+    # Additional Metrics
+    calmar_ratio = Column(DECIMAL(15, 4), nullable=False)  # Annualized return / Max drawdown
+    recovery_factor = Column(DECIMAL(15, 4), nullable=False)  # Net profit / Max drawdown
+    expectancy = Column(DECIMAL(10, 4), nullable=False)  # Expected value per trade
+    
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    
+    # Relationships
+    backtest_run = relationship("BacktestRun", back_populates="metrics")
+    
+    __table_args__ = ({"schema": "public"},)
+
+
+class BacktestEquityCurve(Base):
+    __tablename__ = "backtest_equity_curves"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    backtest_run_id = Column(Integer, ForeignKey('public.backtest_runs.id'), nullable=False)
+    date = Column(Date, nullable=False, index=True)
+    equity_value = Column(DECIMAL(15, 2), nullable=False)
+    drawdown = Column(DECIMAL(8, 4), nullable=False)  # Current drawdown percentage
+    daily_return = Column(DECIMAL(8, 4), nullable=False)  # Daily return percentage
+    cumulative_return = Column(DECIMAL(8, 4), nullable=False)  # Cumulative return percentage
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    
+    __table_args__ = ({"schema": "public"},)
+
+
+# ==================== TRADING STRATEGIES MODELS ====================
+
+class TradingStrategy(Base):
+    __tablename__ = "trading_strategies"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False, unique=True)
+    description = Column(TEXT)
+    strategy_type = Column(String(50), nullable=False)  # 'momentum', 'mean_reversion', 'breakout', 'scalping', 'swing'
+    parameters = Column(JSON)  # Paramètres spécifiques à la stratégie
+    is_active = Column(BOOLEAN, default=True)
+    created_by = Column(String(100), nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    backtest_runs = relationship("BacktestRun", back_populates="strategy")
+    rules = relationship("StrategyRule", back_populates="strategy")
+    parameters_rel = relationship("StrategyParameter", back_populates="strategy")
+    performance = relationship("StrategyPerformance", back_populates="strategy")
+    
+    __table_args__ = ({"schema": "public"},)
+
+
+class StrategyRule(Base):
+    __tablename__ = "strategy_rules"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    strategy_id = Column(Integer, ForeignKey('public.trading_strategies.id'), nullable=False)
+    rule_type = Column(String(50), nullable=False)  # 'entry', 'exit', 'position_sizing', 'risk_management'
+    rule_name = Column(String(255), nullable=False)
+    rule_condition = Column(TEXT, nullable=False)  # Condition logique
+    rule_action = Column(TEXT, nullable=False)  # Action à exécuter
+    priority = Column(Integer, nullable=False, default=1)  # Ordre d'exécution
+    is_active = Column(BOOLEAN, default=True)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    
+    # Relationships
+    strategy = relationship("TradingStrategy", back_populates="rules")
+    
+    __table_args__ = ({"schema": "public"},)
+
+
+class StrategyParameter(Base):
+    __tablename__ = "strategy_parameters"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    strategy_id = Column(Integer, ForeignKey('public.trading_strategies.id'), nullable=False)
+    parameter_name = Column(String(100), nullable=False)
+    parameter_type = Column(String(50), nullable=False)  # 'float', 'int', 'boolean', 'string', 'choice'
+    default_value = Column(TEXT, nullable=False)
+    min_value = Column(DECIMAL(15, 4))
+    max_value = Column(DECIMAL(15, 4))
+    choices = Column(JSON)  # Pour les paramètres de type 'choice'
+    description = Column(TEXT)
+    is_required = Column(BOOLEAN, default=True)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    
+    # Relationships
+    strategy = relationship("TradingStrategy", back_populates="parameters_rel")
+    
+    __table_args__ = ({"schema": "public"},)
+
+
+class StrategyPerformance(Base):
+    __tablename__ = "strategy_performance"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    strategy_id = Column(Integer, ForeignKey('public.trading_strategies.id'), nullable=False)
+    backtest_run_id = Column(Integer, ForeignKey('public.backtest_runs.id'), nullable=False)
+    
+    # Métriques spécifiques à la stratégie
+    strategy_score = Column(DECIMAL(10, 4), nullable=False)  # Score global de la stratégie
+    rule_effectiveness = Column(JSON)  # Efficacité de chaque règle
+    parameter_sensitivity = Column(JSON)  # Sensibilité aux paramètres
+    market_conditions = Column(JSON)  # Conditions de marché optimales
+    
+    # Métriques comparatives
+    benchmark_return = Column(DECIMAL(10, 4))  # Retour du benchmark (S&P 500)
+    alpha = Column(DECIMAL(10, 4))  # Alpha de la stratégie
+    beta = Column(DECIMAL(10, 4))  # Beta de la stratégie
+    information_ratio = Column(DECIMAL(10, 4))  # Ratio d'information
+    
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    
+    # Relationships
+    strategy = relationship("TradingStrategy", back_populates="performance")
+    backtest_run = relationship("BacktestRun", back_populates="strategy_performance")
     
     __table_args__ = ({"schema": "public"},)

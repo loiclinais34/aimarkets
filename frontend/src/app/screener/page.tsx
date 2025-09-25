@@ -10,7 +10,9 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   HomeIcon,
-  ArrowLeftIcon
+  ArrowLeftIcon,
+  CogIcon,
+  ChartBarSquareIcon
 } from '@heroicons/react/24/outline'
 import { apiService, screenerApi } from '@/services/api'
 import LoadingSpinner from '@/components/LoadingSpinner'
@@ -209,6 +211,20 @@ export default function ScreenerPage() {
                 <MagnifyingGlassIcon className="h-5 w-5 mr-2" />
                 Screener
               </div>
+              <a
+                href="/strategies"
+                className="flex items-center py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              >
+                <CogIcon className="h-5 w-5 mr-2" />
+                Stratégies
+              </a>
+              <a
+                href="/backtesting"
+                className="flex items-center py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              >
+                <ChartBarSquareIcon className="h-5 w-5 mr-2" />
+                Backtesting
+              </a>
             </div>
             
             {/* Indicateur de fraîcheur des données compact */}

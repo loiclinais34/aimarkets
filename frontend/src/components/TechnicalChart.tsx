@@ -380,7 +380,7 @@ export default function TechnicalChart({
                       strokeDasharray="5 5"
                       label={{ 
                         value: `Support ${formatPrice(level)}`, 
-                        position: "topLeft",
+                        position: "insideTopLeft" as const,
                         style: { fontSize: '10px', fill: '#10b981' }
                       }}
                     />
@@ -396,7 +396,7 @@ export default function TechnicalChart({
                       strokeDasharray="5 5"
                       label={{ 
                         value: `Résistance ${formatPrice(level)}`, 
-                        position: "topRight",
+                        position: "insideTopRight" as const,
                         style: { fontSize: '10px', fill: '#ef4444' }
                       }}
                     />
@@ -443,7 +443,7 @@ export default function TechnicalChart({
                   y={stats.avgVolume}
                   stroke="#ef4444"
                   strokeDasharray="5 5"
-                  label={{ value: "Volume Moyen", position: "topRight" }}
+                  label={{ value: "Volume Moyen", position: "insideTopRight" as const }}
                 />
               )}
             </ComposedChart>
@@ -483,8 +483,8 @@ export default function TechnicalChart({
               />
               
               {/* RSI Levels */}
-              <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="5 5" label={{ value: "Surachat (70)", position: "topRight" }} />
-              <ReferenceLine y={30} stroke="#10b981" strokeDasharray="5 5" label={{ value: "Survente (30)", position: "bottomRight" }} />
+              <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="5 5" label={{ value: "Surachat (70)", position: "insideTopRight" as const }} />
+              <ReferenceLine y={30} stroke="#10b981" strokeDasharray="5 5" label={{ value: "Survente (30)", position: "insideBottomRight" as const }} />
               <ReferenceLine y={50} stroke="#6b7280" strokeDasharray="2 2" />
             </ComposedChart>
           </ResponsiveContainer>

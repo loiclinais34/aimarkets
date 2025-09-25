@@ -6,7 +6,7 @@ import uvicorn
 
 from .core.config import settings
 from .core.database import init_db, close_db
-from .api.endpoints import data, target_parameters, ml_models, lightgbm_models, lightgbm_test, symbol_metadata
+from .api.endpoints import data, target_parameters, ml_models, lightgbm_models, lightgbm_test, symbol_metadata, backtesting, trading_strategies
 
 
 @asynccontextmanager
@@ -132,6 +132,24 @@ app.include_router(
     indicators_recalculation.router,
     prefix="/api/v1",
     tags=["Recalcul des Indicateurs"]
+)
+
+# Import du router backtesting
+from app.api.endpoints import backtesting
+
+app.include_router(
+    backtesting.router,
+    prefix="/api/v1/backtesting",
+    tags=["Backtesting"]
+)
+
+# Import du router trading_strategies
+from app.api.endpoints import trading_strategies
+
+app.include_router(
+    trading_strategies.router,
+    prefix="/api/v1/strategies",
+    tags=["Stratégies de Trading"]
 )
 
 # Endpoints LightGBM temporairement désactivés à cause de problèmes de stabilité
