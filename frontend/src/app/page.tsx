@@ -14,7 +14,8 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   CogIcon,
-  ChartBarSquareIcon as BacktestIcon
+  ChartBarSquareIcon as BacktestIcon,
+  BeakerIcon
 } from '@heroicons/react/24/outline'
 import { apiService, SymbolWithMetadata } from '@/services/api'
 import TargetParameterForm from '@/components/TargetParameterForm'
@@ -109,6 +110,7 @@ export default function Dashboard() {
                 { id: 'screener', name: 'Screener', icon: MagnifyingGlassIcon, href: '/screener' },
                 { id: 'strategies', name: 'Stratégies', icon: CogIcon, href: '/strategies' },
                 { id: 'backtesting', name: 'Backtesting', icon: BacktestIcon, href: '/backtesting' },
+                { id: 'model-comparison', name: 'Comparaison', icon: BeakerIcon, href: '/model-comparison' },
               ].map((tab) => (
                 tab.href ? (
                   <a

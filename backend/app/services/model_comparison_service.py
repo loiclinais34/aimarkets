@@ -141,16 +141,16 @@ class ModelComparisonService:
             'date': t.date,
             'sma_20': float(t.sma_20) if t.sma_20 else None,
             'sma_50': float(t.sma_50) if t.sma_50 else None,
-            'ema_12': float(t.ema_12) if t.ema_12 else None,
-            'ema_26': float(t.ema_26) if t.ema_26 else None,
-            'rsi': float(t.rsi) if t.rsi else None,
+            'ema_20': float(t.ema_20) if t.ema_20 else None,
+            'ema_50': float(t.ema_50) if t.ema_50 else None,
+            'rsi_14': float(t.rsi_14) if t.rsi_14 else None,
             'macd': float(t.macd) if t.macd else None,
             'macd_signal': float(t.macd_signal) if t.macd_signal else None,
             'bb_upper': float(t.bb_upper) if t.bb_upper else None,
             'bb_middle': float(t.bb_middle) if t.bb_middle else None,
             'bb_lower': float(t.bb_lower) if t.bb_lower else None,
             'bb_position': float(t.bb_position) if t.bb_position else None,
-            'atr': float(t.atr) if t.atr else None,
+            'atr_14': float(t.atr_14) if t.atr_14 else None,
             'obv': float(t.obv) if t.obv else None,
             'stochastic_k': float(t.stochastic_k) if t.stochastic_k else None,
             'stochastic_d': float(t.stochastic_d) if t.stochastic_d else None,
@@ -162,13 +162,13 @@ class ModelComparisonService:
         # DataFrame sentiment
         sent_df = pd.DataFrame([{
             'date': s.date,
-            'sentiment_score': float(s.sentiment_score) if s.sentiment_score else None,
-            'sentiment_momentum': float(s.sentiment_momentum) if s.sentiment_momentum else None,
-            'sentiment_volatility': float(s.sentiment_volatility) if s.sentiment_volatility else None,
-            'news_count': s.news_count if s.news_count else 0,
-            'short_interest': float(s.short_interest) if s.short_interest else None,
-            'short_volume': float(s.short_volume) if s.short_volume else None,
-            'short_volume_ratio': float(s.short_volume_ratio) if s.short_volume_ratio else None
+            'sentiment_score_normalized': float(s.sentiment_score_normalized) if s.sentiment_score_normalized else None,
+            'sentiment_momentum_7d': float(s.sentiment_momentum_7d) if s.sentiment_momentum_7d else None,
+            'sentiment_volatility_7d': float(s.sentiment_volatility_7d) if s.sentiment_volatility_7d else None,
+            'news_positive_ratio': float(s.news_positive_ratio) if s.news_positive_ratio else None,
+            'news_negative_ratio': float(s.news_negative_ratio) if s.news_negative_ratio else None,
+            'news_neutral_ratio': float(s.news_neutral_ratio) if s.news_neutral_ratio else None,
+            'news_sentiment_quality': float(s.news_sentiment_quality) if s.news_sentiment_quality else None
         } for s in sentiment_data])
         
         # Combiner les DataFrames
@@ -227,11 +227,11 @@ class ModelComparisonService:
             'return', 'return_5d', 'return_10d', 'return_20d',
             'volume_ratio', 'volatility_5d', 'volatility_20d',
             'price_vs_sma20', 'price_vs_sma50', 'bb_spread',
-            'rsi', 'macd', 'macd_signal', 'bb_position',
-            'atr', 'stochastic_k', 'stochastic_d', 'williams_r',
-            'roc', 'cci', 'sentiment_score', 'sentiment_momentum',
-            'sentiment_volatility', 'news_count', 'short_interest',
-            'short_volume_ratio'
+            'rsi_14', 'macd', 'macd_signal', 'bb_position',
+            'atr_14', 'stochastic_k', 'stochastic_d', 'williams_r',
+            'roc', 'cci', 'sentiment_score_normalized', 'sentiment_momentum_7d',
+            'sentiment_volatility_7d', 'news_positive_ratio', 'news_negative_ratio',
+            'news_sentiment_quality'
         ]
         
         # Filtrer les colonnes disponibles
