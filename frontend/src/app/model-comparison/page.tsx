@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { 
   ChartBarIcon, 
   CpuChipIcon, 
@@ -23,7 +23,7 @@ import {
   type ComparisonResult,
   type ModelRecommendation,
   type ModelInfo
-} from '../services/modelComparisonApi';
+} from '../../services/modelComparisonApi';
 
 export default function ModelComparisonPage() {
   const [selectedSymbol, setSelectedSymbol] = useState<string>('');
