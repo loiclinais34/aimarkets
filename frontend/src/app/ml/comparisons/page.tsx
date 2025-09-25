@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import RootLayout from '@/components/RootLayout';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { 
   ChartBarIcon, 
@@ -23,11 +24,11 @@ import {
   type EnrichedComparisonResult,
   type ModelRecommendation,
   type ModelInfo
-} from '../../services/modelComparisonApi';
+} from '../../../services/modelComparisonApi';
 
-import InterpretationsDisplay from '../../components/model-comparison/InterpretationsDisplay';
+import InterpretationsDisplay from '../../../components/model-comparison/InterpretationsDisplay';
 
-export default function ModelComparisonPage() {
+export default function MLComparisons() {
   const [selectedSymbol, setSelectedSymbol] = useState<string>('');
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
@@ -130,25 +131,15 @@ export default function ModelComparisonPage() {
   }, [recommendations, selectedModels.length]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="py-6">
-            <div className="flex items-center">
-              <ChartBarIcon className="h-8 w-8 text-blue-600 mr-3" />
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Comparaison de Modèles ML</h1>
-                <p className="text-gray-600 mt-1">
-                  Comparez les performances de différents modèles d'apprentissage automatique pour vos symboles
-                </p>
-              </div>
-            </div>
-          </div>
+    <RootLayout>
+      <div className="px-4 py-6 sm:px-0">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Comparaisons de Modèles ML</h1>
+          <p className="mt-2 text-gray-600">
+            Comparez les performances de différents modèles d'apprentissage automatique pour vos symboles
+          </p>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* Configuration Panel */}
@@ -464,6 +455,6 @@ export default function ModelComparisonPage() {
           </div>
         </div>
       </div>
-    </div>
+    </RootLayout>
   );
 }

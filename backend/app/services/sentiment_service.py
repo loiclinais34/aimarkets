@@ -63,7 +63,7 @@ class SentimentIndicatorService:
                 price_change = (row['close'] - df['close'].shift(1).iloc[len(df) - 1]) / df['close'].shift(1).iloc[len(df) - 1] if len(df) > 1 else 0
                 sentiment_score_normalized = max(-1, min(1, price_change * 10))  # Normaliser entre -1 et 1
                 
-                # Créer l'enregistrement
+                # Créer l'enregistrement avec seulement les champs qui existent dans le modèle
                 sentiment_indicator = SentimentIndicators(
                     symbol=symbol,
                     date=row['date'],
@@ -117,12 +117,26 @@ class SentimentIndicatorService:
                     short_interest_volatility_7d=abs(sentiment_score_normalized) * 0.1,
                     short_interest_volatility_14d=abs(sentiment_score_normalized) * 0.08,
                     short_interest_volatility_30d=abs(sentiment_score_normalized) * 0.06,
+                    short_interest_sma_7=5 + abs(sentiment_score_normalized) * 2,
+                    short_interest_sma_14=4 + abs(sentiment_score_normalized) * 1.5,
+                    short_interest_sma_30=3 + abs(sentiment_score_normalized) * 1,
                     
-                    # Indicateurs composites
-                    sentiment_composite_bullish=max(0, sentiment_score_normalized) * 0.8,
-                    sentiment_composite_bearish=max(0, -sentiment_score_normalized) * 0.8,
-                    sentiment_composite_uncertainty=abs(sentiment_score_normalized) * 0.3,
-                    sentiment_composite_stability=1 - abs(sentiment_score_normalized) * 0.5
+                    # Indicateurs de volume court (simulés)
+                    short_volume_momentum_5d=sentiment_score_normalized * -0.05,
+                    short_volume_momentum_10d=sentiment_score_normalized * -0.04,
+                    short_volume_momentum_20d=sentiment_score_normalized * -0.03,
+                    short_volume_volatility_7d=abs(sentiment_score_normalized) * 0.05,
+                    short_volume_volatility_14d=abs(sentiment_score_normalized) * 0.04,
+                    short_volume_volatility_30d=abs(sentiment_score_normalized) * 0.03,
+                    
+                    # Indicateurs composites de sentiment (utilisant les vrais champs du modèle)
+                    sentiment_strength_index=max(0, sentiment_score_normalized) * 0.8,
+                    market_sentiment_index=50 + sentiment_score_normalized * 25,  # Entre 25-75
+                    sentiment_divergence=abs(sentiment_score_normalized) * 0.3,
+                    sentiment_acceleration=sentiment_score_normalized * 0.1,
+                    sentiment_trend_strength=abs(sentiment_score_normalized) * 0.7,
+                    sentiment_quality_index=0.7 + abs(sentiment_score_normalized) * 0.2,
+                    sentiment_risk_score=abs(sentiment_score_normalized) * 0.5
                 )
                 
                 db.add(sentiment_indicator)

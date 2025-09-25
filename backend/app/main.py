@@ -6,7 +6,7 @@ import uvicorn
 
 from .core.config import settings
 from .core.database import init_db, close_db
-from .api.endpoints import data, target_parameters, ml_models, lightgbm_models, lightgbm_test, symbol_metadata, backtesting, trading_strategies
+from .api.endpoints import data, target_parameters, ml_models, lightgbm_models, lightgbm_test, symbol_metadata, backtesting, trading_strategies, model_comparison, async_model_comparison
 
 
 @asynccontextmanager
@@ -159,6 +159,15 @@ app.include_router(
     model_comparison.router,
     prefix="/api/v1/model-comparison",
     tags=["Comparaison de Modèles"]
+)
+
+# Import du router async_model_comparison
+from app.api.endpoints import async_model_comparison
+
+app.include_router(
+    async_model_comparison.router,
+    prefix="/api/v1/model-comparison",
+    tags=["Comparaison Asynchrone de Modèles"]
 )
 
 # Endpoints LightGBM temporairement désactivés à cause de problèmes de stabilité

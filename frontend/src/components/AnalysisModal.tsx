@@ -257,13 +257,13 @@ export default function AnalysisModal({
                             <p className="text-sm text-gray-600 mb-4">
                               Comprendre pourquoi le modèle a fait cette prédiction
                             </p>
-                            {analysisData.shap_explanations.shap_explanations.length > 0 ? (
+                            {analysisData.shap_explanations && analysisData.shap_explanations.shap_explanations && Array.isArray(analysisData.shap_explanations.shap_explanations) && analysisData.shap_explanations.shap_explanations.length > 0 ? (
                               <div className="space-y-3">
                                 {/* Valeur de base */}
                                 <div className="p-3 bg-white rounded-lg">
                                   <p className="text-sm text-gray-600">Valeur de base</p>
                                   <p className="text-lg font-semibold">
-                                    {analysisData.shap_explanations.base_value.toFixed(4)}
+                                    {analysisData.shap_explanations.base_value?.toFixed(4) || 'N/A'}
                                   </p>
                                 </div>
 

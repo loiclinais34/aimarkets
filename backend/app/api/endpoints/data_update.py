@@ -1,333 +1,292 @@
 """
-Endpoints API pour la mise à jour des données
+Endpoints API pour la gestion des mises à jour de données
 """
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
-from sqlalchemy.orm import Session
-from typing import Dict, Any, List, Optional
 import logging
+from typing import Dict, Any, Optional
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from sqlalchemy.orm import Session
 
-from ...core.database import get_db
-from ...services.data_update_service import DataUpdateService
-from ...services.polygon_service import PolygonService
+from app.core.database import get_db
+from app.services.data_update_service import DataUpdateService
+from app.tasks.data_update_tasks import (
+    check_data_freshness_task,
+    update_historical_data_task,
+    calculate_technical_indicators_task,
+    update_sentiment_data_task,
+    calculate_sentiment_indicators_task,
+    full_data_update_workflow_task
+)
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter()
 
-@router.get("/data-freshness", response_model=Dict[str, Any])
-def get_data_freshness_status(db: Session = Depends(get_db)):
+@router.get("/status", response_model=Dict[str, Any])
+def get_data_update_status(db: Session = Depends(get_db)):
     """
-    Récupère le statut de fraîcheur des données
-    
-    Returns:
-        Statut de fraîcheur des données historiques et de sentiment
+    Récupérer le statut des mises à jour de données
     """
     try:
-        data_service = DataUpdateService(db)
-        status = data_service.get_data_freshness_status()
+        service = DataUpdateService(db)
+        status = service.get_update_status()
         
         return {
-            "status": "success",
-            "data": status
+            'success': True,
+            'data': status
         }
         
     except Exception as e:
-        logger.error(f"Erreur lors de la récupération du statut de fraîcheur: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors de la récupération du statut: {str(e)}"
-        )
+        logger.error(f"Erreur lors de la récupération du statut: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur interne du serveur: {e}")
 
-@router.post("/update-historical/{symbol}", response_model=Dict[str, Any])
-def update_historical_data_for_symbol(
-    symbol: str,
+@router.get("/freshness", response_model=Dict[str, Any])
+def check_data_freshness(db: Session = Depends(get_db)):
+    """
+    Vérifier la fraîcheur des données
+    """
+    try:
+        service = DataUpdateService(db)
+        
+        historical_freshness = service.check_historical_data_freshness()
+        sentiment_freshness = service.check_sentiment_data_freshness()
+        
+        return {
+            'success': True,
+            'data': {
+                'historical_freshness': historical_freshness,
+                'sentiment_freshness': sentiment_freshness,
+                'overall_needs_update': historical_freshness.get('needs_update', False)
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de la vérification de la fraîcheur: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur interne du serveur: {e}")
+
+@router.get("/stats", response_model=Dict[str, Any])
+def get_data_stats(db: Session = Depends(get_db)):
+    """
+    Récupérer les statistiques des données
+    """
+    try:
+        service = DataUpdateService(db)
+        stats = service.get_data_stats()
+        
+        return {
+            'success': True,
+            'data': stats
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des statistiques: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur interne du serveur: {e}")
+
+@router.post("/trigger-update", response_model=Dict[str, Any])
+def trigger_data_update(
     force_update: bool = False,
     db: Session = Depends(get_db)
 ):
     """
-    Met à jour les données historiques pour un symbole spécifique
-    
-    Args:
-        symbol: Symbole du titre à mettre à jour
-        force_update: Forcer la mise à jour même si les données semblent à jour
-    
-    Returns:
-        Résultat de la mise à jour
+    Déclencher une mise à jour complète des données via Celery
     """
     try:
-        data_service = DataUpdateService(db)
-        result = data_service.update_historical_data_for_symbol(symbol, force_update)
+        # Lancer le workflow complet de mise à jour
+        task = full_data_update_workflow_task.delay(force_update=force_update)
+        
+        logger.info(f"Mise à jour des données déclenchée - Task ID: {task.id}")
         
         return {
-            "status": "success",
-            "data": result
+            'success': True,
+            'message': 'Mise à jour des données déclenchée avec succès',
+            'task_id': task.id,
+            'force_update': force_update
         }
         
     except Exception as e:
-        logger.error(f"Erreur lors de la mise à jour des données historiques pour {symbol}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors de la mise à jour: {str(e)}"
-        )
+        logger.error(f"Erreur lors du déclenchement de la mise à jour: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur interne du serveur: {e}")
 
-@router.post("/update-sentiment/{symbol}", response_model=Dict[str, Any])
-def update_sentiment_data_for_symbol(
-    symbol: str,
+@router.post("/trigger-historical-update", response_model=Dict[str, Any])
+def trigger_historical_data_update(
     force_update: bool = False,
     db: Session = Depends(get_db)
 ):
     """
-    Met à jour les données de sentiment pour un symbole spécifique
-    
-    Args:
-        symbol: Symbole du titre à mettre à jour
-        force_update: Forcer la mise à jour même si les données semblent à jour
-    
-    Returns:
-        Résultat de la mise à jour
+    Déclencher une mise à jour des données historiques uniquement
     """
     try:
-        data_service = DataUpdateService(db)
-        result = data_service.update_sentiment_data_for_symbol(symbol, force_update)
+        task = update_historical_data_task.delay(force_update=force_update)
+        
+        logger.info(f"Mise à jour des données historiques déclenchée - Task ID: {task.id}")
         
         return {
-            "status": "success",
-            "data": result
+            'success': True,
+            'message': 'Mise à jour des données historiques déclenchée avec succès',
+            'task_id': task.id,
+            'force_update': force_update
         }
         
     except Exception as e:
-        logger.error(f"Erreur lors de la mise à jour des données de sentiment pour {symbol}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors de la mise à jour: {str(e)}"
-        )
+        logger.error(f"Erreur lors du déclenchement de la mise à jour historique: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur interne du serveur: {e}")
 
-@router.post("/update-all-historical", response_model=Dict[str, Any])
-def update_all_historical_data(
+@router.post("/trigger-sentiment-update", response_model=Dict[str, Any])
+def trigger_sentiment_data_update(
     force_update: bool = False,
-    max_symbols: Optional[int] = None,
-    background_tasks: BackgroundTasks = None,
     db: Session = Depends(get_db)
 ):
     """
-    Met à jour les données historiques pour tous les symboles actifs
-    
-    Args:
-        force_update: Forcer la mise à jour même si les données semblent à jour
-        max_symbols: Nombre maximum de symboles à traiter (pour les tests)
-        background_tasks: Tâches en arrière-plan
-    
-    Returns:
-        Résultat de la mise à jour globale
+    Déclencher une mise à jour des données de sentiment uniquement
     """
     try:
-        data_service = DataUpdateService(db)
+        task = update_sentiment_data_task.delay(force_update=force_update)
         
-        if background_tasks and not max_symbols:
-            # Exécuter en arrière-plan pour éviter les timeouts
-            background_tasks.add_task(
-                data_service.update_all_symbols,
-                force_update=force_update
-            )
-            
+        logger.info(f"Mise à jour des données de sentiment déclenchée - Task ID: {task.id}")
+        
+        return {
+            'success': True,
+            'message': 'Mise à jour des données de sentiment déclenchée avec succès',
+            'task_id': task.id,
+            'force_update': force_update
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur lors du déclenchement de la mise à jour de sentiment: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur interne du serveur: {e}")
+
+@router.post("/trigger-technical-indicators", response_model=Dict[str, Any])
+def trigger_technical_indicators_calculation(db: Session = Depends(get_db)):
+    """
+    Déclencher le calcul des indicateurs techniques
+    """
+    try:
+        task = calculate_technical_indicators_task.delay()
+        
+        logger.info(f"Calcul des indicateurs techniques déclenché - Task ID: {task.id}")
+        
+        return {
+            'success': True,
+            'message': 'Calcul des indicateurs techniques déclenché avec succès',
+            'task_id': task.id
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur lors du déclenchement du calcul des indicateurs techniques: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur interne du serveur: {e}")
+
+@router.post("/trigger-sentiment-indicators", response_model=Dict[str, Any])
+def trigger_sentiment_indicators_calculation(db: Session = Depends(get_db)):
+    """
+    Déclencher le calcul des indicateurs de sentiment
+    """
+    try:
+        task = calculate_sentiment_indicators_task.delay()
+        
+        logger.info(f"Calcul des indicateurs de sentiment déclenché - Task ID: {task.id}")
+        
+        return {
+            'success': True,
+            'message': 'Calcul des indicateurs de sentiment déclenché avec succès',
+            'task_id': task.id
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur lors du déclenchement du calcul des indicateurs de sentiment: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur interne du serveur: {e}")
+
+@router.get("/task-status/{task_id}", response_model=Dict[str, Any])
+def get_task_status(task_id: str):
+    """
+    Récupérer le statut d'une tâche Celery
+    """
+    try:
+        from app.core.celery_app import celery_app
+        
+        task_result = celery_app.AsyncResult(task_id)
+        
+        if task_result.state == 'PENDING':
+            response = {
+                'task_id': task_id,
+                'state': task_result.state,
+                'status': 'En attente...'
+            }
+        elif task_result.state == 'PROGRESS':
+            response = {
+                'task_id': task_id,
+                'state': task_result.state,
+                'status': task_result.info.get('status', 'En cours...'),
+                'progress': task_result.info.get('progress', 0),
+                'current_symbol': task_result.info.get('current_symbol'),
+                'total_symbols': task_result.info.get('total_symbols')
+            }
+        elif task_result.state == 'SUCCESS':
+            response = {
+                'task_id': task_id,
+                'state': task_result.state,
+                'status': 'Terminé avec succès',
+                'result': task_result.result
+            }
+        else:  # FAILURE
+            response = {
+                'task_id': task_id,
+                'state': task_result.state,
+                'status': 'Échec',
+                'error': str(task_result.info)
+            }
+        
+        return {
+            'success': True,
+            'data': response
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération du statut de la tâche {task_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur interne du serveur: {e}")
+
+@router.get("/active-tasks", response_model=Dict[str, Any])
+def get_active_tasks():
+    """
+    Récupérer la liste des tâches actives
+    """
+    try:
+        from app.core.celery_app import celery_app
+        
+        # Récupérer les tâches actives depuis Celery
+        inspect = celery_app.control.inspect()
+        active_tasks = inspect.active()
+        
+        if not active_tasks:
             return {
-                "status": "success",
-                "message": "Mise à jour des données historiques lancée en arrière-plan",
-                "data": {
-                    "background_task": True,
-                    "force_update": force_update
+                'success': True,
+                'data': {
+                    'active_tasks': [],
+                    'total_active': 0
                 }
             }
-        else:
-            # Exécution synchrone (pour les tests ou petits volumes)
-            result = data_service.update_all_symbols(force_update, max_symbols)
-            
-            return {
-                "status": "success",
-                "data": result
-            }
         
-    except Exception as e:
-        logger.error(f"Erreur lors de la mise à jour globale des données historiques: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors de la mise à jour globale: {str(e)}"
-        )
-
-@router.post("/update-all-sentiment", response_model=Dict[str, Any])
-def update_all_sentiment_data(
-    force_update: bool = False,
-    max_symbols: Optional[int] = None,
-    background_tasks: BackgroundTasks = None,
-    db: Session = Depends(get_db)
-):
-    """
-    Met à jour les données de sentiment pour tous les symboles actifs
-    
-    Args:
-        force_update: Forcer la mise à jour même si les données semblent à jour
-        max_symbols: Nombre maximum de symboles à traiter (pour les tests)
-        background_tasks: Tâches en arrière-plan
-    
-    Returns:
-        Résultat de la mise à jour globale
-    """
-    try:
-        data_service = DataUpdateService(db)
+        # Formater les tâches actives
+        formatted_tasks = []
+        total_active = 0
         
-        if background_tasks and not max_symbols:
-            # Exécuter en arrière-plan pour éviter les timeouts
-            background_tasks.add_task(
-                data_service.update_all_symbols,
-                force_update=force_update
-            )
-            
-            return {
-                "status": "success",
-                "message": "Mise à jour des données de sentiment lancée en arrière-plan",
-                "data": {
-                    "background_task": True,
-                    "force_update": force_update
-                }
-            }
-        else:
-            # Exécution synchrone (pour les tests ou petits volumes)
-            result = data_service.update_all_symbols(force_update, max_symbols)
-            
-            return {
-                "status": "success",
-                "data": result
-            }
-        
-    except Exception as e:
-        logger.error(f"Erreur lors de la mise à jour globale des données de sentiment: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors de la mise à jour globale: {str(e)}"
-        )
-
-@router.post("/update-all-data", response_model=Dict[str, Any])
-def update_all_data(
-    force_update: bool = False,
-    max_symbols: Optional[int] = None,
-    background_tasks: BackgroundTasks = None,
-    db: Session = Depends(get_db)
-):
-    """
-    Met à jour toutes les données (historiques et de sentiment) pour tous les symboles actifs
-    
-    Args:
-        force_update: Forcer la mise à jour même si les données semblent à jour
-        max_symbols: Nombre maximum de symboles à traiter (pour les tests)
-        background_tasks: Tâches en arrière-plan
-    
-    Returns:
-        Résultat de la mise à jour globale
-    """
-    try:
-        data_service = DataUpdateService(db)
-        
-        if background_tasks and not max_symbols:
-            # Exécuter en arrière-plan pour éviter les timeouts
-            background_tasks.add_task(
-                data_service.update_all_symbols,
-                force_update=force_update
-            )
-            
-            return {
-                "status": "success",
-                "message": "Mise à jour complète des données lancée en arrière-plan",
-                "data": {
-                    "background_task": True,
-                    "force_update": force_update
-                }
-            }
-        else:
-            # Exécution synchrone (pour les tests ou petits volumes)
-            result = data_service.update_all_symbols(force_update, max_symbols)
-            
-            return {
-                "status": "success",
-                "data": result
-            }
-        
-    except Exception as e:
-        logger.error(f"Erreur lors de la mise à jour complète des données: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors de la mise à jour complète: {str(e)}"
-        )
-
-@router.get("/symbols-status", response_model=Dict[str, Any])
-def get_symbols_update_status(db: Session = Depends(get_db)):
-    """
-    Récupère le statut de mise à jour pour tous les symboles
-    
-    Returns:
-        Statut de mise à jour par symbole
-    """
-    try:
-        polygon_service = PolygonService()
-        symbols = polygon_service.get_symbols_to_update(db)
-        
-        results = []
-        
-        for symbol in symbols[:10]:  # Limiter à 10 symboles pour la démo
-            should_update, db_latest_date, polygon_latest_date = polygon_service.should_update_data(db, symbol)
-            
-            results.append({
-                "symbol": symbol,
-                "should_update": should_update,
-                "db_latest_date": db_latest_date.isoformat() if db_latest_date else None,
-                "polygon_latest_date": polygon_latest_date.isoformat() if polygon_latest_date else None,
-                "days_behind": (polygon_service.get_last_trading_day() - db_latest_date).days if db_latest_date else None
-            })
+        for worker, tasks in active_tasks.items():
+            for task in tasks:
+                formatted_tasks.append({
+                    'task_id': task['id'],
+                    'name': task['name'],
+                    'worker': worker,
+                    'args': task.get('args', []),
+                    'kwargs': task.get('kwargs', {}),
+                    'time_start': task.get('time_start')
+                })
+                total_active += 1
         
         return {
-            "status": "success",
-            "data": {
-                "total_symbols": len(symbols),
-                "sample_results": results,
-                "last_trading_day": polygon_service.get_last_trading_day().isoformat(),
-                "market_is_open": polygon_service.is_market_open()
+            'success': True,
+            'data': {
+                'active_tasks': formatted_tasks,
+                'total_active': total_active
             }
         }
         
     except Exception as e:
-        logger.error(f"Erreur lors de la récupération du statut des symboles: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors de la récupération du statut: {str(e)}"
-        )
-
-@router.get("/market-status", response_model=Dict[str, Any])
-def get_market_status():
-    """
-    Récupère le statut du marché Nasdaq
-    
-    Returns:
-        Statut du marché (ouvert/fermé) et informations temporelles
-    """
-    try:
-        polygon_service = PolygonService()
-        
-        return {
-            "status": "success",
-            "data": {
-                "is_open": polygon_service.is_market_open(),
-                "last_trading_day": polygon_service.get_last_trading_day().isoformat(),
-                "current_date": polygon_service.get_last_trading_day().isoformat(),
-                "timezone_info": {
-                    "market_timezone": "America/New_York",
-                    "server_timezone": "Europe/Paris",
-                    "note": "Le marché Nasdaq suit le fuseau horaire de New York"
-                }
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"Erreur lors de la récupération du statut du marché: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors de la récupération du statut du marché: {str(e)}"
-        )
+        logger.error(f"Erreur lors de la récupération des tâches actives: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur interne du serveur: {e}")

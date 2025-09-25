@@ -340,6 +340,6 @@ export const modelComparisonUtils = {
   sortModelsByMetric(models: Record<string, ModelMetrics>, metric: keyof ModelMetrics): Array<{ name: string; metrics: ModelMetrics }> {
     return Object.entries(models)
       .map(([name, metrics]) => ({ name, metrics }))
-      .sort((a, b) => b.metrics[metric] - a.metrics[metric]);
+      .sort((a, b) => (b.metrics[metric] as number) - (a.metrics[metric] as number));
   }
 };

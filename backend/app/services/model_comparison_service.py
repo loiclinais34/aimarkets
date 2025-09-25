@@ -15,10 +15,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 
 from .model_comparison_framework import (
-    ModelComparisonFramework, 
-    RandomForestModel, 
-    XGBoostModel, 
-    LightGBMModel, 
+    ModelComparisonFramework,
+    RandomForestModel,
+    XGBoostModel,
+    LightGBMModel,
     NeuralNetworkModel,
     LSTMModel
 )

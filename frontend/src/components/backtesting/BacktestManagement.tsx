@@ -320,7 +320,7 @@ export const BacktestForm: React.FC<BacktestFormProps> = ({
     if (formData.model_id && formData.model_id !== 0) {
       backtestingApi.getAvailableDatesForModel(formData.model_id)
         .then(dates => {
-          setPredictionDates(dates);
+          setPredictionDates(dates as any);
           // Auto-remplir les dates si disponibles
           if (dates.available_dates && dates.available_dates.length > 0) {
             const startDate = dates.available_dates[0];

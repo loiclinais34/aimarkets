@@ -143,9 +143,14 @@ def compare_models_with_interpretations(
         service = ModelComparisonService(db)
         
         # Effectuer la comparaison standard
+        # Si aucun modèle spécifié, utiliser les modèles rapides
+        models_to_test = request.models_to_test
+        if not models_to_test:
+            models_to_test = ['RandomForest', 'XGBoost', 'LightGBM', 'NeuralNetwork']
+        
         result = service.compare_models_for_symbol(
             symbol=request.symbol,
-            models_to_test=request.models_to_test,
+            models_to_test=models_to_test,
             start_date=request.start_date,
             end_date=request.end_date
         )

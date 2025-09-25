@@ -643,6 +643,52 @@ export const apiService = {
     })
     return response.data
   },
+
+        // Méthodes pour les données et mises à jour
+        triggerDataUpdate: async (): Promise<any> => {
+          const response = await apiClient.post('/api/v1/data-update/trigger-update')
+          return response.data
+        },
+
+        getDataUpdateStatus: async (): Promise<any> => {
+          const response = await apiClient.get('/api/v1/data-update/status')
+          return response.data
+        },
+
+        getDataFreshness: async (): Promise<any> => {
+          const response = await apiClient.get('/api/v1/data-update/freshness')
+          return response.data
+        },
+
+        getDataStats: async (): Promise<any> => {
+          const response = await apiClient.get('/api/v1/data-update/stats')
+          return response.data.data || response.data
+        },
+
+        getTaskStatus: async (taskId: string): Promise<any> => {
+          const response = await apiClient.get(`/api/v1/data-update/task-status/${taskId}`)
+          return response.data
+        },
+
+        getActiveTasks: async (): Promise<any> => {
+          const response = await apiClient.get('/api/v1/data-update/active-tasks')
+          return response.data
+        },
+
+  // Méthodes pour les opportunités
+  getLatestOpportunities: async (): Promise<any[]> => {
+    const response = await apiClient.get('/api/v1/screener/latest-opportunities')
+    return response.data.data || response.data
+  },
+
+  runLatestScreener: async (): Promise<any> => {
+    const response = await apiClient.post('/api/v1/screener/run-full-ml-limited', {
+      target_return_percentage: 5.0,
+      time_horizon_days: 30,
+      risk_tolerance: 0.5
+    })
+    return response.data
+  },
 }
 
 // API pour les métadonnées des symboles
@@ -829,19 +875,19 @@ export interface SymbolsStatus {
 export const dataUpdateApi = {
   // Récupérer le statut de fraîcheur des données
   getDataFreshnessStatus: async (): Promise<DataFreshnessStatus> => {
-    const response = await apiClient.get('/api/v1/data-update/data-freshness')
+    const response = await apiClient.get('/api/v1/data-update/freshness')
     return response.data.data
   },
 
-  // Récupérer le statut du marché
+  // Récupérer le statut du marché (utilise le même endpoint que freshness pour l'instant)
   getMarketStatus: async (): Promise<MarketStatus> => {
-    const response = await apiClient.get('/api/v1/data-update/market-status')
+    const response = await apiClient.get('/api/v1/data-update/freshness')
     return response.data.data
   },
 
   // Récupérer le statut des symboles
   getSymbolsStatus: async (): Promise<SymbolsStatus> => {
-    const response = await apiClient.get('/api/v1/data-update/symbols-status')
+    const response = await apiClient.get('/api/v1/data-update/freshness')
     return response.data.data
   },
 
@@ -888,5 +934,6 @@ export const dataUpdateApi = {
     return response.data
   },
 }
+
 
 export default apiService

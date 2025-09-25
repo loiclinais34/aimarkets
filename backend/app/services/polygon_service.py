@@ -454,3 +454,126 @@ class PolygonService:
             should_update = True
         
         return should_update, db_latest_date, polygon_latest_date
+    
+    def update_historical_data(self, symbol: str, force_update: bool = False) -> Dict[str, Any]:
+        """
+        Met à jour les données historiques pour un symbole
+        
+        Args:
+            symbol: Symbole du titre (ex: AAPL)
+            force_update: Forcer la mise à jour même si les données sont récentes
+        
+        Returns:
+            Dictionnaire avec le statut de la mise à jour
+        """
+        try:
+            from app.core.database import get_db
+            from app.models.database import HistoricalData
+            from sqlalchemy.orm import Session
+            from sqlalchemy import func, desc
+            
+            logger.info(f"Mise à jour des données historiques pour {symbol}")
+            
+            # Obtenir une session de base de données
+            db = next(get_db())
+            
+            try:
+                # 1. Déterminer la dernière date de données pour ce symbole
+                last_date_result = db.query(func.max(HistoricalData.date)).filter(
+                    HistoricalData.symbol == symbol
+                ).first()
+                
+                last_date = last_date_result[0] if last_date_result[0] else None
+                
+                # 2. Déterminer la date de début pour la mise à jour
+                if last_date:
+                    # Commencer le jour suivant la dernière date
+                    from datetime import timedelta
+                    start_date = last_date + timedelta(days=1)
+                else:
+                    # Si aucune donnée, récupérer les 5 dernières années
+                    from datetime import datetime, timedelta
+                    start_date = (datetime.now() - timedelta(days=365*5)).date()
+                
+                # 3. Déterminer la date de fin (hier pour éviter les données incomplètes)
+                from datetime import datetime, timedelta
+                end_date = (datetime.now() - timedelta(days=1)).date()
+                
+                # 4. Vérifier si nous avons besoin de mettre à jour
+                if not force_update and last_date and last_date >= end_date:
+                    return {
+                        'symbol': symbol,
+                        'status': 'success',
+                        'message': f'Données déjà à jour jusqu\'à {last_date}',
+                        'records_updated': 0,
+                        'last_date': last_date
+                    }
+                
+                # 5. Récupérer les nouvelles données depuis Polygon
+                logger.info(f"Récupération des données pour {symbol} du {start_date} au {end_date}")
+                historical_data = self.get_historical_data(symbol, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
+                
+                if not historical_data:
+                    return {
+                        'symbol': symbol,
+                        'status': 'success',
+                        'message': f'Aucune nouvelle donnée disponible pour {symbol}',
+                        'records_updated': 0,
+                        'last_date': last_date
+                    }
+                
+                # 6. Sauvegarder les nouvelles données en base
+                records_added = 0
+                for data_point in historical_data:
+                    # Vérifier si l'enregistrement existe déjà
+                    existing_record = db.query(HistoricalData).filter(
+                        HistoricalData.symbol == symbol,
+                        HistoricalData.date == data_point['date']
+                    ).first()
+                    
+                    if not existing_record:
+                        # Créer un nouvel enregistrement
+                        new_record = HistoricalData(
+                            symbol=symbol,
+                            date=data_point['date'],
+                            open=data_point['open'],
+                            high=data_point['high'],
+                            low=data_point['low'],
+                            close=data_point['close'],
+                            volume=data_point['volume'],
+                            vwap=data_point.get('vwap')  # VWAP peut être None
+                        )
+                        db.add(new_record)
+                        records_added += 1
+                
+                # 7. Valider les changements
+                db.commit()
+                
+                # 8. Obtenir la nouvelle dernière date
+                new_last_date_result = db.query(func.max(HistoricalData.date)).filter(
+                    HistoricalData.symbol == symbol
+                ).first()
+                new_last_date = new_last_date_result[0] if new_last_date_result[0] else last_date
+                
+                logger.info(f"Symbole {symbol}: {records_added} nouveaux enregistrements ajoutés")
+                
+                return {
+                    'symbol': symbol,
+                    'status': 'success',
+                    'message': f'Données historiques mises à jour avec succès pour {symbol} ({records_added} nouveaux enregistrements)',
+                    'records_updated': records_added,
+                    'last_date': new_last_date
+                }
+                
+            finally:
+                db.close()
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de la mise à jour des données historiques pour {symbol}: {e}")
+            return {
+                'symbol': symbol,
+                'status': 'error',
+                'message': str(e),
+                'records_updated': 0,
+                'last_date': None
+            }

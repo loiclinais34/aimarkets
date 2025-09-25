@@ -202,7 +202,7 @@ export default function StrategiesPage() {
                     Charger
                   </button>
                   <button
-                    onClick={() => handleInitializePredefined(strategyType.type)}
+                    onClick={() => {/* TODO: Implémenter handleInitializePredefined */}}
                     className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200"
                   >
                     Initialiser

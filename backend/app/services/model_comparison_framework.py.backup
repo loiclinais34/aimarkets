@@ -862,6 +862,22 @@ class ModelComparisonFramework:
                 max_iter=2000
             )
         
+        # Ajouter GRU si PyTorch est disponible (modèle robuste recommandé)
+        if PYTORCH_AVAILABLE:
+            models['GRU'] = GRUModel('GRU')
+            models['GRU_Tuned'] = GRUModel(
+                'GRU_Tuned',
+                parameters={
+                    'sequence_length': 7,  # Séquence modérée
+                    'hidden_size': 32,  # Taille cachée modérée
+                    'num_layers': 2,  # Deux couches pour plus de capacité
+                    'dropout_rate': 0.1,  # Dropout léger
+                    'learning_rate': 0.001,
+                    'epochs': 8,  # Épochs modérés
+                    'batch_size': 16  # Batch size modéré
+                }
+            )
+        
         # Ajouter LSTM si TensorFlow est disponible
         if TENSORFLOW_AVAILABLE:
             models['LSTM'] = LSTMModel('LSTM')

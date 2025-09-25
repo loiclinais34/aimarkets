@@ -146,7 +146,7 @@ export const StrategyList: React.FC<StrategyListProps> = ({
         const params = new URLSearchParams();
         if (filters?.strategy_type) params.append('strategy_type', filters.strategy_type);
         if (filters?.is_active !== undefined) params.append('is_active', filters.is_active.toString());
-        if (filters?.created_by) params.append('created_by', filters.created_by);
+        // if (filters?.created_by) params.append('created_by', filters.created_by);
 
         const response = await fetch(`http://localhost:8000/api/v1/strategies/?${params.toString()}`);
         console.log('Response status:', response.status);
@@ -191,7 +191,7 @@ export const StrategyList: React.FC<StrategyListProps> = ({
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
         <p className="text-red-800">Erreur lors du chargement des stratégies</p>
         <button 
-          onClick={() => refetch()}
+          onClick={() => window.location.reload()}
           className="mt-2 text-red-600 hover:text-red-800 text-sm font-medium"
         >
           Réessayer
