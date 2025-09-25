@@ -19,7 +19,8 @@ from .model_comparison_framework import (
     RandomForestModel, 
     XGBoostModel, 
     LightGBMModel, 
-    NeuralNetworkModel
+    NeuralNetworkModel,
+    LSTMModel
 )
 from .trading_metrics_interpreter import TradingMetricsInterpreter
 from ..models.database import (

@@ -31,7 +31,7 @@ from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
     classification_report, confusion_matrix, roc_auc_score
 )
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.preprocessing import StandardScaler, LabelEncoder, MinMaxScaler
 
 # Imports pour les modèles avancés (optionnels)
 try:
@@ -47,6 +47,25 @@ try:
 except ImportError:
     LIGHTGBM_AVAILABLE = False
     print("LightGBM non disponible. Installez avec: pip install lightgbm")
+
+# Désactiver TensorFlow temporairement à cause du mutex
+TENSORFLOW_AVAILABLE = False
+print("TensorFlow désactivé temporairement (problème de mutex)")
+
+# try:
+#     import tensorflow as tf
+#     from tensorflow.keras.models import Sequential
+#     from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization
+#     from tensorflow.keras.optimizers import Adam
+#     from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+#     from tensorflow.keras.regularizers import l1_l2
+#     TENSORFLOW_AVAILABLE = True
+# except ImportError:
+#     TENSORFLOW_AVAILABLE = False
+#     print("TensorFlow non disponible. Installez avec: pip install tensorflow")
+# except Exception as e:
+#     TENSORFLOW_AVAILABLE = False
+#     print(f"TensorFlow non disponible (erreur mutex): {e}")
 
 try:
     from sklearn.neural_network import MLPClassifier, MLPRegressor
@@ -224,6 +243,223 @@ class NeuralNetworkModel(BaseModel):
             random_state=self.parameters.get('random_state', 42)
         )
 
+class LSTMModel(BaseModel):
+    """Modèle LSTM spécialisé pour les données financières séquentielles"""
+    
+    def __init__(self, name: str = "LSTM", parameters: Optional[Dict[str, Any]] = None):
+        super().__init__(name, **parameters if parameters else {})
+        self.scaler = MinMaxScaler()
+        self.sequence_length = self.parameters.get('sequence_length', 60)  # 60 jours de lookback
+        self.feature_columns = None
+        self.is_fitted = False
+        
+    def _create_model(self):
+        if not TENSORFLOW_AVAILABLE:
+            raise ImportError("TensorFlow n'est pas disponible. Installez avec: pip install tensorflow")
+        
+        # Paramètres par défaut optimisés pour les données financières
+        lstm_units = self.parameters.get('lstm_units', [128, 64])
+        dropout_rate = self.parameters.get('dropout_rate', 0.3)
+        learning_rate = self.parameters.get('learning_rate', 0.001)
+        l1_reg = self.parameters.get('l1_reg', 0.01)
+        l2_reg = self.parameters.get('l2_reg', 0.01)
+        
+        model = Sequential()
+        
+        # Première couche LSTM avec return_sequences=True pour les couches suivantes
+        model.add(LSTM(
+            units=lstm_units[0],
+            return_sequences=True,
+            input_shape=(self.sequence_length, len(self.feature_columns)) if self.feature_columns else (self.sequence_length, 1),
+            kernel_regularizer=l1_l2(l1=l1_reg, l2=l2_reg)
+        ))
+        model.add(BatchNormalization())
+        model.add(Dropout(dropout_rate))
+        
+        # Couches LSTM supplémentaires
+        for i, units in enumerate(lstm_units[1:], 1):
+            return_sequences = i < len(lstm_units) - 1
+            model.add(LSTM(
+                units=units,
+                return_sequences=return_sequences,
+                kernel_regularizer=l1_l2(l1=l1_reg, l2=l2_reg)
+            ))
+            model.add(BatchNormalization())
+            model.add(Dropout(dropout_rate))
+        
+        # Couches Dense pour la classification
+        model.add(Dense(32, activation='relu', kernel_regularizer=l1_l2(l1=l1_reg, l2=l2_reg)))
+        model.add(Dropout(dropout_rate))
+        model.add(Dense(16, activation='relu'))
+        model.add(Dropout(dropout_rate / 2))
+        
+        # Couche de sortie pour classification binaire
+        model.add(Dense(1, activation='sigmoid'))
+        
+        # Compilation avec optimiseur Adam
+        model.compile(
+            optimizer=Adam(learning_rate=learning_rate),
+            loss='binary_crossentropy',
+            metrics=['accuracy', 'precision', 'recall']
+        )
+        
+        return model
+    
+    def prepare_sequential_data(self, X: pd.DataFrame, y: pd.Series) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Prépare les données pour l'entraînement LSTM en créant des séquences temporelles
+        
+        Args:
+            X: Features (doit être trié par date)
+            y: Target (doit être trié par date)
+            
+        Returns:
+            X_sequences: Données séquentielles (samples, timesteps, features)
+            y_sequences: Targets correspondants
+        """
+        # Normaliser les features
+        X_scaled = self.scaler.fit_transform(X)
+        
+        # Créer les séquences
+        X_sequences = []
+        y_sequences = []
+        
+        for i in range(self.sequence_length, len(X_scaled)):
+            # Séquence de features (lookback window)
+            X_sequences.append(X_scaled[i-self.sequence_length:i])
+            # Target correspondant
+            y_sequences.append(y.iloc[i])
+        
+        return np.array(X_sequences), np.array(y_sequences)
+    
+    def fit(self, X: pd.DataFrame, y: pd.Series, validation_split: float = 0.2) -> Dict[str, Any]:
+        """
+        Entraîne le modèle LSTM avec gestion des séquences temporelles
+        
+        Args:
+            X: Features (doit être trié par date)
+            y: Target (doit être trié par date)
+            validation_split: Proportion des données pour la validation
+            
+        Returns:
+            Dict avec les métriques d'entraînement
+        """
+        if not TENSORFLOW_AVAILABLE:
+            raise ImportError("TensorFlow n'est pas disponible")
+        
+        # Stocker les colonnes de features
+        self.feature_columns = X.columns.tolist()
+        
+        # Préparer les données séquentielles
+        X_sequences, y_sequences = self.prepare_sequential_data(X, y)
+        
+        # Créer le modèle
+        self.model = self._create_model()
+        
+        # Callbacks pour améliorer l'entraînement
+        callbacks = [
+            EarlyStopping(
+                monitor='val_loss',
+                patience=self.parameters.get('patience', 20),
+                restore_best_weights=True,
+                verbose=1
+            ),
+            ReduceLROnPlateau(
+                monitor='val_loss',
+                factor=0.5,
+                patience=10,
+                min_lr=1e-7,
+                verbose=1
+            )
+        ]
+        
+        # Entraînement
+        history = self.model.fit(
+            X_sequences, y_sequences,
+            epochs=self.parameters.get('epochs', 100),
+            batch_size=self.parameters.get('batch_size', 32),
+            validation_split=validation_split,
+            callbacks=callbacks,
+            verbose=self.parameters.get('verbose', 1)
+        )
+        
+        self.is_fitted = True
+        
+        return {
+            'history': history.history,
+            'best_epoch': len(history.history['loss']),
+            'final_loss': history.history['loss'][-1],
+            'final_val_loss': history.history['val_loss'][-1],
+            'final_accuracy': history.history['accuracy'][-1],
+            'final_val_accuracy': history.history['val_accuracy'][-1]
+        }
+    
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
+        """Prédictions avec le modèle LSTM"""
+        if not self.is_fitted:
+            raise ValueError("Le modèle doit être entraîné avant de faire des prédictions")
+        
+        # Normaliser les données avec le scaler entraîné
+        X_scaled = self.scaler.transform(X)
+        
+        # Créer les séquences pour la prédiction
+        X_sequences = []
+        for i in range(self.sequence_length, len(X_scaled) + 1):
+            X_sequences.append(X_scaled[i-self.sequence_length:i])
+        
+        X_sequences = np.array(X_sequences)
+        
+        # Prédictions
+        predictions = self.model.predict(X_sequences, verbose=0)
+        
+        # Retourner les prédictions comme probabilités
+        return predictions.flatten()
+    
+    def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
+        """Probabilités de prédiction"""
+        predictions = self.predict(X)
+        # Retourner les probabilités pour les deux classes
+        return np.column_stack([1 - predictions, predictions])
+    
+    def get_feature_importance(self) -> Dict[str, float]:
+        """
+        Pour LSTM, on ne peut pas facilement extraire l'importance des features
+        comme pour les arbres. On retourne un dictionnaire vide.
+        """
+        return {}
+    
+    def save_model(self, filepath: str):
+        """Sauvegarde le modèle LSTM et le scaler"""
+        if not self.is_fitted:
+            raise ValueError("Le modèle doit être entraîné avant d'être sauvegardé")
+        
+        # Sauvegarder le modèle Keras
+        self.model.save(f"{filepath}_model.h5")
+        
+        # Sauvegarder le scaler et les métadonnées
+        model_data = {
+            'scaler': self.scaler,
+            'sequence_length': self.sequence_length,
+            'feature_columns': self.feature_columns,
+            'parameters': self.parameters,
+            'is_fitted': self.is_fitted
+        }
+        
+        joblib.dump(model_data, f"{filepath}_metadata.pkl")
+    
+    def load_model(self, filepath: str):
+        """Charge le modèle LSTM et le scaler"""
+        # Charger le modèle Keras
+        self.model = tf.keras.models.load_model(f"{filepath}_model.h5")
+        
+        # Charger les métadonnées
+        model_data = joblib.load(f"{filepath}_metadata.pkl")
+        self.scaler = model_data['scaler']
+        self.sequence_length = model_data['sequence_length']
+        self.feature_columns = model_data['feature_columns']
+        self.parameters = model_data['parameters']
+        self.is_fitted = model_data['is_fitted']
+
 class ModelComparisonFramework:
     """Framework principal pour la comparaison de modèles"""
     
@@ -288,6 +524,32 @@ class ModelComparisonFramework:
                 max_iter=2000
             )
         
+        # Ajouter LSTM si TensorFlow est disponible
+        if TENSORFLOW_AVAILABLE:
+            models['LSTM'] = LSTMModel('LSTM')
+            models['LSTM_Tuned'] = LSTMModel(
+                'LSTM_Tuned',
+                sequence_length=30,  # Lookback plus court pour plus de données
+                lstm_units=[64, 32],  # Architecture plus simple
+                dropout_rate=0.2,
+                learning_rate=0.001,
+                epochs=50,
+                batch_size=16,
+                patience=15
+            )
+            models['LSTM_Deep'] = LSTMModel(
+                'LSTM_Deep',
+                sequence_length=60,  # Lookback plus long
+                lstm_units=[128, 64, 32],  # Architecture plus profonde
+                dropout_rate=0.3,
+                learning_rate=0.0005,
+                epochs=100,
+                batch_size=32,
+                patience=25,
+                l1_reg=0.01,
+                l2_reg=0.01
+            )
+        
         return models
     
     def add_model(self, name: str, model: BaseModel):
@@ -337,20 +599,50 @@ class ModelComparisonFramework:
                     continue
                 
                 # Entraîner le modèle
-                model.fit(X_train, y_train)
-                
-                # Faire des prédictions
-                y_pred = model.predict(X_test)
-                y_pred_proba = model.predict_proba(X_test)
+                if isinstance(model, LSTMModel):
+                    # Pour LSTM, on a besoin de données séquentielles
+                    # Convertir les arrays numpy en DataFrames pour LSTM
+                    X_train_df = pd.DataFrame(X_train)
+                    y_train_series = pd.Series(y_train)
+                    X_test_df = pd.DataFrame(X_test)
+                    
+                    # Entraîner avec validation split
+                    training_info = model.fit(X_train_df, y_train_series, validation_split=0.2)
+                    logger.info(f"Entraînement LSTM terminé - Epochs: {training_info['best_epoch']}, "
+                              f"Loss: {training_info['final_loss']:.4f}, "
+                              f"Val Loss: {training_info['final_val_loss']:.4f}")
+                    
+                    # Prédictions
+                    y_pred = model.predict(X_test_df)
+                    y_pred_proba = model.predict_proba(X_test_df)
+                    
+                    # Pour LSTM, ajuster les targets car on perd des échantillons à cause de la séquence
+                    sequence_length = model.sequence_length
+                    y_test_adjusted = y_test[sequence_length:]
+                    
+                else:
+                    # Entraînement standard pour les autres modèles
+                    model.fit(X_train, y_train)
+                    
+                    # Prédictions
+                    y_pred = model.predict(X_test)
+                    y_pred_proba = model.predict_proba(X_test)
+                    y_test_adjusted = y_test
                 
                 # Calculer les métriques ML
-                ml_metrics = self._calculate_ml_metrics(y_test, y_pred, y_pred_proba)
+                ml_metrics = self._calculate_ml_metrics(y_test_adjusted, y_pred, y_pred_proba)
                 
                 # Calculer les métriques de trading si les prix sont fournis
                 trading_metrics = None
                 if prices is not None:
+                    # Ajuster les prix aussi pour LSTM
+                    if isinstance(model, LSTMModel):
+                        prices_adjusted = prices[sequence_length:]
+                    else:
+                        prices_adjusted = prices
+                    
                     trading_metrics = self._calculate_trading_metrics(
-                        y_pred, y_pred_proba, prices
+                        y_pred, y_pred_proba, prices_adjusted
                     )
                 
                 # Créer les métriques complètes
