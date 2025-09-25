@@ -152,6 +152,15 @@ app.include_router(
     tags=["Stratégies de Trading"]
 )
 
+# Import du router model_comparison
+from app.api.endpoints import model_comparison
+
+app.include_router(
+    model_comparison.router,
+    prefix="/api/v1/model-comparison",
+    tags=["Comparaison de Modèles"]
+)
+
 # Endpoints LightGBM temporairement désactivés à cause de problèmes de stabilité
 # app.include_router(
 #     lightgbm_models.router,
