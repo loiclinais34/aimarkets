@@ -660,10 +660,6 @@ export const apiService = {
           return response.data
         },
 
-        getDataStats: async (): Promise<any> => {
-          const response = await apiClient.get('/api/v1/data-update/stats')
-          return response.data.data || response.data
-        },
 
         getTaskStatus: async (taskId: string): Promise<any> => {
           const response = await apiClient.get(`/api/v1/data-update/task-status/${taskId}`)
@@ -689,6 +685,17 @@ export const apiService = {
     })
     return response.data
   },
+
+  searchOpportunities: async (parameters: {
+    target_return_percentage: number;
+    time_horizon_days: number;
+    risk_tolerance: number;
+    confidence_threshold: number;
+  }): Promise<any> => {
+    const response = await apiClient.post('/api/v1/screener/search-opportunities', parameters)
+    return response.data
+  },
+
 }
 
 // API pour les métadonnées des symboles

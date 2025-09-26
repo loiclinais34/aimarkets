@@ -4,6 +4,7 @@ Tâche de screener ML limité - version de test avec un nombre limité de symbol
 import time
 from datetime import datetime, date
 from typing import Dict, List, Any
+from decimal import Decimal
 from celery import current_task
 from sqlalchemy.orm import Session
 
@@ -34,7 +35,13 @@ def run_full_screener_ml_limited(self, screener_request: Dict[str, Any], user_id
             meta={
                 "status": "Démarrage du screener ML limité...",
                 "progress": 0,
-                "current_step": "initialization"
+                "current_step": "initialization",
+                "steps": [
+                    {"step": 1, "name": "Entraînement des modèles", "status": "pending"},
+                    {"step": 2, "name": "Calcul des prédictions", "status": "pending"},
+                    {"step": 3, "name": "Filtrage des opportunités", "status": "pending"},
+                    {"step": 4, "name": "Finalisation", "status": "pending"}
+                ]
             }
         )
         
@@ -104,7 +111,13 @@ def run_full_screener_ml_limited(self, screener_request: Dict[str, Any], user_id
                 "current_step": "training_models",
                 "screener_run_id": screener_run_id,
                 "total_symbols": total_symbols,
-                "trained_models": 0
+                "trained_models": 0,
+                "steps": [
+                    {"step": 1, "name": "Entraînement des modèles", "status": "current"},
+                    {"step": 2, "name": "Calcul des prédictions", "status": "pending"},
+                    {"step": 3, "name": "Filtrage des opportunités", "status": "pending"},
+                    {"step": 4, "name": "Finalisation", "status": "pending"}
+                ]
             }
         )
         
@@ -121,7 +134,14 @@ def run_full_screener_ml_limited(self, screener_request: Dict[str, Any], user_id
                     "screener_run_id": screener_run_id,
                     "total_symbols": total_symbols,
                     "trained_models": successful_models,
-                    "current_symbol": symbol
+                    "current_symbol": symbol,
+                    "successful_updates": successful_models,
+                    "steps": [
+                        {"step": 1, "name": "Entraînement des modèles", "status": "current"},
+                        {"step": 2, "name": "Calcul des prédictions", "status": "pending"},
+                        {"step": 3, "name": "Filtrage des opportunités", "status": "pending"},
+                        {"step": 4, "name": "Finalisation", "status": "pending"}
+                    ]
                 }
             )
             
@@ -149,11 +169,11 @@ def run_full_screener_ml_limited(self, screener_request: Dict[str, Any], user_id
                         target_param = TargetParameters(
                             user_id=user_id,
                             parameter_name=f"target_{symbol}_{request.target_return_percentage}%_{request.time_horizon_days}d",
-                            target_return_percentage=request.target_return_percentage,
+                            target_return_percentage=Decimal(str(request.target_return_percentage)),
                             time_horizon_days=request.time_horizon_days,
                             risk_tolerance=risk_tolerance_str,
-                            min_confidence_threshold=request.risk_tolerance,
-                            max_drawdown_percentage=5.0,
+                            min_confidence_threshold=Decimal(str(request.risk_tolerance)),
+                            max_drawdown_percentage=Decimal("5.0"),
                             is_active=True
                         )
                         db.add(target_param)
@@ -201,17 +221,42 @@ def run_full_screener_ml_limited(self, screener_request: Dict[str, Any], user_id
                 "current_step": "making_predictions",
                 "screener_run_id": screener_run_id,
                 "total_symbols": total_symbols,
-                "successful_models": successful_models
+                "successful_models": successful_models,
+                "steps": [
+                    {"step": 1, "name": "Entraînement des modèles", "status": "completed"},
+                    {"step": 2, "name": "Calcul des prédictions", "status": "current"},
+                    {"step": 3, "name": "Filtrage des opportunités", "status": "pending"},
+                    {"step": 4, "name": "Finalisation", "status": "pending"}
+                ]
             }
         )
         
         # Récupération des modèles actifs pour les symboles entraînés
+        # Utiliser les modèles qui viennent d'être entraînés avec les paramètres spécifiques
         db = get_fresh_db_session()
         try:
+            # Récupérer les modèles avec les paramètres spécifiques de cette recherche
             active_models = db.query(MLModels).filter(
                 MLModels.is_active == True,
                 MLModels.symbol.in_(symbols)
             ).all()
+            
+            # Filtrer par les paramètres de la recherche
+            filtered_models = []
+            for model in active_models:
+                params = model.model_parameters
+                if params and isinstance(params, dict):
+                    model_target_return = params.get('target_return_percentage')
+                    model_time_horizon = params.get('time_horizon_days')
+                    
+                    # Vérifier si les paramètres correspondent
+                    if (str(model_target_return) == str(request.target_return_percentage) and 
+                        model_time_horizon == request.time_horizon_days):
+                        filtered_models.append(model)
+            
+            active_models = filtered_models
+            print(f"🎯 {len(active_models)} modèles trouvés avec les paramètres {request.target_return_percentage}% sur {request.time_horizon_days} jours")
+            
         finally:
             db.close()
         
@@ -228,10 +273,16 @@ def run_full_screener_ml_limited(self, screener_request: Dict[str, Any], user_id
                     "progress": int(progress),
                     "current_step": "making_predictions",
                     "screener_run_id": screener_run_id,
+                    "current_symbol": model.symbol,
+                    "steps": [
+                        {"step": 1, "name": "Entraînement des modèles", "status": "completed"},
+                        {"step": 2, "name": "Calcul des prédictions", "status": "current"},
+                        {"step": 3, "name": "Filtrage des opportunités", "status": "pending"},
+                        {"step": 4, "name": "Finalisation", "status": "pending"}
+                    ],
                     "total_symbols": total_symbols,
                     "successful_models": successful_models,
-                    "predictions_made": predictions_made,
-                    "current_symbol": model.symbol
+                    "predictions_made": predictions_made
                 }
             )
             
@@ -253,7 +304,9 @@ def run_full_screener_ml_limited(self, screener_request: Dict[str, Any], user_id
                         confidence = prediction_result["confidence"]
                         
                         # Vérification si c'est une opportunité
-                        if prediction == 1.0 and confidence >= request.risk_tolerance:
+                        # Utiliser le confidence_threshold du paramètre de recherche
+                        confidence_threshold = screener_request.get('confidence_threshold', 0.7)
+                        if prediction == 1.0 and confidence >= confidence_threshold:
                             opportunities_found += 1
                             
                             # Enregistrement du résultat
@@ -336,6 +389,12 @@ def run_full_screener_ml_limited(self, screener_request: Dict[str, Any], user_id
             meta={
                 "status": "Screener ML limité terminé avec succès!",
                 "progress": 100,
+                "steps": [
+                    {"step": 1, "name": "Entraînement des modèles", "status": "completed"},
+                    {"step": 2, "name": "Calcul des prédictions", "status": "completed"},
+                    {"step": 3, "name": "Filtrage des opportunités", "status": "completed"},
+                    {"step": 4, "name": "Finalisation", "status": "completed"}
+                ],
                 "current_step": "completed",
                 "result": result
             }

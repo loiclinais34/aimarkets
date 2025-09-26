@@ -8,11 +8,18 @@ from ...models.schemas import (
     ScreenerRequest, ScreenerResponse, ScreenerRun, ScreenerResult,
     ScreenerConfig, ScreenerConfigCreate, ScreenerConfigUpdate
 )
+from pydantic import BaseModel
 from ...services.screener_service import ScreenerService
 from ...services.celery_manager import CeleryManager
 from ...tasks.screener_tasks import get_task_status
 
 router = APIRouter()
+
+class OpportunitySearchRequest(BaseModel):
+    target_return_percentage: float
+    time_horizon_days: int
+    risk_tolerance: float
+    confidence_threshold: float
 
 def ensure_celery_ready():
     """
@@ -337,7 +344,7 @@ def get_latest_opportunities(db: Session = Depends(get_db)):
                 "model_name": model.model_name if model else "Unknown",
                 "target_return": float(model.target_parameter.target_return_percentage) if model and model.target_parameter else None,
                 "time_horizon": model.target_parameter.time_horizon_days if model and model.target_parameter else None,
-                "prediction_date": None,  # ScreenerResult n'a pas de prediction_date
+                "prediction_date": latest_screener_run.run_date.isoformat() if latest_screener_run.run_date else None,
                 "screener_run_id": result.screener_run_id,
                 "rank": result.rank
             })
@@ -772,4 +779,86 @@ def get_screener_stats(db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erreur lors de la récupération des statistiques: {str(e)}"
+        )
+
+@router.post("/search-opportunities")
+async def search_opportunities(
+    request: OpportunitySearchRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Recherche d'opportunités avec paramètres personnalisés.
+    
+    Utilise les modèles robustes (Random Forest, XGBoost, LightGBM, Neural Networks)
+    avec les paramètres de rendement et d'horizon temporel spécifiés.
+    """
+    try:
+        # Validation des paramètres
+        if request.target_return_percentage <= 0 or request.target_return_percentage > 100:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Le rendement attendu doit être entre 0 et 100%"
+            )
+        
+        if request.time_horizon_days <= 0 or request.time_horizon_days > 365:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="L'horizon temporel doit être entre 1 et 365 jours"
+            )
+        
+        if request.risk_tolerance < 0.1 or request.risk_tolerance > 1.0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La tolérance au risque doit être entre 0.1 et 1.0"
+            )
+        
+        if request.confidence_threshold < 0.5 or request.confidence_threshold > 0.95:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Le seuil de confiance doit être entre 0.5 et 0.95"
+            )
+        
+        # S'assurer que Celery est prêt
+        ensure_celery_ready()
+        
+        # Créer une requête de screener avec les paramètres
+        screener_request = ScreenerRequest(
+            target_return_percentage=request.target_return_percentage,
+            time_horizon_days=request.time_horizon_days,
+            risk_tolerance=request.risk_tolerance
+        )
+        
+        # Lancer la tâche de screener avec les modèles robustes
+        from ...tasks.full_screener_ml_limited_tasks import run_full_screener_ml_limited
+        
+        task = run_full_screener_ml_limited.delay(
+            screener_request.dict(),
+            user_id="opportunity_search_user",
+            max_symbols=50  # Limiter pour une recherche rapide
+        )
+        
+        return {
+            "success": True,
+            "message": "Recherche d'opportunités lancée avec succès",
+            "task_id": task.id,
+            "parameters": {
+                "target_return_percentage": request.target_return_percentage,
+                "time_horizon_days": request.time_horizon_days,
+                "risk_tolerance": request.risk_tolerance,
+                "confidence_threshold": request.confidence_threshold
+            },
+            "models_used": [
+                "Random Forest",
+                "XGBoost", 
+                "LightGBM",
+                "Neural Networks"
+            ]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors du lancement de la recherche: {str(e)}"
         )

@@ -82,11 +82,67 @@ class MLService:
         # Calcul du prix cible
         target_price = current_price * (1 + daily_return * time_horizon_days)
         return target_price
+
+    def create_target_labels_with_parameters(self, df: pd.DataFrame, target_return_percentage: float, time_horizon_days: int) -> pd.DataFrame:
+        """
+        Crée les labels de cible en utilisant les paramètres de rendement et d'horizon temporel.
+        
+        Args:
+            df: DataFrame avec les données historiques
+            target_return_percentage: Rendement attendu en pourcentage
+            time_horizon_days: Horizon temporel en jours
+            
+        Returns:
+            DataFrame avec les labels de cible ajoutés
+        """
+        if df.empty:
+            return df
+        
+        # Calculer le prix cible pour chaque jour
+        df['target_price'] = df['close'].apply(
+            lambda x: self.calculate_target_price(x, target_return_percentage, time_horizon_days)
+        )
+        
+        # Calculer le rendement réel sur l'horizon
+        df['future_close'] = df['close'].shift(-time_horizon_days)
+        df['actual_return'] = (df['future_close'] - df['close']) / df['close'] * 100
+        
+        # Créer les labels de classification
+        df['target_achieved'] = (df['actual_return'] >= target_return_percentage).astype(int)
+        
+        # Créer les labels de régression (rendement réel)
+        df['target_return'] = df['actual_return']
+        
+        # Ajouter des features basées sur les paramètres
+        df['target_return_percentage'] = target_return_percentage
+        df['time_horizon_days'] = time_horizon_days
+        
+        # Calculer des ratios basés sur les paramètres
+        df['return_vs_target'] = df['actual_return'] / target_return_percentage
+        df['days_to_target'] = time_horizon_days
+        
+        return df
     
     def create_labels_for_training(self, symbol: str, target_param: TargetParameters, db: Session = None) -> pd.DataFrame:
         """Créer les labels pour l'entraînement basés sur les paramètres de cible"""
         # Utiliser la session passée en paramètre ou celle de l'instance
         session = db or self.db
+        
+        # Récupérer le dernier cours connu pour ce symbole
+        latest_data = session.query(HistoricalData).filter(
+            HistoricalData.symbol == symbol
+        ).order_by(HistoricalData.date.desc()).first()
+        
+        if not latest_data:
+            return pd.DataFrame()
+        
+        latest_price = float(latest_data.close)
+        latest_date = latest_data.date
+        
+        # Calculer le prix cible basé sur le rendement attendu
+        target_price = latest_price * (1 + float(target_param.target_return_percentage) / 100)
+        
+        print(f"🎯 {symbol}: Dernier cours = ${latest_price:.2f}, Prix cible = ${target_price:.2f} (+{target_param.target_return_percentage}%)")
         
         # Récupérer les données historiques avec SQLAlchemy ORM
         historical_data = session.query(HistoricalData).filter(
@@ -227,21 +283,28 @@ class MLService:
         if df.empty:
             return pd.DataFrame()
         
-        # Calculer le prix cible pour chaque jour
-        df['target_price'] = df['close'].apply(
-            lambda x: self.calculate_target_price(x, target_param.target_return_percentage, target_param.time_horizon_days)
-        )
-        
-        # Calculer le rendement réel sur l'horizon
+        # NOUVELLE LOGIQUE : Utiliser le prix cible calculé à partir du dernier cours
+        # Pour chaque ligne, calculer si le prix futur atteint le prix cible
         df['future_close'] = df['close'].shift(-target_param.time_horizon_days)
         df['actual_return'] = (df['future_close'] - df['close']) / df['close'] * 100
         
-        # Créer les labels de classification
-        target_return_float = float(target_param.target_return_percentage)
-        df['target_achieved'] = (df['actual_return'] >= target_return_float).astype(int)
+        # Calculer le prix cible pour chaque jour basé sur le rendement attendu
+        df['target_price'] = df['close'] * (1 + float(target_param.target_return_percentage) / 100)
+        
+        # Créer les labels de classification : le prix futur atteint-il le prix cible ?
+        df['target_achieved'] = (df['future_close'] >= df['target_price']).astype(int)
         
         # Créer les labels de régression (rendement réel)
         df['target_return'] = df['actual_return']
+        
+        # Ajouter des informations de debug
+        print(f"📊 {symbol}: {len(df)} échantillons d'entraînement")
+        print(f"📊 {symbol}: {df['target_achieved'].sum()} échantillons positifs sur {len(df)} ({df['target_achieved'].mean()*100:.1f}%)")
+        
+        # Supprimer les lignes avec des valeurs NaN (futures manquantes)
+        df = df.dropna(subset=['future_close', 'target_achieved'])
+        
+        print(f"📊 {symbol}: {len(df)} échantillons valides après nettoyage")
         
         # Remplacer les valeurs NaN par des valeurs par défaut au lieu de supprimer les lignes
         # Pour les features numériques, utiliser la médiane ou 0
@@ -558,13 +621,14 @@ class MLService:
         }
 
     def train_multiple_models(self, symbol: str, target_param: TargetParameters, algorithms: List[str] = None, db: Session = None) -> Dict:
-        """Entraîner plusieurs types de modèles (RandomForest, XGBoost, LightGBM) pour un symbole"""
+        """Entraîner plusieurs types de modèles (RandomForest, XGBoost, LightGBM, NeuralNetwork) pour un symbole"""
         if algorithms is None:
             algorithms = ['RandomForest']
             if XGBOOST_AVAILABLE:
                 algorithms.append('XGBoost')
             if LIGHTGBM_AVAILABLE:
                 algorithms.append('LightGBM')
+            algorithms.append('NeuralNetwork')
         
         results = {}
         
@@ -578,6 +642,8 @@ class MLService:
                     result = self.train_xgboost_model(symbol, target_param, db)
                 elif algorithm == 'LightGBM' and LIGHTGBM_AVAILABLE:
                     result = self.train_lightgbm_model(symbol, target_param, db)
+                elif algorithm == 'NeuralNetwork':
+                    result = self.train_neural_network_model(symbol, target_param, db)
                 else:
                     print(f"⚠️ Algorithme {algorithm} non disponible")
                     continue
@@ -592,7 +658,42 @@ class MLService:
                 print(f"❌ Erreur lors de l'entraînement {algorithm} pour {symbol}: {str(e)}")
                 continue
         
-        return results
+        # Filtrer les modèles par performance
+        filtered_results = self.filter_models_by_performance(results)
+        
+        print(f"🎯 {symbol}: {len(filtered_results)}/{len(results)} modèles performants retenus")
+        
+        return filtered_results
+
+    def filter_models_by_performance(self, results: Dict, min_accuracy: float = 0.6, min_f1_score: float = 0.5) -> Dict:
+        """
+        Filtre les modèles en fonction de leurs performances.
+        
+        Args:
+            results: Dictionnaire des résultats d'entraînement
+            min_accuracy: Précision minimale requise
+            min_f1_score: Score F1 minimal requis
+            
+        Returns:
+            Dictionnaire des modèles performants
+        """
+        filtered_results = {}
+        
+        for algorithm, result in results.items():
+            if "error" in result:
+                print(f"❌ {algorithm}: {result['error']}")
+                continue
+                
+            accuracy = result.get('accuracy', 0)
+            f1_score = result.get('f1_score', 0)
+            
+            if accuracy >= min_accuracy and f1_score >= min_f1_score:
+                filtered_results[algorithm] = result
+                print(f"✅ {algorithm}: Performance validée (Accuracy: {accuracy:.3f}, F1: {f1_score:.3f})")
+            else:
+                print(f"⚠️ {algorithm}: Performance insuffisante (Accuracy: {accuracy:.3f}, F1: {f1_score:.3f}) - Rejeté")
+        
+        return filtered_results
 
     def train_xgboost_model(self, symbol: str, target_param: TargetParameters, db: Session = None) -> Dict:
         """Entraîner un modèle XGBoost pour la classification"""
@@ -638,7 +739,7 @@ class MLService:
         cv_scores = cross_val_score(model, X, y, cv=5, scoring='accuracy')
         
         # Sauvegarder le modèle
-        model_name = f"classification_{symbol}_target_{symbol}_{target_param.target_return_percentage}%_{target_param.time_horizon_days}d_xgboost"
+        model_name = f"classification_{symbol}_target_{symbol}_{float(target_param.target_return_percentage)}%_{target_param.time_horizon_days}d_xgboost"
         model_path = os.path.join(self.models_path, f"{model_name}.joblib")
         os.makedirs(os.path.dirname(model_path), exist_ok=True)
         joblib.dump(model, model_path)
@@ -737,7 +838,7 @@ class MLService:
         cv_scores = cross_val_score(model, X, y, cv=5, scoring='accuracy')
         
         # Sauvegarder le modèle
-        model_name = f"classification_{symbol}_target_{symbol}_{target_param.target_return_percentage}%_{target_param.time_horizon_days}d_lightgbm"
+        model_name = f"classification_{symbol}_target_{symbol}_{float(target_param.target_return_percentage)}%_{target_param.time_horizon_days}d_lightgbm"
         model_path = os.path.join(self.models_path, f"{model_name}.joblib")
         os.makedirs(os.path.dirname(model_path), exist_ok=True)
         joblib.dump(model, model_path)
@@ -908,10 +1009,19 @@ class MLService:
         if not ml_model:
             return {"error": "Modèle non trouvé"}
         
+        # Vérifier que le chemin du modèle existe
+        if not ml_model.model_path:
+            return {"error": "Chemin du modèle non défini"}
+        
         # Charger le modèle et le scaler
-        model = joblib.load(ml_model.model_path)
-        scaler_path = ml_model.model_path.replace('.joblib', '_scaler.joblib')
-        scaler = joblib.load(scaler_path)
+        try:
+            model = joblib.load(ml_model.model_path)
+            scaler_path = ml_model.model_path.replace('.joblib', '_scaler.joblib')
+            scaler = joblib.load(scaler_path)
+        except FileNotFoundError:
+            return {"error": f"Fichier modèle non trouvé: {ml_model.model_path}"}
+        except Exception as e:
+            return {"error": f"Erreur lors du chargement du modèle: {str(e)}"}
         
         # Récupérer les données du jour avec SQLAlchemy ORM
         # D'abord essayer la date exacte
@@ -1456,3 +1566,125 @@ class MLService:
             }
         else:
             return {"error": "Ce type de modèle ne supporte pas l'importance des features"}
+
+    def train_neural_network_model(self, symbol: str, target_param: TargetParameters, db: Session = None) -> Dict:
+        """Entraîner un modèle de réseau de neurones pour la classification"""
+        try:
+            from sklearn.neural_network import MLPClassifier
+        except ImportError:
+            return {"error": "MLPClassifier non disponible"}
+        
+        # Utiliser la session passée en paramètre ou celle de l'instance
+        session = db or self.db
+        
+        # Créer les données d'entraînement
+        df = self.create_labels_for_training(symbol, target_param, session)
+        
+        if df.empty or len(df) < 100:
+            return {"error": "Pas assez de données pour l'entraînement"}
+        
+        # Préparer les features et labels
+        feature_columns = [col for col in df.columns if col not in [
+            'date', 'symbol', 'target_achieved', 'target_return', 'target_price', 
+            'future_close', 'actual_return', 'target_return_percentage', 
+            'time_horizon_days', 'return_vs_target', 'days_to_target'
+        ]]
+        
+        X = df[feature_columns].fillna(0)
+        y = df['target_achieved']
+        
+        # Supprimer les lignes avec des valeurs infinies
+        mask = np.isfinite(X).all(axis=1) & np.isfinite(y)
+        X = X[mask]
+        y = y[mask]
+        
+        if len(X) < 50:
+            return {"error": "Pas assez de données valides après nettoyage"}
+        
+        # Diviser en train/test
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+        
+        # Normaliser les features
+        scaler = StandardScaler()
+        X_train_scaled = scaler.fit_transform(X_train)
+        X_test_scaled = scaler.transform(X_test)
+        
+        # Entraîner le modèle
+        model = MLPClassifier(
+            hidden_layer_sizes=(100, 50),
+            max_iter=500,
+            random_state=42,
+            early_stopping=True,
+            validation_fraction=0.1
+        )
+        
+        model.fit(X_train_scaled, y_train)
+        
+        # Prédictions
+        y_pred = model.predict(X_test_scaled)
+        y_pred_proba = model.predict_proba(X_test_scaled)[:, 1]
+        
+        # Métriques
+        accuracy = accuracy_score(y_test, y_pred)
+        precision = precision_score(y_test, y_pred, zero_division=0)
+        recall = recall_score(y_test, y_pred, zero_division=0)
+        f1 = f1_score(y_test, y_pred, zero_division=0)
+        
+        # Validation croisée
+        cv_scores = cross_val_score(model, X_train_scaled, y_train, cv=5, scoring='accuracy')
+        
+        # Sauvegarder le modèle
+        model_name = f"NeuralNetwork_{symbol}_{target_param.id}"
+        model_path = os.path.join(self.models_path, f"{model_name}.joblib")
+        
+        # Sauvegarder le modèle et le scaler
+        model_data = {
+            'model': model,
+            'scaler': scaler,
+            'feature_names': feature_columns
+        }
+        joblib.dump(model_data, model_path)
+        
+        # Enregistrer en base de données
+        ml_model = MLModels(
+            model_name=model_name,
+            model_type="classification",
+            symbol=symbol,
+            target_parameter_id=target_param.id,
+            model_path=model_path,
+            model_parameters={
+                "algorithm": "NeuralNetwork",
+                "hidden_layer_sizes": (100, 50),
+                "max_iter": 500,
+                "feature_names": feature_columns,
+                "target_return_percentage": float(target_param.target_return_percentage),
+                "time_horizon_days": target_param.time_horizon_days
+            },
+            performance_metrics={
+                "accuracy": float(accuracy),
+                "precision": float(precision),
+                "recall": float(recall),
+                "f1_score": float(f1),
+                "cv_mean": float(cv_scores.mean()),
+                "cv_std": float(cv_scores.std())
+            },
+            created_at=datetime.now(),
+            is_active=True
+        )
+        
+        session.add(ml_model)
+        session.commit()
+        session.refresh(ml_model)
+        
+        return {
+            "model_id": ml_model.id,
+            "model_name": model_name,
+            "algorithm": "NeuralNetwork",
+            "accuracy": float(accuracy),
+            "precision": float(precision),
+            "recall": float(recall),
+            "f1_score": float(f1),
+            "cv_mean": float(cv_scores.mean()),
+            "cv_std": float(cv_scores.std()),
+            "model_path": model_path
+        }

@@ -27,11 +27,12 @@ celery_app = Celery(
         "app.tasks.test_tasks", # Added for testing
         "app.tasks.data_update_tasks", # Added data update tasks
         "app.tasks.ml_tasks", # Added ML tasks
+        "app.tasks.financial_ratios_tasks", # Added financial ratios tasks
     ]
 )
 
 # Import des tâches pour les enregistrer
-from app.tasks import screener_tasks, test_tasks, simple_screener_tasks, ultra_simple_screener_tasks, demo_screener_tasks, real_screener_tasks, real_screener_limited_tasks, real_screener_fixed_tasks, ultra_simple_real_tasks, full_screener_tasks, full_screener_limited_tasks, full_screener_simple_tasks, full_screener_ml_tasks, full_screener_ml_limited_tasks, full_screener_ml_web_tasks, data_update_tasks, ml_tasks
+from app.tasks import screener_tasks, test_tasks, simple_screener_tasks, ultra_simple_screener_tasks, demo_screener_tasks, real_screener_tasks, real_screener_limited_tasks, real_screener_fixed_tasks, ultra_simple_real_tasks, full_screener_tasks, full_screener_limited_tasks, full_screener_simple_tasks, full_screener_ml_tasks, full_screener_ml_limited_tasks, full_screener_ml_web_tasks, data_update_tasks, ml_tasks, financial_ratios_tasks
 
 # Configuration des tâches
 celery_app.conf.update(

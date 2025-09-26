@@ -129,27 +129,32 @@ const ShapExplanations: React.FC<ShapExplanationsProps> = ({
                   <InformationCircleIcon className="w-5 h-5 text-blue-600" />
                   <h3 className="font-medium text-blue-900">Informations de la Prédiction</h3>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div className="space-y-3">
+                  {/* Nom du modèle sur une ligne dédiée */}
                   <div>
                     <span className="text-blue-700 font-medium">Modèle:</span>
-                    <p className="text-blue-900">{shapData.model_name}</p>
+                    <p className="text-blue-900 text-sm break-all">{shapData.model_name}</p>
                   </div>
-                  <div>
-                    <span className="text-blue-700 font-medium">Symbole:</span>
-                    <p className="text-blue-900">{shapData.symbol}</p>
-                  </div>
-                  <div>
-                    <span className="text-blue-700 font-medium">Prédiction:</span>
-                    <p className="text-blue-900 font-semibold">
-                      {shapData.model_type === 'classification' 
-                        ? (shapData.prediction > 0.5 ? 'Classe Positive' : 'Classe Négative')
-                        : formatValue(shapData.prediction, 2)
-                      }
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-blue-700 font-medium">Valeur de Base:</span>
-                    <p className="text-blue-900">{formatValue(shapData.base_value, 4)}</p>
+                  
+                  {/* Autres informations sur une grille */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="text-blue-700 font-medium">Symbole:</span>
+                      <p className="text-blue-900">{shapData.symbol}</p>
+                    </div>
+                    <div>
+                      <span className="text-blue-700 font-medium">Prédiction:</span>
+                      <p className="text-blue-900 font-semibold">
+                        {shapData.model_type === 'classification' 
+                          ? (shapData.prediction > 0.5 ? 'Classe Positive' : 'Classe Négative')
+                          : formatValue(shapData.prediction, 2)
+                        }
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-blue-700 font-medium">Valeur de Base:</span>
+                      <p className="text-blue-900">{formatValue(shapData.base_value, 4)}</p>
+                    </div>
                   </div>
                 </div>
               </div>

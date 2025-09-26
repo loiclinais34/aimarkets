@@ -154,6 +154,8 @@ class ScreenerService:
         self.db.commit()
         self.db.refresh(target_param)
         
+        print(f"🎯 Nouveau paramètre créé pour {symbol}: {target_return_percentage}% sur {time_horizon_days} jours")
+        
         return target_param
 
     def get_available_models_for_symbol(self, symbol: str, config: ScreenerConfig) -> List[Dict[str, Any]]:

@@ -6,7 +6,7 @@ import uvicorn
 
 from .core.config import settings
 from .core.database import init_db, close_db
-from .api.endpoints import data, target_parameters, ml_models, lightgbm_models, lightgbm_test, symbol_metadata, backtesting, trading_strategies, model_comparison, async_model_comparison
+from .api.endpoints import data, target_parameters, ml_models, lightgbm_models, lightgbm_test, symbol_metadata, backtesting, trading_strategies, model_comparison, async_model_comparison, financial_ratios
 
 
 @asynccontextmanager
@@ -123,6 +123,15 @@ app.include_router(
     celery_management.router,
     prefix="/api/v1",
     tags=["Gestion de Celery"]
+)
+
+# Import du router financial_ratios
+from app.api.endpoints import financial_ratios
+
+app.include_router(
+    financial_ratios.router,
+    prefix="/api/v1",
+    tags=["Ratios Financiers"]
 )
 
 # Import du router indicators_recalculation

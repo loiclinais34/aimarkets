@@ -10,7 +10,8 @@ import {
   BeakerIcon,
   Cog6ToothIcon,
   ChevronDownIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  DocumentTextIcon
 } from '@heroicons/react/24/outline';
 
 interface NavigationItem {
@@ -25,6 +26,11 @@ const navigation: NavigationItem[] = [
     name: 'Dashboard',
     href: '/dashboard',
     icon: HomeIcon,
+  },
+  {
+    name: 'Analyse',
+    href: '/analysis',
+    icon: DocumentTextIcon,
   },
   {
     name: 'Modèles ML',

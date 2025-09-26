@@ -50,14 +50,53 @@ export default function LatestOpportunities({ className = '', maxItems = 6 }: La
     }
   }, []);
 
+  // Auto-refresh des opportunités
   useEffect(() => {
-    fetchOpportunities();
+    if (typeof window === 'undefined') return;
     
-    // Mise à jour automatique toutes les 5 minutes
-    const interval = setInterval(fetchOpportunities, 5 * 60 * 1000);
+    // Fetch initial
+    const timeoutId = setTimeout(() => {
+      fetchOpportunities();
+    }, 1000);
     
-    return () => clearInterval(interval);
+    // Polling périodique seulement si l'onglet est visible
+    let intervalId: NodeJS.Timeout | null = null;
+    
+    const startPolling = () => {
+      if (intervalId) return; // Éviter les doublons
+      intervalId = setInterval(fetchOpportunities, 60000); // Toutes les 60 secondes
+    };
+    
+    const stopPolling = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+    
+    // Gestion de la visibilité de l'onglet
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        startPolling();
+        fetchOpportunities(); // Fetch immédiat quand l'onglet redevient visible
+      }
+    };
+    
+    // Démarrer le polling initial
+    startPolling();
+    
+    // Écouter les changements de visibilité
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      stopPolling();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [fetchOpportunities]);
+
 
   const formatModelName = (modelName: string) => {
     // Extraire le type de modèle (RandomForest, XGBoost, LightGBM)
@@ -137,6 +176,11 @@ export default function LatestOpportunities({ className = '', maxItems = 6 }: La
           <p className="text-sm text-gray-400 mt-1">
             Lancez une recherche pour découvrir de nouvelles opportunités
           </p>
+          {lastUpdated && (
+            <p className="text-xs text-gray-400 mt-2">
+              Dernière mise à jour: {lastUpdated.toLocaleTimeString()}
+            </p>
+          )}
         </div>
       </div>
     );
@@ -150,12 +194,24 @@ export default function LatestOpportunities({ className = '', maxItems = 6 }: La
         <h3 className="text-lg font-semibold text-gray-900 flex items-center">
           <StarIcon className="h-5 w-5 mr-2 text-yellow-600" />
           Dernières Opportunités
-        </h3>
-        {lastUpdated && (
-          <span className="text-xs text-gray-500">
-            Mis à jour: {lastUpdated.toLocaleTimeString()}
+          <span className="ml-2 text-sm font-normal text-gray-500">
+            ({opportunities.length} trouvée{opportunities.length > 1 ? 's' : ''})
           </span>
-        )}
+        </h3>
+        <div className="flex items-center space-x-2">
+          {lastUpdated && (
+            <span className="text-xs text-gray-500">
+              Mis à jour: {lastUpdated.toLocaleTimeString()}
+            </span>
+          )}
+          <button
+            onClick={fetchOpportunities}
+            className="text-xs text-blue-600 hover:text-blue-800"
+            title="Actualiser"
+          >
+            🔄
+          </button>
+        </div>
       </div>
       
       <div className="space-y-3">

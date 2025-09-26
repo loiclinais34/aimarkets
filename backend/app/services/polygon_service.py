@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 
 from ..models.database import HistoricalData, SentimentData, SymbolMetadata
+from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +19,9 @@ class PolygonService:
     """Service pour interagir avec l'API Polygon.io"""
     
     def __init__(self):
-        self.api_key = "HVxEJr0Up37u0LNBN24tqb23qGKHW6Qt"
-        self.base_url = "https://api.polygon.io"
-        self.rate_limit_delay = 0.1  # 100ms entre les requêtes pour respecter les limites
+        self.api_key = settings.polygon_api_key
+        self.base_url = settings.polygon_base_url
+        self.rate_limit_delay = settings.polygon_rate_limit_delay
         
     def _make_request(self, endpoint: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
         """Effectue une requête vers l'API Polygon.io avec gestion des erreurs"""

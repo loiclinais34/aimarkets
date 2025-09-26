@@ -119,6 +119,15 @@ class Settings(BaseSettings):
     dev_debug_toolbar: bool = True
     dev_profiling: bool = False
     
+    # Configuration des APIs externes
+    polygon_api_key: str = ""
+    polygon_base_url: str = "https://api.polygon.io"
+    polygon_rate_limit_delay: float = 0.1
+    
+    alpha_vantage_api_key: str = ""
+    alpha_vantage_base_url: str = "https://www.alphavantage.co/query"
+    alpha_vantage_rate_limit_delay: float = 12.0  # 5 calls per minute = 12 seconds between calls
+    
     # Configuration pour les tests
     test_database_url: str = "postgresql://test_user:test_password@localhost:5432/aimarkets_test"
     test_redis_url: str = "redis://localhost:6379/1"

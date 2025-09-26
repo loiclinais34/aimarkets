@@ -76,6 +76,9 @@ export default function TechnicalChart({
 
   // Transformer les données pour les candlesticks
   const candlestickData = useMemo(() => {
+    if (!chartData || !Array.isArray(chartData)) {
+      return [];
+    }
     return chartData.map((item, index) => {
       const change = item.close - item.open
       const changePercent = (change / item.open) * 100
