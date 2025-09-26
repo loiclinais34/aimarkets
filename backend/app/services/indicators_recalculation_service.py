@@ -442,8 +442,6 @@ class IndicatorsRecalculationService:
             'news_positive_count': s.news_positive_count,
             'news_negative_count': s.news_negative_count,
             'news_neutral_count': s.news_neutral_count,
-            'short_interest_ratio': float(s.short_interest_ratio) if s.short_interest_ratio else None,
-            'short_volume_ratio': float(s.short_volume_ratio) if s.short_volume_ratio else None
         } for s in reversed(sentiment_data)])  # Inverser pour avoir l'ordre chronologique
         
         indicators = {}
@@ -486,13 +484,6 @@ class IndicatorsRecalculationService:
                 indicators['news_positive_ratio'] = 0.0
                 indicators['news_negative_ratio'] = 0.0
             
-            # Indicateurs de short interest
-            if len(df) > 0:
-                indicators['short_interest_trend'] = df['short_interest_ratio'].iloc[-1] if df['short_interest_ratio'].iloc[-1] is not None else None
-                indicators['short_volume_trend'] = df['short_volume_ratio'].iloc[-1] if df['short_volume_ratio'].iloc[-1] is not None else None
-            else:
-                indicators['short_interest_trend'] = None
-                indicators['short_volume_trend'] = None
             
             # Score de qualité des données
             if len(df) > 0:
@@ -511,8 +502,6 @@ class IndicatorsRecalculationService:
                 'sentiment_volatility_14d': 0.0,
                 'news_positive_ratio': 0.0,
                 'news_negative_ratio': 0.0,
-                'short_interest_trend': None,
-                'short_volume_trend': None,
                 'data_quality_score': 0.0
             }
         

@@ -15,6 +15,21 @@ warnings.filterwarnings('ignore')
 # SHAP réactivé pour les explications de modèles
 import shap
 
+# Imports pour XGBoost et LightGBM
+try:
+    import xgboost as xgb
+    XGBOOST_AVAILABLE = True
+except ImportError:
+    XGBOOST_AVAILABLE = False
+    print("⚠️ XGBoost non disponible")
+
+try:
+    import lightgbm as lgb
+    LIGHTGBM_AVAILABLE = True
+except ImportError:
+    LIGHTGBM_AVAILABLE = False
+    print("⚠️ LightGBM non disponible")
+
 from app.models.database import (
     HistoricalData, TechnicalIndicators, SentimentIndicators, 
     TargetParameters, MLModels, MLPredictions
@@ -193,24 +208,6 @@ class MLService:
                     'news_neutral_ratio': float(sent.news_neutral_ratio) if sent.news_neutral_ratio else None,
                     'news_sentiment_quality': float(sent.news_sentiment_quality) if sent.news_sentiment_quality else None,
                     
-                    # Short Interest Indicators
-                    'short_interest_momentum_5d': float(sent.short_interest_momentum_5d) if sent.short_interest_momentum_5d else None,
-                    'short_interest_momentum_10d': float(sent.short_interest_momentum_10d) if sent.short_interest_momentum_10d else None,
-                    'short_interest_momentum_20d': float(sent.short_interest_momentum_20d) if sent.short_interest_momentum_20d else None,
-                    'short_interest_volatility_7d': float(sent.short_interest_volatility_7d) if sent.short_interest_volatility_7d else None,
-                    'short_interest_volatility_14d': float(sent.short_interest_volatility_14d) if sent.short_interest_volatility_14d else None,
-                    'short_interest_volatility_30d': float(sent.short_interest_volatility_30d) if sent.short_interest_volatility_30d else None,
-                    'short_interest_sma_7': float(sent.short_interest_sma_7) if sent.short_interest_sma_7 else None,
-                    'short_interest_sma_14': float(sent.short_interest_sma_14) if sent.short_interest_sma_14 else None,
-                    'short_interest_sma_30': float(sent.short_interest_sma_30) if sent.short_interest_sma_30 else None,
-                    
-                    # Short Volume Indicators
-                    'short_volume_momentum_5d': float(sent.short_volume_momentum_5d) if sent.short_volume_momentum_5d else None,
-                    'short_volume_momentum_10d': float(sent.short_volume_momentum_10d) if sent.short_volume_momentum_10d else None,
-                    'short_volume_momentum_20d': float(sent.short_volume_momentum_20d) if sent.short_volume_momentum_20d else None,
-                    'short_volume_volatility_7d': float(sent.short_volume_volatility_7d) if sent.short_volume_volatility_7d else None,
-                    'short_volume_volatility_14d': float(sent.short_volume_volatility_14d) if sent.short_volume_volatility_14d else None,
-                    'short_volume_volatility_30d': float(sent.short_volume_volatility_30d) if sent.short_volume_volatility_30d else None,
                     
                     # Composite Sentiment Indicators
                     'sentiment_strength_index': float(sent.sentiment_strength_index) if sent.sentiment_strength_index else None,
@@ -293,13 +290,8 @@ class MLService:
             'news_positive_ratio', 'news_negative_ratio', 'news_neutral_ratio', 'news_sentiment_quality',
             
             # Short Interest Indicators
-            'short_interest_momentum_5d', 'short_interest_momentum_10d', 'short_interest_momentum_20d',
-            'short_interest_volatility_7d', 'short_interest_volatility_14d', 'short_interest_volatility_30d',
-            'short_interest_sma_7', 'short_interest_sma_14', 'short_interest_sma_30',
             
             # Short Volume Indicators
-            'short_volume_momentum_5d', 'short_volume_momentum_10d', 'short_volume_momentum_20d',
-            'short_volume_volatility_7d', 'short_volume_volatility_14d', 'short_volume_volatility_30d',
             
             # Composite Sentiment Indicators
             'sentiment_strength_index', 'market_sentiment_index', 'sentiment_divergence',
@@ -550,8 +542,243 @@ class MLService:
             is_active=True,
             created_by="ml_service"
         )
-        self.db.add(ml_model)
-        self.db.commit()
+        session.add(ml_model)
+        session.commit()
+        
+        return {
+            "model_id": ml_model.id,
+            "model_name": model_name,
+            "accuracy": accuracy,
+            "precision": precision,
+            "recall": recall,
+            "f1_score": f1,
+            "cv_mean": float(cv_scores.mean()),
+            "cv_std": float(cv_scores.std()),
+            "feature_importance": dict(zip(feature_names, model.feature_importances_))
+        }
+
+    def train_multiple_models(self, symbol: str, target_param: TargetParameters, algorithms: List[str] = None, db: Session = None) -> Dict:
+        """Entraîner plusieurs types de modèles (RandomForest, XGBoost, LightGBM) pour un symbole"""
+        if algorithms is None:
+            algorithms = ['RandomForest']
+            if XGBOOST_AVAILABLE:
+                algorithms.append('XGBoost')
+            if LIGHTGBM_AVAILABLE:
+                algorithms.append('LightGBM')
+        
+        results = {}
+        
+        for algorithm in algorithms:
+            try:
+                print(f"🤖 Entraînement {algorithm} pour {symbol}")
+                
+                if algorithm == 'RandomForest':
+                    result = self.train_classification_model(symbol, target_param, db)
+                elif algorithm == 'XGBoost' and XGBOOST_AVAILABLE:
+                    result = self.train_xgboost_model(symbol, target_param, db)
+                elif algorithm == 'LightGBM' and LIGHTGBM_AVAILABLE:
+                    result = self.train_lightgbm_model(symbol, target_param, db)
+                else:
+                    print(f"⚠️ Algorithme {algorithm} non disponible")
+                    continue
+                
+                if "error" not in result:
+                    results[algorithm] = result
+                    print(f"✅ {algorithm} entraîné avec succès - Accuracy: {result.get('accuracy', 0):.3f}")
+                else:
+                    print(f"❌ Erreur {algorithm}: {result['error']}")
+                    
+            except Exception as e:
+                print(f"❌ Erreur lors de l'entraînement {algorithm} pour {symbol}: {str(e)}")
+                continue
+        
+        return results
+
+    def train_xgboost_model(self, symbol: str, target_param: TargetParameters, db: Session = None) -> Dict:
+        """Entraîner un modèle XGBoost pour la classification"""
+        if not XGBOOST_AVAILABLE:
+            return {"error": "XGBoost non disponible"}
+        
+        # Utiliser la session passée en paramètre ou celle de l'instance
+        session = db or self.db
+        
+        # Créer les données d'entraînement
+        df = self.create_labels_for_training(symbol, target_param, session)
+        
+        if df.empty or len(df) < 100:
+            return {"error": "Pas assez de données pour l'entraînement"}
+        
+        # Préparer les features
+        X, feature_names = self.prepare_features(df)
+        y = df['target_achieved'].astype(int)
+        
+        # Diviser les données
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        
+        # Entraîner le modèle XGBoost
+        model = xgb.XGBClassifier(
+            n_estimators=100,
+            max_depth=6,
+            learning_rate=0.1,
+            random_state=42,
+            eval_metric='logloss'
+        )
+        model.fit(X_train, y_train)
+        
+        # Évaluer le modèle
+        y_pred = model.predict(X_test)
+        y_pred_proba = model.predict_proba(X_test)[:, 1]
+        
+        accuracy = accuracy_score(y_test, y_pred)
+        precision = precision_score(y_test, y_pred)
+        recall = recall_score(y_test, y_pred)
+        f1 = f1_score(y_test, y_pred)
+        
+        # Validation croisée
+        cv_scores = cross_val_score(model, X, y, cv=5, scoring='accuracy')
+        
+        # Sauvegarder le modèle
+        model_name = f"classification_{symbol}_target_{symbol}_{target_param.target_return_percentage}%_{target_param.time_horizon_days}d_xgboost"
+        model_path = os.path.join(self.models_path, f"{model_name}.joblib")
+        os.makedirs(os.path.dirname(model_path), exist_ok=True)
+        joblib.dump(model, model_path)
+        
+        # Sauvegarder le scaler
+        scaler_path = model_path.replace('.joblib', '_scaler.joblib')
+        scaler = StandardScaler()
+        scaler.fit(X)
+        joblib.dump(scaler, scaler_path)
+        
+        # Créer l'enregistrement en base
+        ml_model = MLModels(
+            model_name=model_name,
+            model_type="classification",
+            model_version="v1",
+            symbol=symbol,
+            target_parameter_id=target_param.id,
+            model_parameters={
+                "algorithm": "XGBoost",
+                "target_return_percentage": str(target_param.target_return_percentage),
+                "time_horizon_days": str(target_param.time_horizon_days),
+                "risk_tolerance": str(target_param.risk_tolerance),
+                "feature_names": feature_names,
+                "training_data_start": str(df['date'].min()),
+                "training_data_end": str(df['date'].max())
+            },
+            performance_metrics={
+                "validation_score": float(cv_scores.mean()),
+                "test_score": accuracy,
+                "precision": precision,
+                "recall": recall,
+                "f1_score": f1,
+                "cv_mean": float(cv_scores.mean()),
+                "cv_std": float(cv_scores.std())
+            },
+            model_path=model_path,
+            is_active=True,
+            created_by="ml_service"
+        )
+        session.add(ml_model)
+        session.commit()
+        
+        return {
+            "model_id": ml_model.id,
+            "model_name": model_name,
+            "accuracy": accuracy,
+            "precision": precision,
+            "recall": recall,
+            "f1_score": f1,
+            "cv_mean": float(cv_scores.mean()),
+            "cv_std": float(cv_scores.std()),
+            "feature_importance": dict(zip(feature_names, model.feature_importances_))
+        }
+
+    def train_lightgbm_model(self, symbol: str, target_param: TargetParameters, db: Session = None) -> Dict:
+        """Entraîner un modèle LightGBM pour la classification"""
+        if not LIGHTGBM_AVAILABLE:
+            return {"error": "LightGBM non disponible"}
+        
+        # Utiliser la session passée en paramètre ou celle de l'instance
+        session = db or self.db
+        
+        # Créer les données d'entraînement
+        df = self.create_labels_for_training(symbol, target_param, session)
+        
+        if df.empty or len(df) < 100:
+            return {"error": "Pas assez de données pour l'entraînement"}
+        
+        # Préparer les features
+        X, feature_names = self.prepare_features(df)
+        y = df['target_achieved'].astype(int)
+        
+        # Diviser les données
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        
+        # Entraîner le modèle LightGBM
+        model = lgb.LGBMClassifier(
+            n_estimators=100,
+            max_depth=6,
+            learning_rate=0.1,
+            random_state=42,
+            verbose=-1
+        )
+        model.fit(X_train, y_train)
+        
+        # Évaluer le modèle
+        y_pred = model.predict(X_test)
+        y_pred_proba = model.predict_proba(X_test)[:, 1]
+        
+        accuracy = accuracy_score(y_test, y_pred)
+        precision = precision_score(y_test, y_pred)
+        recall = recall_score(y_test, y_pred)
+        f1 = f1_score(y_test, y_pred)
+        
+        # Validation croisée
+        cv_scores = cross_val_score(model, X, y, cv=5, scoring='accuracy')
+        
+        # Sauvegarder le modèle
+        model_name = f"classification_{symbol}_target_{symbol}_{target_param.target_return_percentage}%_{target_param.time_horizon_days}d_lightgbm"
+        model_path = os.path.join(self.models_path, f"{model_name}.joblib")
+        os.makedirs(os.path.dirname(model_path), exist_ok=True)
+        joblib.dump(model, model_path)
+        
+        # Sauvegarder le scaler
+        scaler_path = model_path.replace('.joblib', '_scaler.joblib')
+        scaler = StandardScaler()
+        scaler.fit(X)
+        joblib.dump(scaler, scaler_path)
+        
+        # Créer l'enregistrement en base
+        ml_model = MLModels(
+            model_name=model_name,
+            model_type="classification",
+            model_version="v1",
+            symbol=symbol,
+            target_parameter_id=target_param.id,
+            model_parameters={
+                "algorithm": "LightGBM",
+                "target_return_percentage": str(target_param.target_return_percentage),
+                "time_horizon_days": str(target_param.time_horizon_days),
+                "risk_tolerance": str(target_param.risk_tolerance),
+                "feature_names": feature_names,
+                "training_data_start": str(df['date'].min()),
+                "training_data_end": str(df['date'].max())
+            },
+            performance_metrics={
+                "validation_score": float(cv_scores.mean()),
+                "test_score": accuracy,
+                "precision": precision,
+                "recall": recall,
+                "f1_score": f1,
+                "cv_mean": float(cv_scores.mean()),
+                "cv_std": float(cv_scores.std())
+            },
+            model_path=model_path,
+            is_active=True,
+            created_by="ml_service"
+        )
+        session.add(ml_model)
+        session.commit()
         
         return {
             "model_id": ml_model.id,
@@ -657,8 +884,8 @@ class MLService:
             is_active=True,
             created_by="ml_service"
         )
-        self.db.add(ml_model)
-        self.db.commit()
+        session.add(ml_model)
+        session.commit()
         
         return {
             "model_id": ml_model.id,
@@ -814,23 +1041,8 @@ class MLService:
                 'news_sentiment_quality': float(sent.news_sentiment_quality) if sent.news_sentiment_quality else None,
                 
                 # Short Interest Indicators
-                'short_interest_momentum_5d': float(sent.short_interest_momentum_5d) if sent.short_interest_momentum_5d else None,
-                'short_interest_momentum_10d': float(sent.short_interest_momentum_10d) if sent.short_interest_momentum_10d else None,
-                'short_interest_momentum_20d': float(sent.short_interest_momentum_20d) if sent.short_interest_momentum_20d else None,
-                'short_interest_volatility_7d': float(sent.short_interest_volatility_7d) if sent.short_interest_volatility_7d else None,
-                'short_interest_volatility_14d': float(sent.short_interest_volatility_14d) if sent.short_interest_volatility_14d else None,
-                'short_interest_volatility_30d': float(sent.short_interest_volatility_30d) if sent.short_interest_volatility_30d else None,
-                'short_interest_sma_7': float(sent.short_interest_sma_7) if sent.short_interest_sma_7 else None,
-                'short_interest_sma_14': float(sent.short_interest_sma_14) if sent.short_interest_sma_14 else None,
-                'short_interest_sma_30': float(sent.short_interest_sma_30) if sent.short_interest_sma_30 else None,
                 
                 # Short Volume Indicators
-                'short_volume_momentum_5d': float(sent.short_volume_momentum_5d) if sent.short_volume_momentum_5d else None,
-                'short_volume_momentum_10d': float(sent.short_volume_momentum_10d) if sent.short_volume_momentum_10d else None,
-                'short_volume_momentum_20d': float(sent.short_volume_momentum_20d) if sent.short_volume_momentum_20d else None,
-                'short_volume_volatility_7d': float(sent.short_volume_volatility_7d) if sent.short_volume_volatility_7d else None,
-                'short_volume_volatility_14d': float(sent.short_volume_volatility_14d) if sent.short_volume_volatility_14d else None,
-                'short_volume_volatility_30d': float(sent.short_volume_volatility_30d) if sent.short_volume_volatility_30d else None,
                 
                 # Composite Sentiment Indicators
                 'sentiment_strength_index': float(sent.sentiment_strength_index) if sent.sentiment_strength_index else None,
@@ -882,8 +1094,8 @@ class MLService:
             screener_run_id=screener_run_id,
             created_by="ml_service"
         )
-        self.db.add(ml_prediction)
-        self.db.commit()
+        session.add(ml_prediction)
+        session.commit()
         
         return {
             "symbol": symbol,
@@ -1058,23 +1270,8 @@ class MLService:
                 'news_sentiment_quality': float(sent.news_sentiment_quality) if sent.news_sentiment_quality else None,
                 
                 # Short Interest Indicators
-                'short_interest_momentum_5d': float(sent.short_interest_momentum_5d) if sent.short_interest_momentum_5d else None,
-                'short_interest_momentum_10d': float(sent.short_interest_momentum_10d) if sent.short_interest_momentum_10d else None,
-                'short_interest_momentum_20d': float(sent.short_interest_momentum_20d) if sent.short_interest_momentum_20d else None,
-                'short_interest_volatility_7d': float(sent.short_interest_volatility_7d) if sent.short_interest_volatility_7d else None,
-                'short_interest_volatility_14d': float(sent.short_interest_volatility_14d) if sent.short_interest_volatility_14d else None,
-                'short_interest_volatility_30d': float(sent.short_interest_volatility_30d) if sent.short_interest_volatility_30d else None,
-                'short_interest_sma_7': float(sent.short_interest_sma_7) if sent.short_interest_sma_7 else None,
-                'short_interest_sma_14': float(sent.short_interest_sma_14) if sent.short_interest_sma_14 else None,
-                'short_interest_sma_30': float(sent.short_interest_sma_30) if sent.short_interest_sma_30 else None,
                 
                 # Short Volume Indicators
-                'short_volume_momentum_5d': float(sent.short_volume_momentum_5d) if sent.short_volume_momentum_5d else None,
-                'short_volume_momentum_10d': float(sent.short_volume_momentum_10d) if sent.short_volume_momentum_10d else None,
-                'short_volume_momentum_20d': float(sent.short_volume_momentum_20d) if sent.short_volume_momentum_20d else None,
-                'short_volume_volatility_7d': float(sent.short_volume_volatility_7d) if sent.short_volume_volatility_7d else None,
-                'short_volume_volatility_14d': float(sent.short_volume_volatility_14d) if sent.short_volume_volatility_14d else None,
-                'short_volume_volatility_30d': float(sent.short_volume_volatility_30d) if sent.short_volume_volatility_30d else None,
                 
                 # Composite Sentiment Indicators
                 'sentiment_strength_index': float(sent.sentiment_strength_index) if sent.sentiment_strength_index else None,
@@ -1137,13 +1334,8 @@ class MLService:
             'news_positive_ratio', 'news_negative_ratio', 'news_neutral_ratio', 'news_sentiment_quality',
             
             # Short Interest Indicators
-            'short_interest_momentum_5d', 'short_interest_momentum_10d', 'short_interest_momentum_20d',
-            'short_interest_volatility_7d', 'short_interest_volatility_14d', 'short_interest_volatility_30d',
-            'short_interest_sma_7', 'short_interest_sma_14', 'short_interest_sma_30',
             
             # Short Volume Indicators
-            'short_volume_momentum_5d', 'short_volume_momentum_10d', 'short_volume_momentum_20d',
-            'short_volume_volatility_7d', 'short_volume_volatility_14d', 'short_volume_volatility_30d',
             
             # Composite Sentiment Indicators
             'sentiment_strength_index', 'market_sentiment_index', 'sentiment_divergence',

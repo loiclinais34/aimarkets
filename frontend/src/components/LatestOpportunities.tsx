@@ -1,17 +1,7 @@
 'use client';
 
-import React from 'react';
-import { useQuery } from 'react-query';
-import { 
-  ChartBarIcon, 
-  ArrowTrendingUpIcon, 
-  ArrowTrendingDownIcon,
-  ClockIcon,
-  StarIcon,
-  EyeIcon
-} from '@heroicons/react/24/outline';
-import { screenerApi } from '@/services/api';
-import Link from 'next/link';
+import React, { useState, useEffect, useCallback } from 'react';
+import { StarIcon, ChartBarIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/outline';
 
 interface Opportunity {
   symbol: string;
@@ -23,7 +13,8 @@ interface Opportunity {
   target_return: number;
   time_horizon: number;
   rank: number;
-  prediction_date: string;
+  prediction_date: string | null;
+  screener_run_id: number;
 }
 
 interface LatestOpportunitiesProps {
@@ -32,32 +23,62 @@ interface LatestOpportunitiesProps {
 }
 
 export default function LatestOpportunities({ className = '', maxItems = 6 }: LatestOpportunitiesProps) {
-  const { data: opportunities, isLoading, error } = useQuery(
-    'latest-opportunities',
-    () => screenerApi.getLatestOpportunities(),
-    { 
-      staleTime: 2 * 60 * 1000, // 2 minutes
-      refetchInterval: 5 * 60 * 1000 // Refetch every 5 minutes
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const fetchOpportunities = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const response = await fetch('/api/v1/screener/latest-opportunities');
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      setOpportunities(result);
+      setLastUpdated(new Date());
+    } catch (err) {
+      console.error('Erreur lors de la récupération des opportunités:', err);
+      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+    } finally {
+      setIsLoading(false);
     }
-  );
+  }, []);
+
+  useEffect(() => {
+    fetchOpportunities();
+    
+    // Mise à jour automatique toutes les 5 minutes
+    const interval = setInterval(fetchOpportunities, 5 * 60 * 1000);
+    
+    return () => clearInterval(interval);
+  }, [fetchOpportunities]);
+
+  const formatModelName = (modelName: string) => {
+    // Extraire le type de modèle (RandomForest, XGBoost, LightGBM)
+    if (modelName.includes('xgboost')) return 'XGBoost';
+    if (modelName.includes('lightgbm')) return 'LightGBM';
+    if (modelName.includes('randomforest')) return 'RandomForest';
+    return 'ML Model';
+  };
 
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 0.8) return 'text-green-600 bg-green-100';
-    if (confidence >= 0.6) return 'text-blue-600 bg-blue-100';
-    if (confidence >= 0.4) return 'text-yellow-600 bg-yellow-100';
+    if (confidence >= 0.6) return 'text-yellow-600 bg-yellow-100';
     return 'text-red-600 bg-red-100';
   };
 
   const getPredictionIcon = (prediction: number) => {
     return prediction > 0 ? (
-      <ArrowTrendingUpIcon className="h-4 w-4 text-green-600" />
+      <ArrowUpIcon className="h-4 w-4 text-green-600" />
     ) : (
-      <ArrowTrendingDownIcon className="h-4 w-4 text-red-600" />
+      <ArrowDownIcon className="h-4 w-4 text-red-600" />
     );
-  };
-
-  const getPredictionColor = (prediction: number) => {
-    return prediction > 0 ? 'text-green-600' : 'text-red-600';
   };
 
   if (isLoading) {
@@ -74,11 +95,36 @@ export default function LatestOpportunities({ className = '', maxItems = 6 }: La
             </div>
           ))}
         </div>
+        <div className="mt-4 text-sm text-gray-500 text-center">
+          Chargement des opportunités...
+        </div>
       </div>
     );
   }
 
-  if (error || !opportunities || opportunities.length === 0) {
+  if (error) {
+    return (
+      <div className={`bg-white rounded-lg shadow p-6 ${className}`}>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          <StarIcon className="h-5 w-5 mr-2 text-yellow-600" />
+          Dernières Opportunités
+        </h3>
+        <div className="text-center py-8">
+          <ChartBarIcon className="h-12 w-12 text-red-300 mx-auto mb-4" />
+          <p className="text-red-600 font-medium">Erreur de chargement</p>
+          <p className="text-sm text-gray-500 mt-1">{error}</p>
+          <button
+            onClick={fetchOpportunities}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Réessayer
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!opportunities || opportunities.length === 0) {
     return (
       <div className={`bg-white rounded-lg shadow p-6 ${className}`}>
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -105,13 +151,11 @@ export default function LatestOpportunities({ className = '', maxItems = 6 }: La
           <StarIcon className="h-5 w-5 mr-2 text-yellow-600" />
           Dernières Opportunités
         </h3>
-        <Link
-          href="/screeners"
-          className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
-        >
-          <EyeIcon className="h-4 w-4 mr-1" />
-          Voir tout
-        </Link>
+        {lastUpdated && (
+          <span className="text-xs text-gray-500">
+            Mis à jour: {lastUpdated.toLocaleTimeString()}
+          </span>
+        )}
       </div>
       
       <div className="space-y-3">
@@ -137,39 +181,28 @@ export default function LatestOpportunities({ className = '', maxItems = 6 }: La
             
             <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
               <div className="flex items-center space-x-4">
-                <span className={`font-medium ${getPredictionColor(opportunity.prediction)}`}>
+                <span className={`font-medium ${opportunity.prediction > 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {opportunity.prediction > 0 ? '+' : ''}{(opportunity.prediction * 100).toFixed(1)}%
                 </span>
                 <span>{opportunity.target_return}% en {opportunity.time_horizon}j</span>
                 <span className="text-gray-400">•</span>
-                <span>{opportunity.model_name}</span>
+                <span className="bg-gray-100 px-2 py-1 rounded text-xs">
+                  {formatModelName(opportunity.model_name)}
+                </span>
               </div>
-              <div className="flex items-center">
-                <ClockIcon className="h-3 w-3 mr-1" />
-                <span>{new Date(opportunity.prediction_date).toLocaleDateString()}</span>
+              <div>
+                <span>{opportunity.prediction_date ? new Date(opportunity.prediction_date).toLocaleDateString() : 'Récent'}</span>
               </div>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div className="text-xs text-gray-400">
-                Modèle #{opportunity.model_id}
-              </div>
-              <button className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition-colors">
-                Analyser
-              </button>
             </div>
           </div>
         ))}
       </div>
-      
+
       {opportunities.length > maxItems && (
         <div className="mt-4 text-center">
-          <Link
-            href="/screeners"
-            className="text-sm text-blue-600 hover:text-blue-800"
-          >
-            Voir {opportunities.length - maxItems} autres opportunités →
-          </Link>
+          <button className="text-sm text-blue-600 hover:text-blue-800 font-medium">
+            Voir toutes les opportunités ({opportunities.length})
+          </button>
         </div>
       )}
     </div>

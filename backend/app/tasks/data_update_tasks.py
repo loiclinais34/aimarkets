@@ -12,7 +12,7 @@ from app.core.database import get_db
 from app.core.celery_app import celery_app
 from app.services.data_update_service import DataUpdateService
 from app.services.polygon_service import PolygonService
-from app.services.sentiment_service import SentimentIndicatorService
+from app.services.sentiment_indicator_service import SentimentIndicatorService
 from app.services.technical_indicators import TechnicalIndicatorsCalculator
 
 logger = logging.getLogger(__name__)
@@ -235,12 +235,100 @@ def update_sentiment_data_task(self, force_update: bool = False) -> Dict[str, An
                     }
                 )
                 
+                # Créer une nouvelle session pour chaque symbole
+                symbol_db = next(get_db())
+                
                 # Mettre à jour les données de sentiment pour ce symbole
-                # Pour l'instant, on simule une mise à jour réussie
+                from datetime import datetime, timedelta
+                
+                # Déterminer la période de récupération (7 derniers jours)
+                end_date = datetime.now().date()
+                start_date = end_date - timedelta(days=7)
+                
+                # Récupérer les données de news uniquement
+                news_data = polygon_service.get_news_data(
+                    symbol, 
+                    start_date.strftime('%Y-%m-%d'), 
+                    end_date.strftime('%Y-%m-%d')
+                )
+                
+                # Sauvegarder les données en base
+                from app.models.database import SentimentData
+                records_added = 0
+                
+                # Traiter chaque date dans la période
+                current_date = start_date
+                while current_date <= end_date:
+                    # Vérifier si l'enregistrement existe déjà pour cette date
+                    existing_record = symbol_db.query(SentimentData).filter(
+                        SentimentData.symbol == symbol,
+                        SentimentData.date == current_date
+                    ).first()
+                    
+                    if not existing_record or existing_record.news_count == 0:
+                        # Récupérer les données de news spécifiques à cette date
+                        # Les news de Polygon ont 'published_utc' au format ISO
+                        date_news = []
+                        for n in news_data:
+                            published_utc = n.get('published_utc', '')
+                            if published_utc:
+                                try:
+                                    from datetime import datetime
+                                    # Parser la date ISO et extraire la date
+                                    news_date = datetime.fromisoformat(published_utc.replace('Z', '+00:00')).date()
+                                    if news_date == current_date:
+                                        date_news.append(n)
+                                except:
+                                    continue
+                        
+                        # Calculer les métriques de sentiment pour cette date
+                        date_sentiment = polygon_service.calculate_sentiment_from_news(date_news, symbol)
+                        
+                        if existing_record:
+                            # Mettre à jour l'enregistrement existant
+                            existing_record.news_count = date_sentiment['news_count']
+                            existing_record.news_sentiment_score = date_sentiment['news_sentiment_score']
+                            existing_record.news_sentiment_std = date_sentiment['news_sentiment_std']
+                            existing_record.news_positive_count = date_sentiment['news_positive_count']
+                            existing_record.news_negative_count = date_sentiment['news_negative_count']
+                            existing_record.news_neutral_count = date_sentiment['news_neutral_count']
+                            existing_record.top_news_title = date_sentiment['top_news_title']
+                            existing_record.top_news_sentiment = date_sentiment['top_news_sentiment']
+                            existing_record.top_news_url = date_sentiment['top_news_url']
+                            existing_record.sentiment_reasoning = date_sentiment['sentiment_reasoning']
+                        else:
+                            # Créer l'enregistrement (uniquement avec les données de news)
+                            sentiment_record = SentimentData(
+                                symbol=symbol,
+                                date=current_date,
+                                news_count=date_sentiment['news_count'],
+                                news_sentiment_score=date_sentiment['news_sentiment_score'],
+                                news_sentiment_std=date_sentiment['news_sentiment_std'],
+                                news_positive_count=date_sentiment['news_positive_count'],
+                                news_negative_count=date_sentiment['news_negative_count'],
+                                news_neutral_count=date_sentiment['news_neutral_count'],
+                                top_news_title=date_sentiment['top_news_title'],
+                                top_news_sentiment=date_sentiment['top_news_sentiment'],
+                                top_news_url=date_sentiment['top_news_url'],
+                                sentiment_reasoning=date_sentiment['sentiment_reasoning']
+                            )
+                            symbol_db.add(sentiment_record)
+                        records_added += 1
+                    
+                    current_date += timedelta(days=1)
+                
+                # Commit des changements pour ce symbole
+                symbol_db.commit()
+                
+                # Fermer la session
+                symbol_db.close()
+                
                 result = {
                     'symbol': symbol,
                     'status': 'success',
-                    'message': 'Données de sentiment mises à jour avec succès'
+                    'message': f'Données de sentiment mises à jour: {len(news_data)} news, {records_added} nouveaux enregistrements',
+                    'records_updated': records_added,
+                    'news_count': len(news_data)
                 }
                 results.append(result)
                 
@@ -253,6 +341,11 @@ def update_sentiment_data_task(self, force_update: bool = False) -> Dict[str, An
                 
             except Exception as e:
                 logger.error(f"Erreur lors de la mise à jour du sentiment pour {symbol}: {e}")
+                # Fermer la session en cas d'erreur
+                try:
+                    symbol_db.close()
+                except:
+                    pass
                 results.append({
                     'symbol': symbol,
                     'status': 'error',
@@ -312,12 +405,19 @@ def calculate_sentiment_indicators_task(self) -> Dict[str, Any]:
                     }
                 )
                 
+                # Créer une nouvelle session pour chaque symbole
+                symbol_db = next(get_db())
+                
                 # Calculer les indicateurs de sentiment pour ce symbole
-                # Pour l'instant, on simule un calcul réussi
+                indicators_result = indicators_service.calculate_sentiment_indicators(symbol_db, symbol)
+                
+                # Fermer la session
+                symbol_db.close()
+                
                 result = {
                     'symbol': symbol,
-                    'status': 'success',
-                    'message': 'Indicateurs de sentiment calculés avec succès'
+                    'status': 'success' if indicators_result else 'error',
+                    'message': 'Indicateurs de sentiment calculés avec succès' if indicators_result else 'Erreur lors du calcul des indicateurs'
                 }
                 results.append(result)
                 
@@ -330,6 +430,11 @@ def calculate_sentiment_indicators_task(self) -> Dict[str, Any]:
                 
             except Exception as e:
                 logger.error(f"Erreur lors du calcul des indicateurs de sentiment pour {symbol}: {e}")
+                # Fermer la session en cas d'erreur
+                try:
+                    symbol_db.close()
+                except:
+                    pass
                 results.append({
                     'symbol': symbol,
                     'status': 'error',
@@ -370,7 +475,12 @@ def full_data_update_workflow_task(self, force_update: bool = False) -> Dict[str
         }
         
         # Étape 1: Vérifier la fraîcheur des données
-        self.update_state(state='PROGRESS', meta={'status': 'Étape 1/5: Vérification de la fraîcheur des données'})
+        self.update_state(state='PROGRESS', meta={
+            'status': 'Étape 1/5: Vérification de la fraîcheur des données',
+            'steps': workflow_results['steps'],
+            'overall_status': workflow_results['overall_status'],
+            'start_time': workflow_results['start_time']
+        })
         freshness_result = check_data_freshness_task.apply()
         workflow_results['steps'].append({
             'step': 1,
@@ -386,7 +496,12 @@ def full_data_update_workflow_task(self, force_update: bool = False) -> Dict[str
             return workflow_results
         
         # Étape 2: Mise à jour des données historiques
-        self.update_state(state='PROGRESS', meta={'status': 'Étape 2/5: Mise à jour des données historiques'})
+        self.update_state(state='PROGRESS', meta={
+            'status': 'Étape 2/5: Mise à jour des données historiques',
+            'steps': workflow_results['steps'],
+            'overall_status': workflow_results['overall_status'],
+            'start_time': workflow_results['start_time']
+        })
         historical_result = update_historical_data_task.apply(args=[force_update])
         workflow_results['steps'].append({
             'step': 2,
@@ -395,7 +510,12 @@ def full_data_update_workflow_task(self, force_update: bool = False) -> Dict[str
         })
         
         # Étape 3: Calcul des indicateurs techniques
-        self.update_state(state='PROGRESS', meta={'status': 'Étape 3/5: Calcul des indicateurs techniques'})
+        self.update_state(state='PROGRESS', meta={
+            'status': 'Étape 3/5: Calcul des indicateurs techniques',
+            'steps': workflow_results['steps'],
+            'overall_status': workflow_results['overall_status'],
+            'start_time': workflow_results['start_time']
+        })
         technical_result = calculate_technical_indicators_task.apply()
         workflow_results['steps'].append({
             'step': 3,
@@ -404,7 +524,12 @@ def full_data_update_workflow_task(self, force_update: bool = False) -> Dict[str
         })
         
         # Étape 4: Mise à jour des données de sentiment
-        self.update_state(state='PROGRESS', meta={'status': 'Étape 4/5: Mise à jour des données de sentiment'})
+        self.update_state(state='PROGRESS', meta={
+            'status': 'Étape 4/5: Mise à jour des données de sentiment',
+            'steps': workflow_results['steps'],
+            'overall_status': workflow_results['overall_status'],
+            'start_time': workflow_results['start_time']
+        })
         sentiment_result = update_sentiment_data_task.apply(args=[force_update])
         workflow_results['steps'].append({
             'step': 4,
@@ -413,7 +538,12 @@ def full_data_update_workflow_task(self, force_update: bool = False) -> Dict[str
         })
         
         # Étape 5: Calcul des indicateurs de sentiment
-        self.update_state(state='PROGRESS', meta={'status': 'Étape 5/5: Calcul des indicateurs de sentiment'})
+        self.update_state(state='PROGRESS', meta={
+            'status': 'Étape 5/5: Calcul des indicateurs de sentiment',
+            'steps': workflow_results['steps'],
+            'overall_status': workflow_results['overall_status'],
+            'start_time': workflow_results['start_time']
+        })
         sentiment_indicators_result = calculate_sentiment_indicators_task.apply()
         workflow_results['steps'].append({
             'step': 5,

@@ -216,14 +216,21 @@ def get_task_status(task_id: str):
                 'status': task_result.info.get('status', 'En cours...'),
                 'progress': task_result.info.get('progress', 0),
                 'current_symbol': task_result.info.get('current_symbol'),
-                'total_symbols': task_result.info.get('total_symbols')
+                'total_symbols': task_result.info.get('total_symbols'),
+                'steps': task_result.info.get('steps', []),
+                'overall_status': task_result.info.get('overall_status'),
+                'start_time': task_result.info.get('start_time')
             }
         elif task_result.state == 'SUCCESS':
             response = {
                 'task_id': task_id,
                 'state': task_result.state,
                 'status': 'Terminé avec succès',
-                'result': task_result.result
+                'result': task_result.result,
+                'steps': task_result.result.get('steps', []) if task_result.result else [],
+                'overall_status': task_result.result.get('overall_status') if task_result.result else None,
+                'start_time': task_result.result.get('start_time') if task_result.result else None,
+                'end_time': task_result.result.get('end_time') if task_result.result else None
             }
         else:  # FAILURE
             response = {

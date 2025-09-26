@@ -110,24 +110,6 @@ class SentimentIndicatorService:
                     news_neutral_ratio=0.2,
                     news_sentiment_quality=0.7 + abs(sentiment_score_normalized) * 0.2,
                     
-                    # Indicateurs d'intérêt court (simulés)
-                    short_interest_momentum_5d=sentiment_score_normalized * -0.1,  # Inverse du sentiment
-                    short_interest_momentum_10d=sentiment_score_normalized * -0.08,
-                    short_interest_momentum_20d=sentiment_score_normalized * -0.06,
-                    short_interest_volatility_7d=abs(sentiment_score_normalized) * 0.1,
-                    short_interest_volatility_14d=abs(sentiment_score_normalized) * 0.08,
-                    short_interest_volatility_30d=abs(sentiment_score_normalized) * 0.06,
-                    short_interest_sma_7=5 + abs(sentiment_score_normalized) * 2,
-                    short_interest_sma_14=4 + abs(sentiment_score_normalized) * 1.5,
-                    short_interest_sma_30=3 + abs(sentiment_score_normalized) * 1,
-                    
-                    # Indicateurs de volume court (simulés)
-                    short_volume_momentum_5d=sentiment_score_normalized * -0.05,
-                    short_volume_momentum_10d=sentiment_score_normalized * -0.04,
-                    short_volume_momentum_20d=sentiment_score_normalized * -0.03,
-                    short_volume_volatility_7d=abs(sentiment_score_normalized) * 0.05,
-                    short_volume_volatility_14d=abs(sentiment_score_normalized) * 0.04,
-                    short_volume_volatility_30d=abs(sentiment_score_normalized) * 0.03,
                     
                     # Indicateurs composites de sentiment (utilisant les vrais champs du modèle)
                     sentiment_strength_index=max(0, sentiment_score_normalized) * 0.8,

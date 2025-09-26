@@ -68,14 +68,15 @@ def run_real_screener_limited(self, screener_request: Dict[str, Any], user_id: s
         # Sélectionner les symboles les plus populaires pour les tests
         popular_symbols = ["AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "META", "NVDA", "NFLX", "ADBE", "CRM"]
         
-        # Récupérer d'autres symboles disponibles
-        other_symbols = db.query(SymbolMetadata.symbol).filter(
-            SymbolMetadata.is_active == True,
-            SymbolMetadata.symbol.notin_(popular_symbols)
-        ).limit(max_symbols - len(popular_symbols)).all()
-        
-        symbols = popular_symbols + [s[0] for s in other_symbols]
-        symbols = symbols[:max_symbols]  # Limiter au maximum demandé
+        # Récupérer d'autres symboles disponibles seulement si nécessaire
+        if max_symbols > len(popular_symbols):
+            other_symbols = db.query(SymbolMetadata.symbol).filter(
+                SymbolMetadata.is_active == True,
+                SymbolMetadata.symbol.notin_(popular_symbols)
+            ).limit(max_symbols - len(popular_symbols)).all()
+            symbols = popular_symbols + [s[0] for s in other_symbols]
+        else:
+            symbols = popular_symbols[:max_symbols]  # Limiter au maximum demandé
         
         total_symbols = len(symbols)
         

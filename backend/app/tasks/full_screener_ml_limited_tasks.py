@@ -25,6 +25,7 @@ def run_full_screener_ml_limited(self, screener_request: Dict[str, Any], user_id
     Tâche de screener ML limité pour les tests
     """
     screener_run_id = None
+    start_time = time.time()
     
     try:
         # Mise à jour du statut initial
@@ -166,7 +167,7 @@ def run_full_screener_ml_limited(self, screener_request: Dict[str, Any], user_id
                         db=db
                     )
                     
-                    if model_result and model_result.get("success"):
+                    if model_result and "error" not in model_result:
                         successful_models += 1
                         print(f"✅ {symbol}: Modèle ML entraîné avec succès")
                     else:
@@ -246,7 +247,7 @@ def run_full_screener_ml_limited(self, screener_request: Dict[str, Any], user_id
                         db=db
                     )
                     
-                    if prediction_result and prediction_result.get("success"):
+                    if prediction_result and "error" not in prediction_result:
                         predictions_made += 1
                         prediction = prediction_result["prediction"]
                         confidence = prediction_result["confidence"]
@@ -286,7 +287,7 @@ def run_full_screener_ml_limited(self, screener_request: Dict[str, Any], user_id
             if screener_run:
                 screener_run.opportunities_found = opportunities_found
                 screener_run.status = "completed"
-                screener_run.execution_time_seconds = int(time.time() - self.request.started_at)
+                screener_run.execution_time_seconds = int(time.time() - start_time)
                 db.commit()
         finally:
             db.close()
@@ -325,7 +326,7 @@ def run_full_screener_ml_limited(self, screener_request: Dict[str, Any], user_id
             "total_symbols": total_symbols,
             "successful_models": successful_models,
             "total_opportunities_found": opportunities_found,
-            "execution_time_seconds": int(time.time() - self.request.started_at),
+            "execution_time_seconds": int(time.time() - start_time),
             "status": "completed",
             "results": results_list
         }

@@ -15,6 +15,14 @@ interface TaskStatus {
   total_symbols?: number;
   result?: any;
   error?: string;
+  steps?: Array<{
+    step: number;
+    name: string;
+    result: any;
+  }>;
+  overall_status?: string;
+  start_time?: string;
+  end_time?: string;
 }
 
 interface DataUpdateControlsProps {
@@ -143,12 +151,35 @@ export default function DataUpdateControls({ className = '' }: DataUpdateControl
   };
 
   const getProgressBar = () => {
-    if (taskStatus && taskStatus.progress !== undefined) {
+    if (taskStatus) {
+      // Calculer le progrès basé sur l'étape actuelle
+      const getCurrentStep = () => {
+        if (!taskStatus.status) return 0;
+        const status = taskStatus.status.toLowerCase();
+        const steps = [
+          { keywords: ['fraîcheur', 'vérification'] },
+          { keywords: ['historiques', 'données historiques'] },
+          { keywords: ['techniques', 'indicateurs techniques'] },
+          { keywords: ['sentiment', 'données de sentiment'] },
+          { keywords: ['indicateurs de sentiment'] }
+        ];
+        
+        for (let i = 0; i < steps.length; i++) {
+          if (steps[i].keywords.some(keyword => status.includes(keyword))) {
+            return i + 1;
+          }
+        }
+        return 0;
+      };
+
+      const currentStep = getCurrentStep();
+      const progress = currentStep > 0 ? (currentStep / 5) * 100 : 0;
+
       return (
         <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
           <div 
             className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-            style={{ width: `${taskStatus.progress}%` }}
+            style={{ width: `${progress}%` }}
           ></div>
         </div>
       );
@@ -165,6 +196,79 @@ export default function DataUpdateControls({ className = '' }: DataUpdateControl
       );
     }
     return null;
+  };
+
+  const getWorkflowSteps = () => {
+    if (!taskStatus) return null;
+
+    const steps = [
+      { id: 1, name: 'Vérification de la fraîcheur', icon: '🔍', keywords: ['fraîcheur', 'vérification'] },
+      { id: 2, name: 'Mise à jour données historiques', icon: '📊', keywords: ['historiques', 'données historiques'] },
+      { id: 3, name: 'Calcul indicateurs techniques', icon: '📈', keywords: ['techniques', 'indicateurs techniques'] },
+      { id: 4, name: 'Mise à jour données de sentiment', icon: '💭', keywords: ['sentiment', 'données de sentiment'] },
+      { id: 5, name: 'Calcul indicateurs de sentiment', icon: '🎯', keywords: ['indicateurs de sentiment'] }
+    ];
+
+    // Déterminer l'étape actuelle basée sur le statut
+    const getCurrentStep = () => {
+      if (!taskStatus.status) return 0;
+      const status = taskStatus.status.toLowerCase();
+      for (let i = 0; i < steps.length; i++) {
+        if (steps[i].keywords.some(keyword => status.includes(keyword))) {
+          return i + 1;
+        }
+      }
+      return 0;
+    };
+
+    const currentStep = getCurrentStep();
+    const stepResult = taskStatus.steps?.find(s => s.step === currentStep);
+
+    return (
+      <div className="mt-4 space-y-2">
+        <h4 className="text-sm font-medium text-gray-900">Étapes du workflow</h4>
+        {steps.map((step) => {
+          const isCompleted = currentStep > step.id;
+          const isCurrent = currentStep === step.id;
+          const stepData = taskStatus.steps?.find(s => s.step === step.id);
+          
+          return (
+            <div key={step.id} className={`flex items-center p-2 rounded-lg ${
+              isCurrent ? 'bg-blue-50 border border-blue-200' : 
+              isCompleted ? 'bg-green-50 border border-green-200' : 
+              'bg-gray-50 border border-gray-200'
+            }`}>
+              <div className="flex-shrink-0 mr-3">
+                {isCurrent ? (
+                  <ClockIcon className="h-4 w-4 text-blue-500 animate-spin" />
+                ) : isCompleted ? (
+                  <CheckCircleIcon className="h-4 w-4 text-green-500" />
+                ) : (
+                  <div className="h-4 w-4 rounded-full border-2 border-gray-300"></div>
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-medium text-gray-900">
+                  {step.icon} {step.name}
+                </div>
+                {isCurrent && (
+                  <div className="text-xs text-blue-600 mt-1">
+                    En cours...
+                  </div>
+                )}
+                {stepData && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    {stepData.result?.status === 'completed' ? 'Terminé' : 
+                     stepData.result?.status === 'success' ? 'Succès' : 
+                     stepData.result?.status || 'Terminé'}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   return (
@@ -193,6 +297,7 @@ export default function DataUpdateControls({ className = '' }: DataUpdateControl
           
           {getProgressBar()}
           {getCurrentSymbolInfo()}
+          {getWorkflowSteps()}
         </div>
 
         {/* Mise à jour des données historiques */}

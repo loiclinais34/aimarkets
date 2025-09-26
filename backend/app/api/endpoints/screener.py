@@ -244,6 +244,63 @@ def run_ultra_simple_real_screener_endpoint(
             detail=f"Erreur lors du lancement du screener ultra-simple réel: {str(e)}"
         )
 
+@router.get("/task-status/{task_id}", response_model=Dict[str, Any])
+def get_task_status_endpoint(task_id: str):
+    """Récupérer le statut d'une tâche Celery"""
+    try:
+        from app.core.celery_app import celery_app
+        
+        # Récupérer le statut de la tâche
+        task_result = celery_app.AsyncResult(task_id)
+        
+        if task_result.state == 'PENDING':
+            response = {
+                'task_id': task_id,
+                'state': task_result.state,
+                'status': 'En attente...',
+                'progress': 0
+            }
+        elif task_result.state == 'PROGRESS':
+            response = {
+                'task_id': task_id,
+                'state': task_result.state,
+                'status': task_result.info.get('status', 'En cours...'),
+                'progress': task_result.info.get('progress', 0),
+                'current_step': task_result.info.get('current_step', ''),
+                'meta': task_result.info
+            }
+        elif task_result.state == 'SUCCESS':
+            response = {
+                'task_id': task_id,
+                'state': task_result.state,
+                'status': 'Terminé avec succès',
+                'progress': 100,
+                'result': task_result.result
+            }
+        elif task_result.state == 'FAILURE':
+            response = {
+                'task_id': task_id,
+                'state': task_result.state,
+                'status': 'Échec',
+                'progress': 0,
+                'error': str(task_result.info)
+            }
+        else:
+            response = {
+                'task_id': task_id,
+                'state': task_result.state,
+                'status': 'État inconnu',
+                'progress': 0
+            }
+        
+        return response
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la récupération du statut de la tâche: {str(e)}"
+        )
+
 @router.get("/latest-opportunities", response_model=List[Dict[str, Any]])
 def get_latest_opportunities(db: Session = Depends(get_db)):
     """Récupérer les dernières opportunités (prediction_value=1) du screener le plus récent"""
@@ -256,32 +313,33 @@ def get_latest_opportunities(db: Session = Depends(get_db)):
         if not latest_screener_run:
             return []
         
-        # Récupérer les prédictions avec prediction_value=1 pour ce screener_run_id
-        predictions = db.query(MLPredictions).join(MLModels).join(SymbolMetadata, SymbolMetadata.symbol == MLPredictions.symbol).filter(
-            MLPredictions.screener_run_id == latest_screener_run.id,
-            MLPredictions.prediction_value == 1.0
-        ).order_by(MLPredictions.confidence.desc()).all()
+        # Récupérer les opportunités depuis ScreenerResult pour ce screener_run_id
+        from app.models.database import ScreenerResult
+        screener_results = db.query(ScreenerResult).join(SymbolMetadata, SymbolMetadata.symbol == ScreenerResult.symbol).filter(
+            ScreenerResult.screener_run_id == latest_screener_run.id,
+            ScreenerResult.prediction == 1.0
+        ).order_by(ScreenerResult.confidence.desc()).all()
         
         results = []
-        for pred in predictions:
+        for result in screener_results:
             # Récupérer les métadonnées du symbole
-            symbol_metadata = db.query(SymbolMetadata).filter(SymbolMetadata.symbol == pred.symbol).first()
+            symbol_metadata = db.query(SymbolMetadata).filter(SymbolMetadata.symbol == result.symbol).first()
             
             # Récupérer les informations du modèle
-            model = db.query(MLModels).filter(MLModels.id == pred.model_id).first()
+            model = db.query(MLModels).filter(MLModels.id == result.model_id).first()
             
             results.append({
-                "symbol": pred.symbol,
-                "company_name": symbol_metadata.company_name if symbol_metadata else pred.symbol,
-                "prediction": float(pred.prediction_value),
-                "confidence": float(pred.confidence),
-                "model_id": pred.model_id,
+                "symbol": result.symbol,
+                "company_name": symbol_metadata.company_name if symbol_metadata else result.symbol,
+                "prediction": float(result.prediction),
+                "confidence": float(result.confidence),
+                "model_id": result.model_id,
                 "model_name": model.model_name if model else "Unknown",
                 "target_return": float(model.target_parameter.target_return_percentage) if model and model.target_parameter else None,
                 "time_horizon": model.target_parameter.time_horizon_days if model and model.target_parameter else None,
-                "prediction_date": pred.prediction_date.isoformat() if pred.prediction_date else None,
-                "screener_run_id": pred.screener_run_id,
-                "rank": len(results) + 1
+                "prediction_date": None,  # ScreenerResult n'a pas de prediction_date
+                "screener_run_id": result.screener_run_id,
+                "rank": result.rank
             })
         
         return results

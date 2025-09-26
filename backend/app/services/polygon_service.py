@@ -148,80 +148,7 @@ class PolygonService:
         logger.info(f"Récupéré {len(all_news)} articles de news pour {symbol}")
         return all_news
     
-    def get_short_interest_data(self, symbol: str, from_date: str, to_date: str) -> List[Dict[str, Any]]:
-        """
-        Récupère les données de short interest
-        
-        Args:
-            symbol: Symbole du titre
-            from_date: Date de début (format YYYY-MM-DD)
-            to_date: Date de fin (format YYYY-MM-DD)
-        
-        Returns:
-            Liste des données de short interest
-        """
-        endpoint = f"/stocks/v1/short-interest/{symbol}"
-        params = {
-            'timestamp.gte': from_date,
-            'timestamp.lte': to_date
-        }
-        
-        data = self._make_request(endpoint, params)
-        
-        if not data or 'results' not in data:
-            logger.warning(f"Aucune donnée de short interest trouvée pour {symbol}")
-            return []
-        
-        results = []
-        for item in data['results']:
-            results.append({
-                'symbol': symbol,
-                'date': datetime.fromisoformat(item['timestamp'].replace('Z', '+00:00')).date(),
-                'short_interest_ratio': Decimal(str(item.get('short_interest_ratio', 0))),
-                'short_interest_volume': int(item.get('short_interest_volume', 0)),
-                'short_interest_date': datetime.fromisoformat(item.get('short_interest_date', item['timestamp']).replace('Z', '+00:00')).date() if item.get('short_interest_date') else None
-            })
-        
-        logger.info(f"Récupéré {len(results)} points de short interest pour {symbol}")
-        return results
     
-    def get_short_volume_data(self, symbol: str, from_date: str, to_date: str) -> List[Dict[str, Any]]:
-        """
-        Récupère les données de short volume
-        
-        Args:
-            symbol: Symbole du titre
-            from_date: Date de début (format YYYY-MM-DD)
-            to_date: Date de fin (format YYYY-MM-DD)
-        
-        Returns:
-            Liste des données de short volume
-        """
-        endpoint = f"/stocks/v1/short-volume/{symbol}"
-        params = {
-            'timestamp.gte': from_date,
-            'timestamp.lte': to_date
-        }
-        
-        data = self._make_request(endpoint, params)
-        
-        if not data or 'results' not in data:
-            logger.warning(f"Aucune donnée de short volume trouvée pour {symbol}")
-            return []
-        
-        results = []
-        for item in data['results']:
-            results.append({
-                'symbol': symbol,
-                'date': datetime.fromisoformat(item['timestamp'].replace('Z', '+00:00')).date(),
-                'short_volume': int(item.get('short_volume', 0)),
-                'short_exempt_volume': int(item.get('short_exempt_volume', 0)),
-                'total_volume': int(item.get('total_volume', 0)),
-                'short_volume_ratio': Decimal(str(item.get('short_volume_ratio', 0)))
-            })
-        
-        logger.info(f"Récupéré {len(results)} points de short volume pour {symbol}")
-        return results
     
     def get_latest_data_date(self, symbol: str) -> Optional[date]:
         """
@@ -281,12 +208,13 @@ class PolygonService:
         
         return [symbol[0] for symbol in symbols]
     
-    def calculate_sentiment_from_news(self, news_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def calculate_sentiment_from_news(self, news_data: List[Dict[str, Any]], symbol: str) -> Dict[str, Any]:
         """
-        Calcule les métriques de sentiment à partir des données de news
+        Calcule les métriques de sentiment à partir des données de news en utilisant les insights de Polygon
         
         Args:
             news_data: Liste des données de news
+            symbol: Symbole pour lequel calculer le sentiment
         
         Returns:
             Dictionnaire avec les métriques de sentiment calculées
@@ -301,51 +229,97 @@ class PolygonService:
                 'news_neutral_count': 0,
                 'top_news_title': None,
                 'top_news_sentiment': None,
-                'top_news_url': None
+                'top_news_url': None,
+                'sentiment_reasoning': None
             }
         
-        # Analyser le sentiment des titres (simulation basique)
+        # Analyser le sentiment en utilisant les insights de Polygon
         sentiment_scores = []
         positive_count = 0
         negative_count = 0
         neutral_count = 0
-        
-        # Mots-clés pour l'analyse de sentiment (très basique)
-        positive_words = ['rise', 'gain', 'up', 'positive', 'growth', 'profit', 'beat', 'exceed', 'strong']
-        negative_words = ['fall', 'drop', 'down', 'negative', 'loss', 'decline', 'miss', 'weak', 'concern']
+        all_reasonings = []
         
         top_news = None
-        max_sentiment = -1
+        max_sentiment = 0.0
+        top_reasoning = None
         
         for news in news_data:
-            title = news.get('title', '').lower()
-            description = news.get('description', '').lower()
-            text = f"{title} {description}"
+            # Chercher les insights pour ce symbole
+            insights = news.get('insights', [])
+            symbol_insight = None
             
-            # Calculer un score de sentiment basique
-            positive_score = sum(1 for word in positive_words if word in text)
-            negative_score = sum(1 for word in negative_words if word in text)
+            for insight in insights:
+                if insight.get('ticker') == symbol:
+                    symbol_insight = insight
+                    break
             
-            if positive_score > negative_score:
-                sentiment = 0.5 + (positive_score - negative_score) * 0.1
-                positive_count += 1
-            elif negative_score > positive_score:
-                sentiment = 0.5 - (negative_score - positive_score) * 0.1
-                negative_count += 1
+            if symbol_insight:
+                # Utiliser le sentiment de Polygon
+                sentiment = symbol_insight.get('sentiment', 'neutral')
+                reasoning = symbol_insight.get('sentiment_reasoning', '')
+                
+                # Convertir le sentiment en score numérique
+                if sentiment == 'positive':
+                    score = 1.0
+                    positive_count += 1
+                elif sentiment == 'negative':
+                    score = -1.0
+                    negative_count += 1
+                else:  # neutral
+                    score = 0.0
+                    neutral_count += 1
+                
+                sentiment_scores.append(score)
+                if reasoning:
+                    all_reasonings.append(reasoning)
+                
+                # Garder la news avec le sentiment le plus fort
+                if abs(score) > abs(max_sentiment):
+                    max_sentiment = score
+                    top_news = news
+                    top_reasoning = reasoning
             else:
-                sentiment = 0.5
-                neutral_count += 1
-            
-            sentiment_scores.append(sentiment)
-            
-            # Garder la news avec le sentiment le plus fort
-            if abs(sentiment - 0.5) > abs(max_sentiment - 0.5):
-                max_sentiment = sentiment
-                top_news = news
+                # Fallback: analyse basique des mots-clés si pas d'insights
+                title = news.get('title', '').lower()
+                description = news.get('description', '').lower()
+                text = f"{title} {description}"
+                
+                # Mots-clés pour l'analyse de sentiment (fallback)
+                positive_words = ['rise', 'gain', 'up', 'positive', 'growth', 'profit', 'beat', 'exceed', 'strong']
+                negative_words = ['fall', 'drop', 'down', 'negative', 'loss', 'decline', 'miss', 'weak', 'concern']
+                
+                positive_matches = sum(1 for word in positive_words if word in text)
+                negative_matches = sum(1 for word in negative_words if word in text)
+                
+                if positive_matches > negative_matches:
+                    score = 0.5
+                    positive_count += 1
+                elif negative_matches > positive_matches:
+                    score = -0.5
+                    negative_count += 1
+                else:
+                    score = 0.0
+                    neutral_count += 1
+                
+                sentiment_scores.append(score)
+                
+                # Garder la news avec le sentiment le plus fort (fallback)
+                if abs(score) > abs(max_sentiment):
+                    max_sentiment = score
+                    top_news = news
+                    top_reasoning = None
         
         # Calculer les statistiques
-        avg_sentiment = sum(sentiment_scores) / len(sentiment_scores) if sentiment_scores else 0.5
-        sentiment_std = (sum((s - avg_sentiment) ** 2 for s in sentiment_scores) / len(sentiment_scores)) ** 0.5 if sentiment_scores else 0.0
+        if sentiment_scores:
+            avg_sentiment = sum(sentiment_scores) / len(sentiment_scores)
+            sentiment_std = (sum((s - avg_sentiment) ** 2 for s in sentiment_scores) / len(sentiment_scores)) ** 0.5
+        else:
+            avg_sentiment = 0.0
+            sentiment_std = 0.0
+        
+        # Combiner les raisonnements
+        combined_reasoning = '; '.join(all_reasonings) if all_reasonings else None
         
         return {
             'news_count': len(news_data),
@@ -356,7 +330,8 @@ class PolygonService:
             'news_neutral_count': neutral_count,
             'top_news_title': top_news.get('title') if top_news else None,
             'top_news_sentiment': Decimal(str(round(max_sentiment, 4))) if top_news else None,
-            'top_news_url': top_news.get('article_url') if top_news else None
+            'top_news_url': top_news.get('article_url') if top_news else None,
+            'sentiment_reasoning': combined_reasoning
         }
     
     def is_market_open(self, check_date: date = None) -> bool:
@@ -485,29 +460,62 @@ class PolygonService:
                 
                 last_date = last_date_result[0] if last_date_result[0] else None
                 
-                # 2. Déterminer la date de début pour la mise à jour
-                if last_date:
-                    # Commencer le jour suivant la dernière date
-                    from datetime import timedelta
-                    start_date = last_date + timedelta(days=1)
-                else:
-                    # Si aucune donnée, récupérer les 5 dernières années
-                    from datetime import datetime, timedelta
-                    start_date = (datetime.now() - timedelta(days=365*5)).date()
-                
-                # 3. Déterminer la date de fin (hier pour éviter les données incomplètes)
-                from datetime import datetime, timedelta
+                # 2. Déterminer la date de fin (hier pour éviter les données incomplètes)
+                from datetime import datetime, timedelta, timezone
                 end_date = (datetime.now() - timedelta(days=1)).date()
                 
-                # 4. Vérifier si nous avons besoin de mettre à jour
-                if not force_update and last_date and last_date >= end_date:
-                    return {
-                        'symbol': symbol,
-                        'status': 'success',
-                        'message': f'Données déjà à jour jusqu\'à {last_date}',
-                        'records_updated': 0,
-                        'last_date': last_date
-                    }
+                # 3. Déterminer la date de début pour la mise à jour
+                if last_date:
+                    # Commencer le jour suivant la dernière date
+                    start_date = last_date + timedelta(days=1)
+                    
+                    # Vérifier que start_date n'est pas postérieur à end_date
+                    if start_date > end_date:
+                        # Les données sont déjà à jour, pas besoin de récupérer
+                        return {
+                            'symbol': symbol,
+                            'status': 'success',
+                            'message': f'Données déjà à jour jusqu\'à {last_date}',
+                            'records_updated': 0,
+                            'last_date': last_date
+                        }
+                else:
+                    # Si aucune donnée, récupérer les 5 dernières années
+                    start_date = (datetime.now() - timedelta(days=365*5)).date()
+                
+                # 4. Vérifier si nous avons besoin de mettre à jour (logique de fraîcheur basée sur l'heure de clôture NASDAQ)
+                if not force_update and last_date:
+                    # Obtenir l'heure de la dernière mise à jour (created_at) pour ce symbole
+                    last_update_result = db.query(func.max(HistoricalData.created_at)).filter(
+                        HistoricalData.symbol == symbol
+                    ).first()
+                    
+                    if last_update_result[0]:
+                        last_update_datetime = last_update_result[0]
+                        
+                        # Calculer l'heure de clôture NASDAQ pour la date de la dernière donnée
+                        from app.services.data_update_service import DataUpdateService
+                        data_update_service = DataUpdateService(db)
+                        
+                        # Convertir last_date en datetime pour la comparaison
+                        last_date_datetime = datetime.combine(last_date, datetime.min.time())
+                        nasdaq_close_time = data_update_service.get_nasdaq_close_time_utc2(last_date_datetime)
+                        
+                        # Convertir last_update_datetime en UTC+2 si nécessaire
+                        if last_update_datetime.tzinfo is None:
+                            last_update_utc2 = last_update_datetime.replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=2)))
+                        else:
+                            last_update_utc2 = last_update_datetime.astimezone(timezone(timedelta(hours=2)))
+                        
+                        # Vérifier si la mise à jour est postérieure à la clôture NASDAQ
+                        if last_update_utc2 >= nasdaq_close_time:
+                            return {
+                                'symbol': symbol,
+                                'status': 'success',
+                                'message': f'Données déjà à jour jusqu\'à {last_date} (mise à jour après clôture NASDAQ)',
+                                'records_updated': 0,
+                                'last_date': last_date
+                            }
                 
                 # 5. Récupérer les nouvelles données depuis Polygon
                 logger.info(f"Récupération des données pour {symbol} du {start_date} au {end_date}")

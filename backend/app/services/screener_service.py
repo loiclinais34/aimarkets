@@ -156,22 +156,111 @@ class ScreenerService:
         
         return target_param
 
+    def get_available_models_for_symbol(self, symbol: str, config: ScreenerConfig) -> List[Dict[str, Any]]:
+        """Récupère tous les modèles disponibles pour un symbole (RandomForest, XGBoost, LightGBM)"""
+        # Joindre avec TargetParameters pour filtrer par target_return_percentage et time_horizon_days
+        models = self.db.query(MLModels).join(TargetParameters).filter(
+            and_(
+                MLModels.symbol == symbol,
+                TargetParameters.target_return_percentage == config.target_return_percentage,
+                TargetParameters.time_horizon_days == config.time_horizon_days,
+                MLModels.is_active == True
+            )
+        ).all()
+        
+        available_models = []
+        for model in models:
+            # Extraire l'algorithme des paramètres du modèle
+            algorithm = "RandomForest"  # Par défaut
+            if model.model_parameters:
+                import json
+                params = json.loads(model.model_parameters) if isinstance(model.model_parameters, str) else model.model_parameters
+                algorithm = params.get("algorithm", "RandomForest")
+            
+            # Extraire les métriques de performance
+            performance_metrics = {}
+            if model.performance_metrics:
+                performance_metrics = json.loads(model.performance_metrics) if isinstance(model.performance_metrics, str) else model.performance_metrics
+            
+            available_models.append({
+                "model_id": model.id,
+                "model_name": model.model_name,
+                "model_type": model.model_type,
+                "algorithm": algorithm,
+                "accuracy": performance_metrics.get("test_score", 0.0),
+                "precision": performance_metrics.get("precision", 0.0),
+                "recall": performance_metrics.get("recall", 0.0),
+                "f1_score": performance_metrics.get("f1_score", 0.0),
+                "roc_auc": performance_metrics.get("roc_auc", 0.0),
+                "sharpe_ratio": performance_metrics.get("sharpe_ratio", 0.0),
+                "max_drawdown": performance_metrics.get("max_drawdown", 0.0),
+                "total_return": performance_metrics.get("total_return", 0.0),
+                "win_rate": performance_metrics.get("win_rate", 0.0),
+                "profit_factor": performance_metrics.get("profit_factor", 0.0)
+            })
+        
+        return available_models
+
+    def select_best_model(self, models: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Sélectionne le meilleur modèle basé sur un score composite"""
+        if not models:
+            return None
+        
+        if len(models) == 1:
+            return models[0]
+        
+        # Score composite basé sur plusieurs métriques
+        best_model = None
+        best_score = -1
+        
+        for model in models:
+            # Score composite : 40% accuracy + 30% f1_score + 20% sharpe_ratio + 10% win_rate
+            composite_score = (
+                0.4 * model["accuracy"] +
+                0.3 * model["f1_score"] +
+                0.2 * model["sharpe_ratio"] +
+                0.1 * model["win_rate"]
+            )
+            
+            if composite_score > best_score:
+                best_score = composite_score
+                best_model = model
+        
+        # Ajouter le score composite au modèle sélectionné
+        best_model["composite_score"] = best_score
+        return best_model
+
     async def run_predictions_for_all_models(self, model_results: Dict[str, Any], config: ScreenerConfig) -> List[Dict[str, Any]]:
-        """Exécute les prédictions pour tous les modèles entraînés"""
+        """Exécute les prédictions pour tous les modèles entraînés avec sélection du meilleur modèle"""
         today = date.today()
         opportunities = []
         
-        print(f"🔮 Début des prédictions pour {len(model_results)} modèles...")
+        print(f"🔮 Début des prédictions pour {len(model_results)} symboles...")
         
         for symbol, model_info in model_results.items():
             try:
-                model_id = model_info["model_id"]
-                print(f"🔍 Prédiction pour {symbol} (Modèle ID: {model_id})")
+                print(f"🔍 Analyse des modèles pour {symbol}")
                 
-                # Faire la prédiction
+                # Récupérer tous les modèles disponibles pour ce symbole
+                available_models = self.get_available_models_for_symbol(symbol, config)
+                
+                if not available_models:
+                    print(f"⚠️ Aucun modèle disponible pour {symbol}")
+                    continue
+                
+                # Sélectionner le meilleur modèle
+                best_model = self.select_best_model(available_models)
+                
+                if not best_model:
+                    print(f"⚠️ Impossible de sélectionner un modèle pour {symbol}")
+                    continue
+                
+                print(f"🎯 Meilleur modèle pour {symbol}: {best_model['algorithm']} (Score: {best_model['composite_score']:.3f})")
+                
+                # Faire la prédiction avec le meilleur modèle
                 prediction_result = self.ml_service.predict(
                     symbol=symbol,
-                    model_id=model_id,
+                    model_id=best_model["model_id"],
                     date=today,
                     db=self.db
                 )
@@ -192,8 +281,14 @@ class ScreenerService:
                             "company_name": symbol_metadata.company_name if symbol_metadata else symbol,
                             "prediction": prediction_value,
                             "confidence": confidence,
-                            "model_id": model_id,
-                            "model_name": model_info["model_name"],
+                            "model_id": best_model["model_id"],
+                            "model_name": best_model["model_name"],
+                            "model_type": best_model["model_type"],
+                            "model_algorithm": best_model["algorithm"],
+                            "model_accuracy": best_model["accuracy"],
+                            "model_f1_score": best_model["f1_score"],
+                            "model_sharpe_ratio": best_model["sharpe_ratio"],
+                            "model_composite_score": best_model["composite_score"],
                             "target_return": float(config.target_return_percentage),
                             "time_horizon": config.time_horizon_days
                         }

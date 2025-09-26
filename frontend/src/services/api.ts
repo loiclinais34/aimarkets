@@ -678,7 +678,7 @@ export const apiService = {
   // Méthodes pour les opportunités
   getLatestOpportunities: async (): Promise<any[]> => {
     const response = await apiClient.get('/api/v1/screener/latest-opportunities')
-    return response.data.data || response.data
+    return response.data
   },
 
   runLatestScreener: async (): Promise<any> => {

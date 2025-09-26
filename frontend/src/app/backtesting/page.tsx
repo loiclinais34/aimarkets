@@ -3,10 +3,10 @@
 import React, { useState } from 'react';
 import RootLayout from '@/components/RootLayout';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
-import { BacktestRun, BacktestCreateForm } from '../../../types/strategies';
-import { backtestingApi } from '../../../services/strategiesApi';
-import { BacktestList, BacktestForm } from '../../../components/backtesting/BacktestManagement';
-import { BacktestResultsView } from '../../../components/backtesting/BacktestResults';
+import { BacktestRun, BacktestCreateForm } from '../../types/strategies';
+import { backtestingApi } from '../../services/strategiesApi';
+import { BacktestList, BacktestForm } from '../../components/backtesting/BacktestManagement';
+import { BacktestResultsView } from '../../components/backtesting/BacktestResults';
 import { ChartBarIcon, PlusIcon, PlayIcon } from '@heroicons/react/24/outline';
 
 export default function BacktestingPage() {

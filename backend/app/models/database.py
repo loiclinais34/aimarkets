@@ -53,13 +53,7 @@ class SentimentData(Base):
     top_news_title = Column(TEXT)
     top_news_sentiment = Column(DECIMAL(5, 4))
     top_news_url = Column(TEXT)
-    short_interest_ratio = Column(DECIMAL(10, 4))
-    short_interest_volume = Column(BIGINT)
-    short_interest_date = Column(Date)
-    short_volume = Column(BIGINT)
-    short_exempt_volume = Column(BIGINT)
-    total_volume = Column(BIGINT)
-    short_volume_ratio = Column(DECIMAL(5, 4))
+    sentiment_reasoning = Column(TEXT)
     sentiment_momentum_5d = Column(DECIMAL(5, 4))
     sentiment_momentum_20d = Column(DECIMAL(5, 4))
     sentiment_volatility_5d = Column(DECIMAL(5, 4))
@@ -173,25 +167,6 @@ class SentimentIndicators(Base):
     news_negative_ratio = Column(DECIMAL(10, 4))
     news_neutral_ratio = Column(DECIMAL(10, 4))
     news_sentiment_quality = Column(DECIMAL(10, 4))
-    
-    # Short Interest Indicators
-    short_interest_momentum_5d = Column(DECIMAL(10, 4))
-    short_interest_momentum_10d = Column(DECIMAL(10, 4))
-    short_interest_momentum_20d = Column(DECIMAL(10, 4))
-    short_interest_volatility_7d = Column(DECIMAL(10, 4))
-    short_interest_volatility_14d = Column(DECIMAL(10, 4))
-    short_interest_volatility_30d = Column(DECIMAL(10, 4))
-    short_interest_sma_7 = Column(DECIMAL(10, 4))
-    short_interest_sma_14 = Column(DECIMAL(10, 4))
-    short_interest_sma_30 = Column(DECIMAL(10, 4))
-    
-    # Short Volume Indicators
-    short_volume_momentum_5d = Column(DECIMAL(10, 4))
-    short_volume_momentum_10d = Column(DECIMAL(10, 4))
-    short_volume_momentum_20d = Column(DECIMAL(10, 4))
-    short_volume_volatility_7d = Column(DECIMAL(10, 4))
-    short_volume_volatility_14d = Column(DECIMAL(10, 4))
-    short_volume_volatility_30d = Column(DECIMAL(10, 4))
     
     # Composite Sentiment Indicators
     sentiment_strength_index = Column(DECIMAL(10, 4))

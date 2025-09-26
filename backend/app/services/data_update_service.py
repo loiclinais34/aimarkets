@@ -115,14 +115,13 @@ class DataUpdateService:
             hours_behind_nasdaq_close = (nasdaq_close_time - last_update_utc2).total_seconds() / 3600
             
             # Déterminer si une mise à jour est nécessaire
-            # Si nous sommes avant la clôture d'aujourd'hui, les données sont à jour
-            if now_utc2.weekday() < 5 and now_utc2.hour < 23:
-                # Avant la clôture d'aujourd'hui : données à jour
-                needs_update = False
-                hours_behind_nasdaq_close = 0  # Pas de retard car pas encore de nouvelles données disponibles
+            # Vérifier si les données sont à jour par rapport à la dernière clôture NASDAQ
+            if hours_behind_nasdaq_close > 0:
+                # Les données sont en retard par rapport à la dernière clôture
+                needs_update = True
             else:
-                # Après la clôture : vérifier si les données sont à jour
-                needs_update = hours_behind_nasdaq_close > 0
+                # Les données sont à jour par rapport à la dernière clôture
+                needs_update = False
             
             # Déterminer le message
             if needs_update:
@@ -135,6 +134,7 @@ class DataUpdateService:
                     hours_remaining = int(hours_behind_nasdaq_close % 24)
                     message = f'Mise à jour urgente ({days_behind}j {hours_remaining}h de retard)'
             else:
+                # Les données sont à jour par rapport à la dernière clôture
                 if now_utc2.weekday() < 5 and now_utc2.hour < 23:
                     # Avant la clôture d'aujourd'hui
                     next_close_hour = 23 - now_utc2.hour
