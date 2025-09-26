@@ -907,9 +907,15 @@ async def get_search_opportunities(
             # Récupérer les informations du modèle
             model = db.query(MLModels).filter(MLModels.id == opp.model_id).first()
             if model:
+                # Récupérer le nom de l'entreprise depuis SymbolMetadata
+                from ...models.database import SymbolMetadata
+                symbol_metadata = db.query(SymbolMetadata).filter(SymbolMetadata.symbol == opp.symbol).first()
+                company_name = symbol_metadata.company_name if symbol_metadata else opp.symbol
+                
                 formatted_opportunities.append({
                     "id": opp.id,
                     "symbol": opp.symbol,
+                    "company_name": company_name,
                     "model_id": opp.model_id,
                     "model_name": model.model_name,
                     "prediction": float(opp.prediction),

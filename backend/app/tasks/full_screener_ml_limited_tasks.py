@@ -321,7 +321,7 @@ def run_full_screener_ml_limited(self, screener_request: Dict[str, Any], user_id
                         
                         # Vérification si c'est une opportunité
                         # Utiliser le confidence_threshold du paramètre de recherche
-                        confidence_threshold = screener_request.get('confidence_threshold', 0.7)
+                        confidence_threshold = float(screener_request.get('confidence_threshold', 0.7))
                         if prediction == 1.0 and confidence >= confidence_threshold:
                             opportunities_found += 1
                             

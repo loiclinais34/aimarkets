@@ -535,8 +535,10 @@ class MLService:
         
         # Entraîner le modèle
         model = RandomForestClassifier(
-            n_estimators=100,
-            max_depth=10,
+            n_estimators=150,
+            max_depth=12,
+            min_samples_split=5,
+            min_samples_leaf=2,
             random_state=42,
             class_weight='balanced'
         )
@@ -666,7 +668,7 @@ class MLService:
         
         return filtered_results
 
-    def filter_models_by_performance(self, results: Dict, min_accuracy: float = 0.6, min_f1_score: float = 0.5) -> Dict:
+    def filter_models_by_performance(self, results: Dict, min_accuracy: float = 0.55, min_f1_score: float = 0.8) -> Dict:
         """
         Filtre les modèles en fonction de leurs performances.
         
@@ -719,9 +721,11 @@ class MLService:
         
         # Entraîner le modèle XGBoost
         model = xgb.XGBClassifier(
-            n_estimators=100,
-            max_depth=6,
-            learning_rate=0.1,
+            n_estimators=200,
+            max_depth=8,
+            learning_rate=0.08,
+            subsample=0.8,
+            colsample_bytree=0.8,
             random_state=42,
             eval_metric='logloss'
         )
@@ -819,9 +823,11 @@ class MLService:
         
         # Entraîner le modèle LightGBM
         model = lgb.LGBMClassifier(
-            n_estimators=100,
-            max_depth=6,
-            learning_rate=0.1,
+            n_estimators=200,
+            max_depth=8,
+            learning_rate=0.08,
+            subsample=0.8,
+            colsample_bytree=0.8,
             random_state=42,
             verbose=-1
         )
@@ -1615,8 +1621,10 @@ class MLService:
         
         # Entraîner le modèle
         model = MLPClassifier(
-            hidden_layer_sizes=(100, 50),
-            max_iter=500,
+            hidden_layer_sizes=(150, 100, 50),
+            max_iter=800,
+            learning_rate_init=0.001,
+            alpha=0.0001,
             random_state=42,
             early_stopping=True,
             validation_fraction=0.1

@@ -123,13 +123,19 @@ export default function OpportunitySearch({ className = '', onSearchCompleted }:
     searchOpportunitiesMutation.mutate(parameters);
   };
 
-  const getRiskLevel = (risk: number) => {
-    if (risk <= 0.3) return { label: 'Conservateur', color: 'text-green-600', bg: 'bg-green-100' };
-    if (risk <= 0.7) return { label: 'Modéré', color: 'text-yellow-600', bg: 'bg-yellow-100' };
-    return { label: 'Agressif', color: 'text-red-600', bg: 'bg-red-100' };
+  const getRiskLevel = (riskTolerance: number, confidenceThreshold: number) => {
+    // Calcul du risque combiné : plus la confiance est élevée, plus le risque est faible
+    // Formule : risque = risk_tolerance * (1 - confidence_threshold)
+    const combinedRisk = riskTolerance * (1 - confidenceThreshold);
+    
+    if (combinedRisk <= 0.2) return { label: 'Très Conservateur', color: 'text-green-600', bg: 'bg-green-100' };
+    if (combinedRisk <= 0.4) return { label: 'Conservateur', color: 'text-green-500', bg: 'bg-green-50' };
+    if (combinedRisk <= 0.6) return { label: 'Modéré', color: 'text-yellow-600', bg: 'bg-yellow-100' };
+    if (combinedRisk <= 0.8) return { label: 'Élevé', color: 'text-orange-600', bg: 'bg-orange-100' };
+    return { label: 'Très Agressif', color: 'text-red-600', bg: 'bg-red-100' };
   };
 
-  const riskLevel = getRiskLevel(parameters.risk_tolerance);
+  const riskLevel = getRiskLevel(parameters.risk_tolerance, parameters.confidence_threshold);
 
   const getProgressSteps = () => {
     if (!taskStatus) return [];
@@ -270,6 +276,31 @@ export default function OpportunitySearch({ className = '', onSearchCompleted }:
               <CheckCircleIcon className="h-4 w-4 inline mr-1" />
               Seuil de confiance minimum
             </label>
+            
+            {/* Slider pour le niveau de confiance */}
+            <div className="mb-3">
+              <input
+                type="range"
+                min="0.5"
+                max="0.95"
+                step="0.05"
+                value={parameters.confidence_threshold}
+                onChange={(e) => handleParameterChange('confidence_threshold', parseFloat(e.target.value))}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                style={{
+                  background: `linear-gradient(to right, #ef4444 0%, #f97316 25%, #eab308 50%, #22c55e 75%, #16a34a 100%)`
+                }}
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>50%</span>
+                <span>60%</span>
+                <span>70%</span>
+                <span>80%</span>
+                <span>90%</span>
+              </div>
+            </div>
+            
+            {/* Affichage de la valeur actuelle */}
             <div className="relative">
               <input
                 type="number"
@@ -282,8 +313,26 @@ export default function OpportunitySearch({ className = '', onSearchCompleted }:
               />
               <span className="absolute right-3 top-2 text-sm text-gray-500">%</span>
             </div>
+            
+            {/* Indicateur de niveau de confiance */}
+            <div className="mt-2 flex items-center space-x-2">
+              <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                parameters.confidence_threshold >= 0.8 ? 'bg-green-100 text-green-800' :
+                parameters.confidence_threshold >= 0.7 ? 'bg-yellow-100 text-yellow-800' :
+                parameters.confidence_threshold >= 0.6 ? 'bg-orange-100 text-orange-800' :
+                'bg-red-100 text-red-800'
+              }`}>
+                {parameters.confidence_threshold >= 0.8 ? 'Très élevée' :
+                 parameters.confidence_threshold >= 0.7 ? 'Élevée' :
+                 parameters.confidence_threshold >= 0.6 ? 'Modérée' : 'Faible'}
+              </div>
+              <span className="text-xs text-gray-500">
+                Confiance requise
+              </span>
+            </div>
+            
             <p className="text-xs text-gray-500 mt-1">
-              Confiance minimale pour valider une opportunité
+              Plus le seuil est élevé, plus les opportunités sont filtrées
             </p>
           </div>
         </div>
@@ -309,6 +358,19 @@ export default function OpportunitySearch({ className = '', onSearchCompleted }:
             <span className="text-blue-700">Confiance:</span>
             <span className="font-medium text-blue-900 ml-1">{(parameters.confidence_threshold * 100).toFixed(0)}%</span>
           </div>
+        </div>
+        
+        {/* Indicateur de risque combiné */}
+        <div className="mt-3 pt-3 border-t border-blue-200">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-blue-700">Profil de risque combiné:</span>
+            <div className={`px-3 py-1 rounded-full text-sm font-medium ${riskLevel.bg} ${riskLevel.color}`}>
+              {riskLevel.label}
+            </div>
+          </div>
+          <p className="text-xs text-blue-600 mt-1">
+            Basé sur la tolérance au risque ({parameters.risk_tolerance}) et le niveau de confiance ({(parameters.confidence_threshold * 100).toFixed(0)}%)
+          </p>
         </div>
       </div>
 
