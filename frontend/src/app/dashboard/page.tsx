@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import RootLayout from '@/components/RootLayout';
 import DashboardStats from '@/components/DashboardStats';
 import DataUpdateControls from '@/components/DataUpdateControls';
@@ -61,6 +61,11 @@ const recentActivities = [
 ];
 
 export default function Dashboard() {
+  const [currentSearchId, setCurrentSearchId] = useState<string | null>(null);
+
+  const handleSearchCompleted = (searchId: string) => {
+    setCurrentSearchId(searchId);
+  };
 
   return (
     <RootLayout>
@@ -81,7 +86,7 @@ export default function Dashboard() {
         <DashboardStats className="mb-8" />
 
         {/* Recherche d'opportunités */}
-        <OpportunitySearch className="mb-8" />
+        <OpportunitySearch className="mb-8" onSearchCompleted={handleSearchCompleted} />
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
@@ -92,7 +97,7 @@ export default function Dashboard() {
 
           {/* Opportunités par titre */}
           <div className="lg:col-span-2">
-            <OpportunitiesBySymbol />
+            <OpportunitiesBySymbol searchId={currentSearchId} />
           </div>
         </div>
 

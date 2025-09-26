@@ -510,7 +510,7 @@ class MLService:
         
         return df_features
     
-    def train_classification_model(self, symbol: str, target_param: TargetParameters, db: Session = None) -> Dict:
+    def train_classification_model(self, symbol: str, target_param: TargetParameters, db: Session = None, search_id: str = None) -> Dict:
         """Entraîner un modèle de classification pour prédire si la cible sera atteinte"""
         # Utiliser la session passée en paramètre ou celle de l'instance
         session = db or self.db
@@ -584,6 +584,7 @@ class MLService:
             model_version=version,
             symbol=symbol,
             target_parameter_id=target_param.id,
+            search_id=search_id,
             model_parameters={
                 "target_return_percentage": float(target_param.target_return_percentage),
                 "time_horizon_days": int(target_param.time_horizon_days),
@@ -620,7 +621,7 @@ class MLService:
             "feature_importance": dict(zip(feature_names, model.feature_importances_))
         }
 
-    def train_multiple_models(self, symbol: str, target_param: TargetParameters, algorithms: List[str] = None, db: Session = None) -> Dict:
+    def train_multiple_models(self, symbol: str, target_param: TargetParameters, algorithms: List[str] = None, db: Session = None, search_id: str = None) -> Dict:
         """Entraîner plusieurs types de modèles (RandomForest, XGBoost, LightGBM, NeuralNetwork) pour un symbole"""
         if algorithms is None:
             algorithms = ['RandomForest']
@@ -637,13 +638,13 @@ class MLService:
                 print(f"🤖 Entraînement {algorithm} pour {symbol}")
                 
                 if algorithm == 'RandomForest':
-                    result = self.train_classification_model(symbol, target_param, db)
+                    result = self.train_classification_model(symbol, target_param, db, search_id)
                 elif algorithm == 'XGBoost' and XGBOOST_AVAILABLE:
-                    result = self.train_xgboost_model(symbol, target_param, db)
+                    result = self.train_xgboost_model(symbol, target_param, db, search_id)
                 elif algorithm == 'LightGBM' and LIGHTGBM_AVAILABLE:
-                    result = self.train_lightgbm_model(symbol, target_param, db)
+                    result = self.train_lightgbm_model(symbol, target_param, db, search_id)
                 elif algorithm == 'NeuralNetwork':
-                    result = self.train_neural_network_model(symbol, target_param, db)
+                    result = self.train_neural_network_model(symbol, target_param, db, search_id)
                 else:
                     print(f"⚠️ Algorithme {algorithm} non disponible")
                     continue
@@ -695,7 +696,7 @@ class MLService:
         
         return filtered_results
 
-    def train_xgboost_model(self, symbol: str, target_param: TargetParameters, db: Session = None) -> Dict:
+    def train_xgboost_model(self, symbol: str, target_param: TargetParameters, db: Session = None, search_id: str = None) -> Dict:
         """Entraîner un modèle XGBoost pour la classification"""
         if not XGBOOST_AVAILABLE:
             return {"error": "XGBoost non disponible"}
@@ -757,6 +758,7 @@ class MLService:
             model_version="v1",
             symbol=symbol,
             target_parameter_id=target_param.id,
+            search_id=search_id,
             model_parameters={
                 "algorithm": "XGBoost",
                 "target_return_percentage": str(target_param.target_return_percentage),
@@ -794,7 +796,7 @@ class MLService:
             "feature_importance": dict(zip(feature_names, model.feature_importances_))
         }
 
-    def train_lightgbm_model(self, symbol: str, target_param: TargetParameters, db: Session = None) -> Dict:
+    def train_lightgbm_model(self, symbol: str, target_param: TargetParameters, db: Session = None, search_id: str = None) -> Dict:
         """Entraîner un modèle LightGBM pour la classification"""
         if not LIGHTGBM_AVAILABLE:
             return {"error": "LightGBM non disponible"}
@@ -856,6 +858,7 @@ class MLService:
             model_version="v1",
             symbol=symbol,
             target_parameter_id=target_param.id,
+            search_id=search_id,
             model_parameters={
                 "algorithm": "LightGBM",
                 "target_return_percentage": str(target_param.target_return_percentage),
@@ -964,6 +967,7 @@ class MLService:
             model_version=version,
             symbol=symbol,
             target_parameter_id=target_param.id,
+            search_id=search_id,
             model_parameters={
                 "target_return_percentage": float(target_param.target_return_percentage),
                 "time_horizon_days": int(target_param.time_horizon_days),
@@ -1567,7 +1571,7 @@ class MLService:
         else:
             return {"error": "Ce type de modèle ne supporte pas l'importance des features"}
 
-    def train_neural_network_model(self, symbol: str, target_param: TargetParameters, db: Session = None) -> Dict:
+    def train_neural_network_model(self, symbol: str, target_param: TargetParameters, db: Session = None, search_id: str = None) -> Dict:
         """Entraîner un modèle de réseau de neurones pour la classification"""
         try:
             from sklearn.neural_network import MLPClassifier
@@ -1651,6 +1655,7 @@ class MLService:
             model_type="classification",
             symbol=symbol,
             target_parameter_id=target_param.id,
+            search_id=search_id,
             model_path=model_path,
             model_parameters={
                 "algorithm": "NeuralNetwork",

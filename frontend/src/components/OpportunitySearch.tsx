@@ -15,6 +15,7 @@ import {
 
 interface OpportunitySearchProps {
   className?: string;
+  onSearchCompleted?: (searchId: string) => void;
 }
 
 interface SearchParameters {
@@ -24,11 +25,12 @@ interface SearchParameters {
   confidence_threshold: number;
 }
 
-export default function OpportunitySearch({ className = '' }: OpportunitySearchProps) {
+export default function OpportunitySearch({ className = '', onSearchCompleted }: OpportunitySearchProps) {
   const queryClient = useQueryClient();
   const [isSearching, setIsSearching] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const [currentSearchId, setCurrentSearchId] = useState<string | null>(null);
   const [taskStatus, setTaskStatus] = useState<any>(null);
   
   const [parameters, setParameters] = useState<SearchParameters>({
@@ -53,12 +55,13 @@ export default function OpportunitySearch({ className = '' }: OpportunitySearchP
     {
       onSuccess: (data) => {
         console.log('Search opportunities response:', data);
-        if (data.task_id) {
-          console.log('Setting task ID:', data.task_id);
+        if (data.task_id && data.search_id) {
+          console.log('Setting task ID:', data.task_id, 'and search ID:', data.search_id);
           setCurrentTaskId(data.task_id);
+          setCurrentSearchId(data.search_id);
           toast.success('Recherche d\'opportunités lancée');
         } else {
-          console.log('No task ID, search completed immediately');
+          console.log('No task ID or search ID, search completed immediately');
           toast.success(`Recherche terminée: ${data.opportunities_found || 0} opportunités trouvées`);
           queryClient.invalidateQueries(['latest-opportunities']);
           setIsSearching(false);
@@ -84,15 +87,25 @@ export default function OpportunitySearch({ className = '' }: OpportunitySearchP
         
         if (response.state === 'SUCCESS') {
           console.log('Task completed successfully:', response.result);
-          toast.success(`Recherche terminée: ${response.result?.successful_updates || 0} opportunités trouvées`);
+          toast.success(`Recherche terminée: ${response.result?.total_opportunities_found || 0} opportunités trouvées`);
+          // Invalider les queries pour les opportunités de cette recherche spécifique
+          if (currentSearchId) {
+            queryClient.invalidateQueries(['search-opportunities', currentSearchId]);
+            // Notifier le parent que la recherche est terminée
+            if (onSearchCompleted) {
+              onSearchCompleted(currentSearchId);
+            }
+          }
           queryClient.invalidateQueries(['latest-opportunities']);
           setIsSearching(false);
           setCurrentTaskId(null);
+          setCurrentSearchId(null);
         } else if (response.state === 'FAILURE') {
           console.log('Task failed:', response.error);
           toast.error(`Erreur lors de la recherche: ${response.error || 'Erreur inconnue'}`);
           setIsSearching(false);
           setCurrentTaskId(null);
+          setCurrentSearchId(null);
         } else {
           console.log('Task in progress:', response.state, response.progress);
         }
@@ -103,7 +116,7 @@ export default function OpportunitySearch({ className = '' }: OpportunitySearchP
 
     const interval = setInterval(pollTaskStatus, 2000); // Polling toutes les 2 secondes
     return () => clearInterval(interval);
-  }, [currentTaskId, queryClient]);
+  }, [currentTaskId, currentSearchId, queryClient]);
 
   const handleSearch = () => {
     setIsSearching(true);

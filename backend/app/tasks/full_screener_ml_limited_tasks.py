@@ -21,7 +21,7 @@ def get_fresh_db_session():
 
 
 @celery_app.task(bind=True, name="run_full_screener_ml_limited")
-def run_full_screener_ml_limited(self, screener_request: Dict[str, Any], user_id: str = "screener_user", max_symbols: int = 5) -> Dict[str, Any]:
+def run_full_screener_ml_limited(self, screener_request: Dict[str, Any], user_id: str = "screener_user", max_symbols: int = 5, search_id: str = None) -> Dict[str, Any]:
     """
     Tâche de screener ML limité pour les tests
     """
@@ -65,6 +65,12 @@ def run_full_screener_ml_limited(self, screener_request: Dict[str, Any], user_id
             db.commit()
             db.refresh(screener_run)
             screener_run_id = screener_run.id
+            
+            # Mettre à jour le statut de la session de recherche si elle existe
+            if search_id:
+                from app.services.search_session_service import SearchSessionService
+                search_service = SearchSessionService(db)
+                search_service.update_search_session_status(search_id, 'running')
         finally:
             db.close()
         
@@ -184,7 +190,8 @@ def run_full_screener_ml_limited(self, screener_request: Dict[str, Any], user_id
                     model_result = ml_service.train_classification_model(
                         symbol=symbol,
                         target_param=target_param,
-                        db=db
+                        db=db,
+                        search_id=search_id
                     )
                     
                     if model_result and "error" not in model_result:
@@ -236,10 +243,19 @@ def run_full_screener_ml_limited(self, screener_request: Dict[str, Any], user_id
         db = get_fresh_db_session()
         try:
             # Récupérer les modèles avec les paramètres spécifiques de cette recherche
-            active_models = db.query(MLModels).filter(
-                MLModels.is_active == True,
-                MLModels.symbol.in_(symbols)
-            ).all()
+            if search_id:
+                # Filtrer par session de recherche si disponible
+                active_models = db.query(MLModels).filter(
+                    MLModels.is_active == True,
+                    MLModels.symbol.in_(symbols),
+                    MLModels.search_id == search_id
+                ).all()
+            else:
+                # Fallback pour les anciennes recherches
+                active_models = db.query(MLModels).filter(
+                    MLModels.is_active == True,
+                    MLModels.symbol.in_(symbols)
+                ).all()
             
             # Filtrer par les paramètres de la recherche
             filtered_models = []
@@ -312,6 +328,7 @@ def run_full_screener_ml_limited(self, screener_request: Dict[str, Any], user_id
                             # Enregistrement du résultat
                             screener_result = ScreenerResult(
                                 screener_run_id=screener_run_id,
+                                search_id=search_id,  # Lier à la session de recherche
                                 symbol=model.symbol,
                                 model_id=model.id,
                                 prediction=float(prediction),
@@ -373,9 +390,24 @@ def run_full_screener_ml_limited(self, screener_request: Dict[str, Any], user_id
         
         print(f"🎉 Screener ML limité terminé: {opportunities_found} opportunités trouvées sur {total_symbols} symboles")
         
+        # Mettre à jour le statut de la session de recherche si elle existe
+        if search_id:
+            db = get_fresh_db_session()
+            try:
+                from app.services.search_session_service import SearchSessionService
+                search_service = SearchSessionService(db)
+                search_service.update_search_session_status(
+                    search_id, 
+                    'completed', 
+                    opportunities_found
+                )
+            finally:
+                db.close()
+        
         # Résultat final
         result = {
             "screener_run_id": screener_run_id,
+            "search_id": search_id,
             "total_symbols": total_symbols,
             "successful_models": successful_models,
             "total_opportunities_found": opportunities_found,

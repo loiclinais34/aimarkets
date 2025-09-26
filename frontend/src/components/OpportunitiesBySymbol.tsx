@@ -40,9 +40,10 @@ interface SymbolOpportunities {
 interface OpportunitiesBySymbolProps {
   className?: string;
   maxItems?: number;
+  searchId?: string; // ID de session de recherche spécifique
 }
 
-export default function OpportunitiesBySymbol({ className = '', maxItems = 6 }: OpportunitiesBySymbolProps) {
+export default function OpportunitiesBySymbol({ className = '', maxItems = 6, searchId }: OpportunitiesBySymbolProps) {
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [groupedOpportunities, setGroupedOpportunities] = useState<SymbolOpportunities[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -65,14 +66,29 @@ export default function OpportunitiesBySymbol({ className = '', maxItems = 6 }: 
       setIsLoading(true);
       setError(null);
       
-      const response = await fetch('/api/v1/screener/latest-opportunities');
+      let response;
+      if (searchId) {
+        // Récupérer les opportunités d'une session de recherche spécifique
+        response = await fetch(`/api/v1/screener/search-opportunities/${searchId}`);
+      } else {
+        // Récupérer les dernières opportunités (comportement par défaut)
+        response = await fetch('/api/v1/screener/latest-opportunities');
+      }
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const result = await response.json();
-      setOpportunities(result);
+      
+      if (searchId) {
+        // Pour les sessions de recherche, extraire les opportunités du résultat
+        setOpportunities(result.opportunities || []);
+      } else {
+        // Pour les dernières opportunités, utiliser directement le résultat
+        setOpportunities(result);
+      }
+      
       setLastUpdated(new Date());
     } catch (err) {
       console.error('Erreur lors de la récupération des opportunités:', err);
@@ -80,7 +96,7 @@ export default function OpportunitiesBySymbol({ className = '', maxItems = 6 }: 
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [searchId]);
 
   // Grouper les opportunités par symbole
   useEffect(() => {

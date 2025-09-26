@@ -260,6 +260,7 @@ class MLModels(Base):
     model_version = Column(String(20), nullable=False, default="v1.0")
     symbol = Column(String(10), nullable=False, index=True)
     target_parameter_id = Column(Integer, ForeignKey('public.target_parameters.id'), nullable=True)
+    search_id = Column(String(36), ForeignKey('public.search_sessions.search_id'), nullable=True, index=True)  # Link to search session
     model_parameters = Column(JSON)
     performance_metrics = Column(JSON)
     model_path = Column(TEXT)
@@ -331,6 +332,23 @@ class CorrelationAlerts(Base):
     __table_args__ = ({"schema": "public"},)
 
 
+class SearchSession(Base):
+    __tablename__ = "search_sessions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    search_id = Column(String(36), nullable=False, unique=True, index=True)  # UUID
+    target_return_percentage = Column(DECIMAL(5, 2), nullable=False)
+    time_horizon_days = Column(Integer, nullable=False)
+    risk_tolerance = Column(DECIMAL(3, 2), nullable=False)  # 0.1 to 1.0
+    confidence_threshold = Column(DECIMAL(3, 2), nullable=False)
+    status = Column(String(50), nullable=False, default='pending')  # 'pending', 'running', 'completed', 'failed'
+    total_opportunities = Column(Integer, default=0)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    completed_at = Column(TIMESTAMP)
+    
+    __table_args__ = ({"schema": "public"},)
+
+
 class ScreenerConfig(Base):
     __tablename__ = "screener_configs"
     
@@ -370,6 +388,7 @@ class ScreenerResult(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     screener_run_id = Column(Integer, ForeignKey('public.screener_runs.id'), nullable=False)
+    search_id = Column(String(36), ForeignKey('public.search_sessions.search_id'), nullable=True, index=True)  # Link to search session
     symbol = Column(String(10), nullable=False, index=True)
     model_id = Column(Integer, ForeignKey('public.ml_models.id'), nullable=False)
     prediction = Column(DECIMAL(10, 6), nullable=False)

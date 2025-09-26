@@ -8,6 +8,7 @@ from ...models.schemas import (
     ScreenerRequest, ScreenerResponse, ScreenerRun, ScreenerResult,
     ScreenerConfig, ScreenerConfigCreate, ScreenerConfigUpdate
 )
+from ...models.database import MLModels
 from pydantic import BaseModel
 from ...services.screener_service import ScreenerService
 from ...services.celery_manager import CeleryManager
@@ -821,6 +822,17 @@ async def search_opportunities(
         # S'assurer que Celery est prêt
         ensure_celery_ready()
         
+        # Créer une session de recherche
+        from ...services.search_session_service import SearchSessionService
+        search_service = SearchSessionService(db)
+        
+        search_session = search_service.create_search_session(
+            target_return_percentage=request.target_return_percentage,
+            time_horizon_days=request.time_horizon_days,
+            risk_tolerance=request.risk_tolerance,
+            confidence_threshold=request.confidence_threshold
+        )
+        
         # Créer une requête de screener avec les paramètres
         screener_request = ScreenerRequest(
             target_return_percentage=request.target_return_percentage,
@@ -834,13 +846,15 @@ async def search_opportunities(
         task = run_full_screener_ml_limited.delay(
             screener_request.dict(),
             user_id="opportunity_search_user",
-            max_symbols=50  # Limiter pour une recherche rapide
+            max_symbols=50,  # Limiter pour une recherche rapide
+            search_id=search_session.search_id  # Passer l'ID de session
         )
         
         return {
             "success": True,
             "message": "Recherche d'opportunités lancée avec succès",
             "task_id": task.id,
+            "search_id": search_session.search_id,
             "parameters": {
                 "target_return_percentage": request.target_return_percentage,
                 "time_horizon_days": request.time_horizon_days,
@@ -861,4 +875,71 @@ async def search_opportunities(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erreur lors du lancement de la recherche: {str(e)}"
+        )
+
+
+@router.get("/search-opportunities/{search_id}")
+async def get_search_opportunities(
+    search_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Récupérer les opportunités d'une session de recherche spécifique.
+    """
+    try:
+        from ...services.search_session_service import SearchSessionService
+        search_service = SearchSessionService(db)
+        
+        # Récupérer la session de recherche
+        search_session = search_service.get_search_session(search_id)
+        if not search_session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session de recherche non trouvée"
+            )
+        
+        # Récupérer les opportunités
+        opportunities = search_service.get_search_opportunities(search_id)
+        
+        # Formater les opportunités pour la réponse
+        formatted_opportunities = []
+        for opp in opportunities:
+            # Récupérer les informations du modèle
+            model = db.query(MLModels).filter(MLModels.id == opp.model_id).first()
+            if model:
+                formatted_opportunities.append({
+                    "id": opp.id,
+                    "symbol": opp.symbol,
+                    "model_id": opp.model_id,
+                    "model_name": model.model_name,
+                    "prediction": float(opp.prediction),
+                    "confidence": float(opp.confidence),
+                    "rank": opp.rank,
+                    "target_return": float(search_session.target_return_percentage),
+                    "time_horizon": search_session.time_horizon_days,
+                    "prediction_date": search_session.created_at.isoformat(),
+                    "screener_run_id": opp.screener_run_id
+                })
+        
+        return {
+            "search_id": search_id,
+            "status": search_session.status,
+            "total_opportunities": len(formatted_opportunities),
+            "opportunities": formatted_opportunities,
+            "search_parameters": {
+                "target_return_percentage": float(search_session.target_return_percentage),
+                "time_horizon_days": search_session.time_horizon_days,
+                "risk_tolerance": float(search_session.risk_tolerance),
+                "confidence_threshold": float(search_session.confidence_threshold)
+            },
+            "created_at": search_session.created_at.isoformat(),
+            "completed_at": search_session.completed_at.isoformat() if search_session.completed_at else None
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la récupération des opportunités: {str(e)}"
         )

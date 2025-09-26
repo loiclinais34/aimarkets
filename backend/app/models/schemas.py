@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, validator
 from typing import Optional, List, Dict, Any
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from decimal import Decimal
 
 
@@ -466,3 +466,49 @@ class ScreenerResponse(BaseModel):
     opportunities_found: int
     execution_time_seconds: int
     results: List[Dict[str, Any]]
+
+
+# === SCHÉMAS POUR LES SESSIONS DE RECHERCHE ===
+
+class SearchSessionBase(BaseModel):
+    target_return_percentage: float = Field(..., ge=0, le=100, description="Rendement cible en pourcentage")
+    time_horizon_days: int = Field(..., ge=1, le=365, description="Horizon temporel en jours")
+    risk_tolerance: float = Field(..., ge=0.1, le=1.0, description="Tolérance au risque")
+    confidence_threshold: float = Field(..., ge=0.5, le=0.95, description="Seuil de confiance")
+
+
+class SearchSessionCreate(SearchSessionBase):
+    pass
+
+
+class SearchSessionUpdate(BaseModel):
+    status: Optional[str] = None
+    total_opportunities: Optional[int] = None
+
+
+class SearchSession(SearchSessionBase):
+    id: int
+    search_id: str
+    status: str
+    total_opportunities: int
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class SearchSessionWithResults(SearchSession):
+    opportunities: List[Dict[str, Any]] = []
+    models: List[Dict[str, Any]] = []
+    stats: Dict[str, Any] = {}
+
+
+class SearchOpportunityResponse(BaseModel):
+    search_id: str
+    status: str
+    total_opportunities: int
+    opportunities: List[Dict[str, Any]]
+    search_parameters: Dict[str, Any]
+    created_at: datetime
+    completed_at: Optional[datetime] = None

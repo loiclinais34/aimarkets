@@ -696,6 +696,11 @@ export const apiService = {
     return response.data
   },
 
+  getSearchOpportunities: async (searchId: string): Promise<any> => {
+    const response = await apiClient.get(`/api/v1/screener/search-opportunities/${searchId}`)
+    return response.data
+  },
+
 }
 
 // API pour les métadonnées des symboles
