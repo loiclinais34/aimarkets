@@ -40,6 +40,7 @@ class AnalysisRequest(BaseModel):
     symbol: str = Field(..., description="Symbole à analyser")
     time_horizon: int = Field(30, ge=1, le=365, description="Horizon temporel en jours")
     include_ml: bool = Field(True, description="Inclure l'analyse ML")
+    weights: Optional[Dict[str, float]] = Field(default=None, description="Poids personnalisés pour le scoring")
     
     @validator('symbol')
     def validate_symbol(cls, v):
@@ -62,6 +63,7 @@ class HybridSearchRequest(BaseModel):
     analysis_types: List[str] = Field(default=["technical", "sentiment"], description="Types d'analyse à effectuer")
     time_horizon: int = Field(default=30, ge=1, le=365, description="Horizon temporel en jours")
     weights: Optional[Dict[str, float]] = Field(default=None, description="Poids pour le scoring hybride")
+    limit: Optional[int] = Field(default=None, ge=1, le=100, description="Nombre maximum de résultats à retourner")
     
     @validator('symbols')
     def validate_symbols(cls, v):

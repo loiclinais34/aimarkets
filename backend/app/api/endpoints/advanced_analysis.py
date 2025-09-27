@@ -51,23 +51,40 @@ async def analyze_opportunity(
         result = await advanced_analyzer.analyze_opportunity(
             symbol=symbol,
             time_horizon=time_horizon,
-            include_ml=include_ml
+            include_ml=include_ml,
+            db=db
         )
         
-        # Retourner le résumé de l'analyse
-        analysis_summary = advanced_analyzer.get_analysis_summary(result)
+        logger.info(f"Analysis completed for {symbol}: {result.recommendation}")
         
         return {
-            "success": True,
             "symbol": symbol,
-            "analysis_date": result.analysis_date.isoformat(),
-            "time_horizon": time_horizon,
-            "summary": analysis_summary,
-            "detailed_analysis": {
+            "analysis_date": result.analysis_date,
+            "recommendation": result.recommendation,
+            "risk_level": result.risk_level,
+            "composite_score": result.composite_score,
+            "confidence_level": result.confidence_level,
+            "scores": {
+                "technical": result.technical_score,
+                "sentiment": result.sentiment_score,
+                "market": result.market_score,
+                "ml": result.ml_score,
+                "candlestick": result.candlestick_score,
+                "garch": result.garch_score,
+                "monte_carlo": result.monte_carlo_score,
+                "markov": result.markov_score,
+                "volatility": result.volatility_score
+            },
+            "analysis_details": {
                 "technical": result.technical_analysis,
                 "sentiment": result.sentiment_analysis,
                 "market": result.market_indicators,
-                "ml": result.ml_analysis
+                "ml": result.ml_analysis,
+                "candlestick": result.candlestick_analysis,
+                "garch": result.garch_analysis,
+                "monte_carlo": result.monte_carlo_analysis,
+                "markov": result.markov_analysis,
+                "volatility": result.volatility_analysis
             }
         }
         
@@ -78,17 +95,16 @@ async def analyze_opportunity(
             detail=f"Erreur lors de l'analyse complète: {str(e)}"
         )
 
->>>>>>> 9a31cdaa90ac59c5c2dba51e90814207bf0d73a6
 @router.post("/hybrid-search")
 async def hybrid_search(
     request: HybridSearchRequest,
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
-    Recherche hybride d'opportunités combinant ML et analyse conventionnelle
+    Recherche hybride d'opportunités sur plusieurs symboles
     
     Args:
-        request: Requête contenant les symboles et types d'analyse
+        request: Paramètres de recherche hybride
         
     Returns:
         Dict contenant les opportunités hybrides trouvées
@@ -96,159 +112,355 @@ async def hybrid_search(
     try:
         logger.info(f"Hybrid search for symbols: {request.symbols}")
         
-<<<<<<< HEAD
-        analyzer = AdvancedTradingAnalysis()
-=======
->>>>>>> 9a31cdaa90ac59c5c2dba51e90814207bf0d73a6
         opportunities = []
         
         for symbol in request.symbols:
             try:
                 # Analyse avancée pour chaque symbole
-<<<<<<< HEAD
-                analysis_result = await analyzer.analyze_opportunity(
+                analysis_result = await advanced_analyzer.analyze_opportunity(
                     symbol=symbol,
                     time_horizon=request.time_horizon,
-                    include_ml=True
-=======
-                analysis_result = await advanced_analyzer.analyze_symbol(
-                    symbol=symbol,
-                    time_horizon=request.time_horizon,
-                    analysis_types=request.analysis_types,
+                    include_ml=True,
                     db=db
                 )
                 
                 # Calculer le score hybride
-                hybrid_score = hybrid_scorer.calculate_hybrid_score(
-                    ml_score=analysis_result.get('ml_score', 0.5),
-                    technical_score=analysis_result.get('technical_score', 0.5),
-                    sentiment_score=analysis_result.get('sentiment_score', 0.5),
-                    market_score=analysis_result.get('market_score', 0.5),
-                    weights=request.weights
->>>>>>> 9a31cdaa90ac59c5c2dba51e90814207bf0d73a6
+                hybrid_score = hybrid_scorer.calculate_simple_hybrid_score(
+                    ml_score=analysis_result.ml_score,
+                    technical_score=analysis_result.technical_score,
+                    sentiment_score=analysis_result.sentiment_score,
+                    market_score=analysis_result.market_score
                 )
                 
-                opportunity = {
+                # Ajouter à la liste des opportunités
+                opportunities.append({
                     "symbol": symbol,
-<<<<<<< HEAD
-                    "hybrid_score": analysis_result.composite_score,
+                    "hybrid_score": hybrid_score,
+                    "composite_score": analysis_result.composite_score,
                     "confidence": analysis_result.confidence_level,
                     "recommendation": analysis_result.recommendation,
                     "risk_level": analysis_result.risk_level,
-                    "technical_score": analysis_result.technical_score,
-                    "sentiment_score": analysis_result.sentiment_score,
-                    "market_score": analysis_result.market_score,
-                    "ml_score": analysis_result.ml_analysis.get('accuracy', 0.5) if analysis_result.ml_analysis else 0.5,
-                    "analysis_details": {
-                        "technical_summary": f"Score: {analysis_result.technical_score:.2f}",
-                        "sentiment_summary": f"Score: {analysis_result.sentiment_score:.2f}", 
-                        "market_summary": f"Score: {analysis_result.market_score:.2f}",
-                        "ml_summary": f"Score: {analysis_result.ml_analysis.get('accuracy', 0.5):.2f}" if analysis_result.ml_analysis else "No ML model"
+                    "analysis": {
+                        "technical": analysis_result.technical_analysis,
+                        "sentiment": analysis_result.sentiment_analysis,
+                        "market": analysis_result.market_indicators,
+                        "ml": analysis_result.ml_analysis
                     }
-=======
-                    "hybrid_score": hybrid_score,
-                    "confidence": analysis_result.get('confidence', 0.5),
-                    "recommendation": analysis_result.get('recommendation', 'HOLD'),
-                    "risk_level": analysis_result.get('risk_level', 'MEDIUM'),
-                    "technical_score": analysis_result.get('technical_score', 0.5),
-                    "sentiment_score": analysis_result.get('sentiment_score', 0.5),
-                    "market_score": analysis_result.get('market_score', 0.5),
-                    "ml_score": analysis_result.get('ml_score', 0.5),
-                    "analysis_details": analysis_result
->>>>>>> 9a31cdaa90ac59c5c2dba51e90814207bf0d73a6
-                }
-                
-                opportunities.append(opportunity)
+                })
                 
             except Exception as e:
-                logger.error(f"Error analyzing {symbol}: {str(e)}")
-<<<<<<< HEAD
-                # Ajouter une opportunité avec score par défaut même en cas d'erreur
-                opportunity = {
-                    "symbol": symbol,
-                    "hybrid_score": 0.0,
-                    "confidence": 0.0,
-                    "recommendation": "HOLD",
-                    "risk_level": "HIGH",
-                    "technical_score": 0.0,
-                    "sentiment_score": 0.0,
-                    "market_score": 0.0,
-                    "ml_score": 0.0,
-                    "analysis_details": {"error": str(e)}
-                }
-                opportunities.append(opportunity)
-=======
->>>>>>> 9a31cdaa90ac59c5c2dba51e90814207bf0d73a6
+                logger.warning(f"Failed to analyze {symbol}: {e}")
                 continue
         
         # Trier par score hybride décroissant
-        opportunities.sort(key=lambda x: x['hybrid_score'], reverse=True)
+        opportunities.sort(key=lambda x: x["hybrid_score"], reverse=True)
         
         return {
-            "opportunities": opportunities,
-            "total_found": len(opportunities),
-            "search_timestamp": datetime.now().isoformat(),
-            "analysis_types": request.analysis_types,
-            "time_horizon": request.time_horizon
+            "total_symbols": len(request.symbols),
+            "analyzed_symbols": len(opportunities),
+            "opportunities": opportunities[:request.limit] if request.limit else opportunities
         }
         
     except Exception as e:
-        logger.error(f"Error in hybrid search: {str(e)}")
+        logger.error(f"Error in hybrid search: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erreur lors de la recherche hybride: {str(e)}"
         )
 
-<<<<<<< HEAD
-@router.post("/opportunity/{symbol}")
-async def analyze_opportunity(
-    symbol: str,
+@router.post("/composite-analysis")
+async def composite_analysis(
     request: AnalysisRequest,
     db: Session = Depends(get_db)
-) -> AnalysisResponse:
+) -> Dict[str, Any]:
     """
-    Analyse une opportunité d'investissement pour un symbole donné
+    Analyse composite avec scoring personnalisé
     
     Args:
-        symbol: Symbole de l'actif à analyser
-        request: Paramètres d'analyse
+        request: Paramètres d'analyse composite
         
     Returns:
-        Résultat de l'analyse
+        Dict contenant l'analyse composite
     """
     try:
-        logger.info(f"Analyzing opportunity for {symbol}")
+        logger.info(f"Composite analysis for {request.symbol}")
         
-        analyzer = AdvancedTradingAnalysis()
-        
-        # Effectuer l'analyse
-        result = await analyzer.analyze_opportunity(
-            symbol=symbol,
+        # Effectuer l'analyse complète
+        result = await advanced_analyzer.analyze_opportunity(
+            symbol=request.symbol,
             time_horizon=request.time_horizon,
-            include_ml=request.include_ml
+            include_ml=request.include_ml,
+            db=db
         )
         
-        return AnalysisResponse(
-            symbol=result.symbol,
-            analysis_date=result.analysis_date,
+        # Calculer le score composite personnalisé
+        composite_score = composite_scorer.calculate_simple_composite_score(
             technical_score=result.technical_score,
             sentiment_score=result.sentiment_score,
             market_score=result.market_score,
-            composite_score=result.composite_score,
-            confidence_level=result.confidence_level,
-            recommendation=result.recommendation,
-            risk_level=result.risk_level,
-            technical_analysis=result.technical_analysis,
-            sentiment_analysis=result.sentiment_analysis,
-            market_indicators=result.market_indicators,
-            ml_analysis=result.ml_analysis
+            ml_score=result.ml_score,
+            candlestick_score=result.candlestick_score,
+            garch_score=result.garch_score,
+            monte_carlo_score=result.monte_carlo_score,
+            markov_score=result.markov_score,
+            volatility_score=result.volatility_score,
+            weights=request.weights
         )
         
+        # Déterminer le niveau de risque
+        risk_level = composite_scorer.determine_risk_level(composite_score)
+        
+        return {
+            "symbol": request.symbol,
+            "analysis_date": result.analysis_date,
+            "composite_score": composite_score,
+            "risk_level": risk_level,
+            "recommendation": result.recommendation,
+            "confidence_level": result.confidence_level,
+            "scores_breakdown": {
+                "technical": result.technical_score,
+                "sentiment": result.sentiment_score,
+                "market": result.market_score,
+                "ml": result.ml_score,
+                "candlestick": result.candlestick_score,
+                "garch": result.garch_score,
+                "monte_carlo": result.monte_carlo_score,
+                "markov": result.markov_score,
+                "volatility": result.volatility_score
+            },
+            "analysis_details": {
+                "technical": result.technical_analysis,
+                "sentiment": result.sentiment_analysis,
+                "market": result.market_indicators,
+                "ml": result.ml_analysis,
+                "candlestick": result.candlestick_analysis,
+                "garch": result.garch_analysis,
+                "monte_carlo": result.monte_carlo_analysis,
+                "markov": result.markov_analysis,
+                "volatility": result.volatility_analysis
+            }
+        }
+        
     except Exception as e:
-        logger.error(f"Error analyzing opportunity for {symbol}: {str(e)}")
+        logger.error(f"Error in composite analysis for {request.symbol}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors de l'analyse de l'opportunité: {str(e)}"
+            detail=f"Erreur lors de l'analyse composite: {str(e)}"
+        )
+
+@router.get("/opportunities/search")
+async def search_opportunities(
+    # Filtres de base
+    min_score: float = Query(0.5, ge=0.0, le=1.0, description="Score composite minimum"),
+    max_risk: str = Query("HIGH", description="Niveau de risque maximum (LOW, MEDIUM, HIGH)"),
+    limit: int = Query(10, ge=1, le=100, description="Nombre maximum de résultats"),
+    
+    # Filtres de dates
+    date_from: str = Query(None, description="Date de début (YYYY-MM-DD) - basé sur updated_at"),
+    date_to: str = Query(None, description="Date de fin (YYYY-MM-DD) - basé sur updated_at"),
+    
+    # Filtres de scores individuels
+    min_technical_score: float = Query(None, ge=0.0, le=1.0, description="Score technique minimum"),
+    min_sentiment_score: float = Query(None, ge=0.0, le=1.0, description="Score sentiment minimum"),
+    min_market_score: float = Query(None, ge=0.0, le=1.0, description="Score marché minimum"),
+    min_ml_score: float = Query(None, ge=0.0, le=1.0, description="Score ML minimum"),
+    min_candlestick_score: float = Query(None, ge=0.0, le=1.0, description="Score chandeliers minimum"),
+    min_garch_score: float = Query(None, ge=0.0, le=1.0, description="Score GARCH minimum"),
+    min_monte_carlo_score: float = Query(None, ge=0.0, le=1.0, description="Score Monte Carlo minimum"),
+    min_markov_score: float = Query(None, ge=0.0, le=1.0, description="Score Markov minimum"),
+    min_volatility_score: float = Query(None, ge=0.0, le=1.0, description="Score volatilité minimum"),
+    
+    # Filtres de recommandation et confiance
+    recommendations: str = Query(None, description="Recommandations séparées par virgule (BUY,SELL,HOLD,STRONG_BUY,STRONG_SELL)"),
+    min_confidence: float = Query(None, ge=0.0, le=1.0, description="Niveau de confiance minimum"),
+    max_confidence: float = Query(None, ge=0.0, le=1.0, description="Niveau de confiance maximum"),
+    
+    # Filtres de symboles
+    symbols: str = Query(None, description="Symboles séparés par virgule (ex: AAPL,MSFT,GOOGL)"),
+    
+    # Tri
+    sort_by: str = Query("composite_score", description="Champ de tri (composite_score, confidence_level, analysis_date, updated_at)"),
+    sort_order: str = Query("desc", description="Ordre de tri (asc, desc)"),
+    
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Recherche avancée d'opportunités existantes dans la base de données
+    
+    Args:
+        min_score: Score composite minimum
+        max_risk: Niveau de risque maximum (LOW, MEDIUM, HIGH)
+        limit: Nombre maximum de résultats
+        date_from: Date de début (YYYY-MM-DD) - basé sur updated_at
+        date_to: Date de fin (YYYY-MM-DD) - basé sur updated_at
+        min_technical_score: Score technique minimum
+        min_sentiment_score: Score sentiment minimum
+        min_market_score: Score marché minimum
+        min_ml_score: Score ML minimum
+        min_candlestick_score: Score chandeliers minimum
+        min_garch_score: Score GARCH minimum
+        min_monte_carlo_score: Score Monte Carlo minimum
+        min_markov_score: Score Markov minimum
+        min_volatility_score: Score volatilité minimum
+        recommendations: Recommandations séparées par virgule
+        min_confidence: Niveau de confiance minimum
+        max_confidence: Niveau de confiance maximum
+        symbols: Symboles séparés par virgule
+        sort_by: Champ de tri
+        sort_order: Ordre de tri (asc, desc)
+        
+    Returns:
+        Dict contenant les opportunités trouvées avec métadonnées de filtrage
+    """
+    try:
+        from app.models.advanced_opportunities import AdvancedOpportunity
+        from datetime import datetime
+        from sqlalchemy import and_, or_
+        
+        # Construire la requête
+        query = db.query(AdvancedOpportunity)
+        
+        # Filtrer par score composite minimum
+        query = query.filter(AdvancedOpportunity.composite_score >= min_score)
+        
+        # Filtrer par niveau de risque
+        risk_levels = ["LOW", "MEDIUM", "HIGH"]
+        if max_risk in risk_levels:
+            max_risk_index = risk_levels.index(max_risk)
+            allowed_risks = risk_levels[:max_risk_index + 1]
+            query = query.filter(AdvancedOpportunity.risk_level.in_(allowed_risks))
+        
+        # Filtres de dates (basés sur updated_at)
+        if date_from:
+            try:
+                date_from_obj = datetime.strptime(date_from, "%Y-%m-%d")
+                query = query.filter(AdvancedOpportunity.updated_at >= date_from_obj)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Format de date_from invalide. Utilisez YYYY-MM-DD")
+        
+        if date_to:
+            try:
+                date_to_obj = datetime.strptime(date_to, "%Y-%m-%d")
+                # Ajouter 23:59:59 pour inclure toute la journée
+                date_to_obj = date_to_obj.replace(hour=23, minute=59, second=59)
+                query = query.filter(AdvancedOpportunity.updated_at <= date_to_obj)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Format de date_to invalide. Utilisez YYYY-MM-DD")
+        
+        # Filtres de scores individuels
+        if min_technical_score is not None:
+            query = query.filter(AdvancedOpportunity.technical_score >= min_technical_score)
+        if min_sentiment_score is not None:
+            query = query.filter(AdvancedOpportunity.sentiment_score >= min_sentiment_score)
+        if min_market_score is not None:
+            query = query.filter(AdvancedOpportunity.market_score >= min_market_score)
+        if min_ml_score is not None:
+            query = query.filter(AdvancedOpportunity.ml_score >= min_ml_score)
+        if min_candlestick_score is not None:
+            query = query.filter(AdvancedOpportunity.candlestick_score >= min_candlestick_score)
+        if min_garch_score is not None:
+            query = query.filter(AdvancedOpportunity.garch_score >= min_garch_score)
+        if min_monte_carlo_score is not None:
+            query = query.filter(AdvancedOpportunity.monte_carlo_score >= min_monte_carlo_score)
+        if min_markov_score is not None:
+            query = query.filter(AdvancedOpportunity.markov_score >= min_markov_score)
+        if min_volatility_score is not None:
+            query = query.filter(AdvancedOpportunity.volatility_score >= min_volatility_score)
+        
+        # Filtres de recommandation
+        if recommendations:
+            try:
+                rec_list = [rec.strip().upper() for rec in recommendations.split(",")]
+                valid_recommendations = ["BUY", "SELL", "HOLD", "STRONG_BUY", "STRONG_SELL"]
+                rec_list = [rec for rec in rec_list if rec in valid_recommendations]
+                if rec_list:
+                    query = query.filter(AdvancedOpportunity.recommendation.in_(rec_list))
+            except Exception:
+                pass  # Ignorer les erreurs de parsing
+        
+        # Filtres de confiance
+        if min_confidence is not None:
+            query = query.filter(AdvancedOpportunity.confidence_level >= min_confidence)
+        if max_confidence is not None:
+            query = query.filter(AdvancedOpportunity.confidence_level <= max_confidence)
+        
+        # Filtre de symboles
+        if symbols:
+            try:
+                symbol_list = [sym.strip().upper() for sym in symbols.split(",")]
+                if symbol_list:
+                    query = query.filter(AdvancedOpportunity.symbol.in_(symbol_list))
+            except Exception:
+                pass  # Ignorer les erreurs de parsing
+        
+        # Tri
+        valid_sort_fields = {
+            "composite_score": AdvancedOpportunity.composite_score,
+            "confidence_level": AdvancedOpportunity.confidence_level,
+            "analysis_date": AdvancedOpportunity.analysis_date,
+            "updated_at": AdvancedOpportunity.updated_at,
+            "technical_score": AdvancedOpportunity.technical_score,
+            "sentiment_score": AdvancedOpportunity.sentiment_score,
+            "market_score": AdvancedOpportunity.market_score
+        }
+        
+        sort_field = valid_sort_fields.get(sort_by, AdvancedOpportunity.composite_score)
+        if sort_order.lower() == "asc":
+            query = query.order_by(sort_field.asc())
+        else:
+            query = query.order_by(sort_field.desc())
+        
+        # Limiter les résultats
+        opportunities = query.limit(limit).all()
+        
+        # Formater les résultats
+        results = []
+        for opp in opportunities:
+            results.append({
+                "symbol": opp.symbol,
+                "analysis_date": opp.analysis_date.isoformat() if opp.analysis_date else None,
+                "updated_at": opp.updated_at.isoformat() if opp.updated_at else None,
+                "composite_score": float(opp.composite_score),
+                "confidence_level": float(opp.confidence_level),
+                "recommendation": opp.recommendation,
+                "risk_level": opp.risk_level,
+                "scores": {
+                    "technical": float(opp.technical_score),
+                    "sentiment": float(opp.sentiment_score),
+                    "market": float(opp.market_score),
+                    "ml": float(opp.ml_score),
+                    "candlestick": float(opp.candlestick_score),
+                    "garch": float(opp.garch_score),
+                    "monte_carlo": float(opp.monte_carlo_score),
+                    "markov": float(opp.markov_score),
+                    "volatility": float(opp.volatility_score)
+                }
+            })
+        
+        # Compter le total sans limite pour les métadonnées
+        total_count = db.query(AdvancedOpportunity).count()
+        
+        return {
+            "total_found": len(results),
+            "total_available": total_count,
+            "filters_applied": {
+                "min_score": min_score,
+                "max_risk": max_risk,
+                "date_from": date_from,
+                "date_to": date_to,
+                "recommendations": recommendations,
+                "symbols": symbols,
+                "sort_by": sort_by,
+                "sort_order": sort_order
+            },
+            "opportunities": results
+        }
+        
+    except Exception as e:
+        logger.error(f"Error searching opportunities: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la recherche d'opportunités: {str(e)}"
         )
 
 @router.get("/health")
@@ -257,260 +469,9 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "Advanced Analysis API",
-        "timestamp": datetime.now().isoformat(),
-        "version": "1.0.0-simplified"
+        "components": {
+            "advanced_analyzer": "available",
+            "hybrid_scorer": "available", 
+            "composite_scorer": "available"
+        }
     }
-=======
-@router.post("/hybrid-score")
-async def calculate_hybrid_score(
-    request: HybridAnalysisRequest,
-    db: Session = Depends(get_db)
-) -> Dict[str, Any]:
-    """
-    Calcule le score hybride combinant ML et analyse conventionnelle
-    
-    Args:
-        request: Requête contenant les analyses ML et conventionnelle
-        
-    Returns:
-        Dict contenant le score hybride
-    """
-    try:
-        logger.info(f"Calculating hybrid score for {request.symbol}")
-        
-        # Calculer le score hybride
-        hybrid_score = hybrid_scorer.calculate_hybrid_score(
-            ml_analysis=request.ml_analysis,
-            conventional_analysis=request.conventional_analysis
-        )
-        
-        return {
-            "success": True,
-            "symbol": hybrid_score.symbol,
-            "analysis_date": hybrid_score.analysis_date.isoformat(),
-            "hybrid_score": hybrid_score.hybrid_score,
-            "confidence": hybrid_score.confidence,
-            "convergence_factor": hybrid_score.convergence_factor,
-            "recommendation": hybrid_score.recommendation,
-            "score_breakdown": {
-                "ml_score": hybrid_score.ml_score,
-                "conventional_score": hybrid_score.conventional_score
-            },
-            "scoring_weights": hybrid_scorer.get_scoring_weights()
-        }
-        
-    except Exception as e:
-        logger.error(f"Error calculating hybrid score: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors du calcul du score hybride: {str(e)}"
-        )
-
-@router.post("/composite-score")
-async def calculate_composite_score(
-    analyses: Dict[str, Dict[str, Any]],
-    custom_weights: Optional[Dict[str, float]] = None,
-    db: Session = Depends(get_db)
-) -> Dict[str, Any]:
-    """
-    Calcule le score composite unifié
-    
-    Args:
-        analyses: Dictionnaire des analyses par type
-        custom_weights: Poids personnalisés (optionnel)
-        
-    Returns:
-        Dict contenant le score composite
-    """
-    try:
-        logger.info("Calculating composite score")
-        
-        # Convertir les analyses en format attendu
-        analysis_types = {}
-        for analysis_name, analysis_data in analyses.items():
-            try:
-                analysis_type = AnalysisType(analysis_name)
-                analysis_types[analysis_type] = analysis_data
-            except ValueError:
-                logger.warning(f"Unknown analysis type: {analysis_name}")
-                continue
-        
-        # Convertir les poids personnalisés
-        custom_weights_converted = None
-        if custom_weights:
-            custom_weights_converted = {}
-            for weight_name, weight_value in custom_weights.items():
-                try:
-                    analysis_type = AnalysisType(weight_name)
-                    custom_weights_converted[analysis_type] = weight_value
-                except ValueError:
-                    logger.warning(f"Unknown analysis type in weights: {weight_name}")
-                    continue
-        
-        # Calculer le score composite
-        composite_score = composite_scorer.calculate_composite_score(
-            analyses=analysis_types,
-            custom_weights=custom_weights_converted
-        )
-        
-        return {
-            "success": True,
-            "symbol": composite_score.symbol,
-            "analysis_date": composite_score.analysis_date.isoformat(),
-            "overall_score": composite_score.overall_score,
-            "confidence_level": composite_score.confidence_level,
-            "risk_level": composite_score.risk_level.value,
-            "recommendation": composite_score.recommendation,
-            "score_breakdown": composite_score.score_breakdown,
-            "analysis_quality": composite_score.analysis_quality,
-            "convergence_metrics": composite_score.convergence_metrics
-        }
-        
-    except Exception as e:
-        logger.error(f"Error calculating composite score: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors du calcul du score composite: {str(e)}"
-        )
-
-@router.get("/analysis/{symbol}/summary")
-async def get_analysis_summary(
-    symbol: str,
-    db: Session = Depends(get_db)
-) -> Dict[str, Any]:
-    """
-    Récupère un résumé de la dernière analyse pour un symbole
-    
-    Args:
-        symbol: Symbole à analyser
-        
-    Returns:
-        Dict contenant le résumé de l'analyse
-    """
-    try:
-        logger.info(f"Getting analysis summary for {symbol}")
-        
-        # Effectuer une analyse rapide
-        result = await advanced_analyzer.analyze_opportunity(
-            symbol=symbol,
-            time_horizon=30,
-            include_ml=True
-        )
-        
-        # Retourner le résumé
-        summary = advanced_analyzer.get_analysis_summary(result)
-        
-        return {
-            "success": True,
-            "summary": summary
-        }
-        
-    except Exception as e:
-        logger.error(f"Error getting analysis summary for {symbol}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors de la récupération du résumé: {str(e)}"
-        )
-
-@router.get("/scoring/configuration")
-async def get_scoring_configuration() -> Dict[str, Any]:
-    """
-    Récupère la configuration actuelle du scoring
-    
-    Returns:
-        Dict contenant la configuration du scoring
-    """
-    try:
-        return {
-            "success": True,
-            "hybrid_scoring": hybrid_scorer.get_scoring_weights(),
-            "composite_scoring": composite_scorer.get_scoring_configuration()
-        }
-        
-    except Exception as e:
-        logger.error(f"Error getting scoring configuration: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors de la récupération de la configuration: {str(e)}"
-        )
-
-@router.post("/scoring/configuration")
-async def update_scoring_configuration(
-    config: Dict[str, Any],
-    db: Session = Depends(get_db)
-) -> Dict[str, Any]:
-    """
-    Met à jour la configuration du scoring
-    
-    Args:
-        config: Nouvelle configuration du scoring
-        
-    Returns:
-        Dict confirmant la mise à jour
-    """
-    try:
-        logger.info("Updating scoring configuration")
-        
-        success = True
-        
-        # Mettre à jour la configuration du scoring hybride
-        if 'hybrid_scoring' in config:
-            hybrid_config = config['hybrid_scoring']
-            if 'ml_weight' in hybrid_config and 'conventional_weight' in hybrid_config:
-                success &= hybrid_scorer.update_scoring_weights(
-                    ml_weight=hybrid_config['ml_weight'],
-                    conventional_weight=hybrid_config['conventional_weight']
-                )
-        
-        # Mettre à jour la configuration du scoring composite
-        if 'composite_scoring' in config:
-            composite_config = config['composite_scoring']
-            success &= composite_scorer.update_scoring_configuration(composite_config)
-        
-        if success:
-            return {
-                "success": True,
-                "message": "Configuration mise à jour avec succès"
-            }
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Erreur lors de la mise à jour de la configuration"
-            )
-        
-    except Exception as e:
-        logger.error(f"Error updating scoring configuration: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors de la mise à jour de la configuration: {str(e)}"
-        )
-
-@router.get("/health")
-async def health_check() -> Dict[str, Any]:
-    """
-    Vérification de l'état des services d'analyse avancée
-    
-    Returns:
-        Dict contenant l'état des services
-    """
-    try:
-        return {
-            "success": True,
-            "status": "healthy",
-            "services": {
-                "advanced_analyzer": "active",
-                "hybrid_scorer": "active",
-                "composite_scorer": "active"
-            },
-            "timestamp": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Error in health check: {e}")
-        return {
-            "success": False,
-            "status": "unhealthy",
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
->>>>>>> 9a31cdaa90ac59c5c2dba51e90814207bf0d73a6

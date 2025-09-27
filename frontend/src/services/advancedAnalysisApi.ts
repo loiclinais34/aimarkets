@@ -50,6 +50,41 @@ export interface HybridAnalysisRequest {
   analysis_types?: string[];
   time_horizon?: number;
   weights?: Record<string, number>;
+  threshold?: number;
+}
+
+export interface AdvancedSearchFilters {
+  // Filtres de base
+  min_score?: number;
+  max_risk?: string;
+  limit?: number;
+  
+  // Filtres de dates
+  date_from?: string; // YYYY-MM-DD
+  date_to?: string;   // YYYY-MM-DD
+  
+  // Filtres de scores individuels
+  min_technical_score?: number;
+  min_sentiment_score?: number;
+  min_market_score?: number;
+  min_ml_score?: number;
+  min_candlestick_score?: number;
+  min_garch_score?: number;
+  min_monte_carlo_score?: number;
+  min_markov_score?: number;
+  min_volatility_score?: number;
+  
+  // Filtres de recommandation et confiance
+  recommendations?: string; // BUY,SELL,HOLD,STRONG_BUY,STRONG_SELL
+  min_confidence?: number;
+  max_confidence?: number;
+  
+  // Filtres de symboles
+  symbols?: string; // AAPL,MSFT,GOOGL
+  
+  // Tri
+  sort_by?: string; // composite_score, confidence_level, analysis_date, updated_at
+  sort_order?: string; // asc, desc
 }
 
 export interface HybridAnalysisResponse {
@@ -63,8 +98,20 @@ export interface HybridAnalysisResponse {
     sentiment_score: number;
     market_score: number;
     ml_score: number;
+    candlestick_score: number;
+    garch_score: number;
+    monte_carlo_score: number;
+    markov_score: number;
+    volatility_score: number;
+    analysis_timestamp?: string;
+    updated_at?: string;
   }>;
   analysis_timestamp: string;
+  metadata?: {
+    total_found: number;
+    total_available: number;
+    filters_applied: any;
+  };
 }
 
 export interface CompositeAnalysisRequest {
@@ -93,11 +140,71 @@ class AdvancedAnalysisApi {
   }
 
   /**
-   * Recherche hybride d'opportunités
+   * Recherche d'opportunités stockées dans la base de données avec filtres avancés
+   */
+  async searchStoredOpportunities(
+    filters: AdvancedSearchFilters = {}
+  ): Promise<HybridAnalysisResponse> {
+    // Valeurs par défaut
+    const defaultFilters = {
+      max_risk: "HIGH",
+      limit: 10,
+      sort_by: "composite_score",
+      sort_order: "desc"
+    };
+    
+    const searchParams = { ...defaultFilters, ...filters };
+    
+    const response = await apiClient.get('/api/v1/advanced-analysis/opportunities/search', {
+      params: searchParams
+    });
+    
+    const data = response.data;
+    
+    // Convertir les opportunités stockées en format hybride
+    const opportunities = data.opportunities.map((opp: any) => ({
+      symbol: opp.symbol,
+      hybrid_score: opp.composite_score * 100, // Convertir en pourcentage
+      composite_score: opp.composite_score,
+      confidence: opp.confidence_level,
+      recommendation: opp.recommendation,
+      risk_level: opp.risk_level,
+      technical_score: opp.scores.technical * 100,
+      sentiment_score: opp.scores.sentiment * 100,
+      market_score: opp.scores.market * 100,
+      ml_score: opp.scores.ml * 100,
+      candlestick_score: opp.scores.candlestick * 100,
+      garch_score: opp.scores.garch * 100,
+      monte_carlo_score: opp.scores.monte_carlo * 100,
+      markov_score: opp.scores.markov * 100,
+      volatility_score: opp.scores.volatility * 100,
+      analysis_timestamp: opp.analysis_date,
+      updated_at: opp.updated_at
+    }));
+    
+    return {
+      opportunities: opportunities,
+      analysis_timestamp: data.analysis_timestamp || new Date().toISOString(),
+      metadata: {
+        total_found: data.total_found,
+        total_available: data.total_available,
+        filters_applied: data.filters_applied
+      }
+    };
+  }
+
+  /**
+   * Recherche hybride d'opportunités (utilise les opportunités stockées)
    */
   async hybridSearch(request: HybridAnalysisRequest): Promise<HybridAnalysisResponse> {
-    const response = await apiClient.post('/api/v1/advanced-analysis/hybrid-search', request);
-    return response.data;
+    // Construire les filtres à partir de la requête
+    const filters: AdvancedSearchFilters = {
+      min_score: request.threshold || 0.5,
+      limit: request.symbols.length > 0 ? request.symbols.length * 2 : 20,
+      symbols: request.symbols.join(',') // Convertir le tableau en string séparée par virgules
+    };
+    
+    return await this.searchStoredOpportunities(filters);
   }
 
   /**

@@ -391,8 +391,8 @@ class SupportResistanceAnalyzer:
                 high, low, 'down'
             )
             
-            # Niveaux de support/résistance
-            analysis['support_resistance'] = SupportResistanceAnalyzer.find_support_resistance_levels(
+            # Niveaux de support/résistance multi-temporels
+            analysis['support_resistance'] = SupportResistanceAnalyzer.analyze_multi_timeframe_levels(
                 high, low, close
             )
             
@@ -410,3 +410,217 @@ class SupportResistanceAnalyzer:
         except Exception as e:
             logger.error(f"Erreur lors de l'analyse complète des niveaux: {e}")
             return {}
+    
+    @staticmethod
+    def analyze_multi_timeframe_levels(high: pd.Series, low: pd.Series, close: pd.Series) -> Dict[str, any]:
+        """
+        Analyse les niveaux de support/résistance sur plusieurs horizons temporels.
+        
+        Args:
+            high: Série des prix hauts
+            low: Série des prix bas
+            close: Série des prix de clôture
+            
+        Returns:
+            Dictionnaire contenant les niveaux par horizon temporel
+        """
+        try:
+            # Configuration des horizons temporels
+            timeframes = {
+                'major': {
+                    'window': 50,        # 50 jours pour les extrêmes
+                    'min_touches': 3,    # Plus de validations
+                    'description': 'Niveaux majeurs (6-12 mois)'
+                },
+                'intermediate': {
+                    'window': 20,        # 20 jours
+                    'min_touches': 2,
+                    'description': 'Niveaux intermédiaires (1-3 mois)'
+                },
+                'minor': {
+                    'window': 10,        # 10 jours
+                    'min_touches': 2,
+                    'description': 'Niveaux mineurs (1-2 semaines)'
+                }
+            }
+            
+            multi_timeframe_analysis = {}
+            
+            for timeframe, config in timeframes.items():
+                # Analyser les niveaux pour cet horizon
+                levels = SupportResistanceAnalyzer.find_support_resistance_levels(
+                    high, low, close, 
+                    window=config['window'], 
+                    min_touches=config['min_touches']
+                )
+                
+                # Calculer la force des niveaux
+                enhanced_levels = SupportResistanceAnalyzer._enhance_levels_with_strength(
+                    levels, close, config['window']
+                )
+                
+                multi_timeframe_analysis[timeframe] = {
+                    'levels': enhanced_levels,
+                    'config': config,
+                    'support_levels': enhanced_levels['support_levels'],
+                    'resistance_levels': enhanced_levels['resistance_levels']
+                }
+            
+            # Niveaux consolidés (tous horizons confondus)
+            consolidated = SupportResistanceAnalyzer._consolidate_multi_timeframe_levels(
+                multi_timeframe_analysis
+            )
+            
+            return {
+                'multi_timeframe': multi_timeframe_analysis,
+                'consolidated': consolidated,
+                'support_levels': consolidated['support_levels'],
+                'resistance_levels': consolidated['resistance_levels']
+            }
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de l'analyse multi-temporelle: {e}")
+            # Fallback vers l'analyse simple
+            return SupportResistanceAnalyzer.find_support_resistance_levels(high, low, close)
+    
+    @staticmethod
+    def _enhance_levels_with_strength(levels: Dict[str, List[float]], close: pd.Series, window: int) -> Dict[str, List[Dict]]:
+        """
+        Améliore les niveaux avec des informations de force et de pertinence.
+        
+        Args:
+            levels: Niveaux de support/résistance
+            close: Série des prix de clôture
+            window: Fenêtre d'analyse
+            
+        Returns:
+            Niveaux enrichis avec métadonnées
+        """
+        try:
+            enhanced = {
+                'support_levels': [],
+                'resistance_levels': []
+            }
+            
+            current_price = close.iloc[-1]
+            
+            # Enrichir les niveaux de support
+            for level in levels['support_levels']:
+                strength = SupportResistanceAnalyzer._calculate_level_strength(
+                    level, current_price, close, window
+                )
+                enhanced['support_levels'].append({
+                    'price': level,
+                    'strength': strength,
+                    'distance_percent': abs((level - current_price) / current_price * 100),
+                    'type': 'support'
+                })
+            
+            # Enrichir les niveaux de résistance
+            for level in levels['resistance_levels']:
+                strength = SupportResistanceAnalyzer._calculate_level_strength(
+                    level, current_price, close, window
+                )
+                enhanced['resistance_levels'].append({
+                    'price': level,
+                    'strength': strength,
+                    'distance_percent': abs((level - current_price) / current_price * 100),
+                    'type': 'resistance'
+                })
+            
+            return enhanced
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de l'enrichissement des niveaux: {e}")
+            return levels
+    
+    @staticmethod
+    def _calculate_level_strength(level: float, current_price: float, close: pd.Series, window: int) -> float:
+        """
+        Calcule la force d'un niveau de support/résistance.
+        
+        Args:
+            level: Niveau de prix
+            current_price: Prix actuel
+            close: Série des prix de clôture
+            window: Fenêtre d'analyse
+            
+        Returns:
+            Score de force entre 0 et 1
+        """
+        try:
+            # Compter les touches du niveau
+            tolerance = 0.02  # 2% de tolérance
+            touches = 0
+            
+            for price in close.tail(window * 2):  # Analyser les 2x window derniers prix
+                if abs(price - level) / level <= tolerance:
+                    touches += 1
+            
+            # Score basé sur le nombre de touches
+            touch_score = min(touches / 5, 1.0)
+            
+            # Score basé sur la récence (plus récent = plus fort)
+            recent_touches = 0
+            for price in close.tail(window):
+                if abs(price - level) / level <= tolerance:
+                    recent_touches += 1
+            
+            recency_score = min(recent_touches / 3, 1.0)
+            
+            # Score composite
+            strength = (touch_score * 0.6) + (recency_score * 0.4)
+            
+            return round(strength, 2)
+            
+        except Exception as e:
+            logger.error(f"Erreur lors du calcul de la force: {e}")
+            return 0.5
+    
+    @staticmethod
+    def _consolidate_multi_timeframe_levels(multi_timeframe_analysis: Dict) -> Dict[str, List[Dict]]:
+        """
+        Consolide les niveaux de tous les horizons temporels.
+        
+        Args:
+            multi_timeframe_analysis: Analyse multi-temporelle
+            
+        Returns:
+            Niveaux consolidés avec priorité
+        """
+        try:
+            all_support = []
+            all_resistance = []
+            
+            # Collecter tous les niveaux
+            for timeframe, data in multi_timeframe_analysis.items():
+                # Ajouter un poids selon l'horizon
+                weight = {'major': 3, 'intermediate': 2, 'minor': 1}[timeframe]
+                
+                for level in data['support_levels']:
+                    level['timeframe'] = timeframe
+                    level['weight'] = weight
+                    level['weighted_strength'] = level['strength'] * weight
+                    all_support.append(level)
+                
+                for level in data['resistance_levels']:
+                    level['timeframe'] = timeframe
+                    level['weight'] = weight
+                    level['weighted_strength'] = level['strength'] * weight
+                    all_resistance.append(level)
+            
+            # Trier par force pondérée
+            all_support.sort(key=lambda x: x['weighted_strength'], reverse=True)
+            all_resistance.sort(key=lambda x: x['weighted_strength'], reverse=True)
+            
+            # Garder les 5 meilleurs niveaux de chaque type
+            consolidated = {
+                'support_levels': all_support[:5],
+                'resistance_levels': all_resistance[:5]
+            }
+            
+            return consolidated
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de la consolidation: {e}")
+            return {'support_levels': [], 'resistance_levels': []}

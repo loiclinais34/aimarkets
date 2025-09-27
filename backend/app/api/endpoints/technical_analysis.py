@@ -109,7 +109,12 @@ async def get_technical_signals(
             if pd.isna(value) or value is None:
                 return None
             try:
-                return float(value)
+                if isinstance(value, np.integer):
+                    return float(int(value))
+                elif isinstance(value, np.floating):
+                    return float(value)
+                else:
+                    return float(value)
             except (ValueError, TypeError):
                 return None
         
@@ -118,15 +123,23 @@ async def get_technical_signals(
             if pd.isna(value) or value is None:
                 return None
             try:
-                return int(value)
+                if isinstance(value, np.integer):
+                    return int(value)
+                elif isinstance(value, np.floating):
+                    return int(value)
+                else:
+                    return int(value)
             except (ValueError, TypeError):
                 return None
         
         # Préparer les indicateurs
         indicators_data = {}
+        
+        # RSI
         if 'rsi' in indicators and not indicators['rsi'].empty:
             indicators_data['rsi'] = safe_float(indicators['rsi'].iloc[-1])
         
+        # MACD
         if 'macd' in indicators:
             macd_data = indicators['macd']
             indicators_data['macd'] = {
@@ -135,6 +148,7 @@ async def get_technical_signals(
                 "histogram": safe_float(macd_data.get('histogram', pd.Series()).iloc[-1]) if not macd_data.get('histogram', pd.Series()).empty else None
             }
         
+        # Bollinger Bands
         if 'bollinger_bands' in indicators:
             bb_data = indicators['bollinger_bands']
             indicators_data['bollinger_bands'] = {
@@ -143,6 +157,7 @@ async def get_technical_signals(
                 "lower": safe_float(bb_data.get('lower', pd.Series()).iloc[-1]) if not bb_data.get('lower', pd.Series()).empty else None
             }
         
+        # Stochastic
         if 'stochastic' in indicators:
             stoch_data = indicators['stochastic']
             indicators_data['stochastic'] = {
@@ -150,11 +165,56 @@ async def get_technical_signals(
                 "d_percent": safe_float(stoch_data.get('d_percent', pd.Series()).iloc[-1]) if not stoch_data.get('d_percent', pd.Series()).empty else None
             }
         
+        # Williams %R
+        if 'williams_r' in indicators and not indicators['williams_r'].empty:
+            indicators_data['williams_r'] = safe_float(indicators['williams_r'].iloc[-1])
+        
+        # CCI (Commodity Channel Index)
+        if 'cci' in indicators and not indicators['cci'].empty:
+            indicators_data['cci'] = safe_float(indicators['cci'].iloc[-1])
+        
+        # ADX (Average Directional Index)
+        if 'adx' in indicators:
+            adx_data = indicators['adx']
+            indicators_data['adx'] = {
+                "adx": safe_float(adx_data.get('adx', pd.Series()).iloc[-1]) if not adx_data.get('adx', pd.Series()).empty else None,
+                "plus_di": safe_float(adx_data.get('plus_di', pd.Series()).iloc[-1]) if not adx_data.get('plus_di', pd.Series()).empty else None,
+                "minus_di": safe_float(adx_data.get('minus_di', pd.Series()).iloc[-1]) if not adx_data.get('minus_di', pd.Series()).empty else None
+            }
+        
+        # Parabolic SAR
+        if 'parabolic_sar' in indicators and not indicators['parabolic_sar'].empty:
+            indicators_data['parabolic_sar'] = safe_float(indicators['parabolic_sar'].iloc[-1])
+        
+        # Ichimoku Cloud
+        if 'ichimoku' in indicators:
+            ichimoku_data = indicators['ichimoku']
+            indicators_data['ichimoku'] = {
+                "tenkan_sen": safe_float(ichimoku_data.get('tenkan_sen', pd.Series()).iloc[-1]) if not ichimoku_data.get('tenkan_sen', pd.Series()).empty else None,
+                "kijun_sen": safe_float(ichimoku_data.get('kijun_sen', pd.Series()).iloc[-1]) if not ichimoku_data.get('kijun_sen', pd.Series()).empty else None,
+                "senkou_span_a": safe_float(ichimoku_data.get('senkou_span_a', pd.Series()).iloc[-1]) if not ichimoku_data.get('senkou_span_a', pd.Series()).empty else None,
+                "senkou_span_b": safe_float(ichimoku_data.get('senkou_span_b', pd.Series()).iloc[-1]) if not ichimoku_data.get('senkou_span_b', pd.Series()).empty else None,
+                "chikou_span": safe_float(ichimoku_data.get('chikou_span', pd.Series()).iloc[-1]) if not ichimoku_data.get('chikou_span', pd.Series()).empty else None
+            }
+        
+        # SMA 20 et 50
+        if 'sma_20' in indicators and not indicators['sma_20'].empty:
+            indicators_data['sma_20'] = safe_float(indicators['sma_20'].iloc[-1])
+        
+        if 'sma_50' in indicators and not indicators['sma_50'].empty:
+            indicators_data['sma_50'] = safe_float(indicators['sma_50'].iloc[-1])
+        
         # Préparer les patterns
         patterns_data = {}
         for pattern_name, pattern_data in patterns.items():
             if isinstance(pattern_data, pd.Series) and not pattern_data.empty:
-                patterns_data[pattern_name] = safe_int(pattern_data.iloc[-5:].sum())
+                sum_value = pattern_data.iloc[-5:].sum()
+                if isinstance(sum_value, np.integer):
+                    patterns_data[pattern_name] = int(sum_value)
+                elif isinstance(sum_value, np.floating):
+                    patterns_data[pattern_name] = float(sum_value)
+                else:
+                    patterns_data[pattern_name] = safe_int(sum_value)
             else:
                 patterns_data[pattern_name] = 0
         
@@ -165,6 +225,10 @@ async def get_technical_signals(
                 signals_data[key] = safe_float(value)
             elif isinstance(value, str):
                 signals_data[key] = value
+            elif isinstance(value, np.integer):
+                signals_data[key] = int(value)
+            elif isinstance(value, np.floating):
+                signals_data[key] = float(value)
             else:
                 signals_data[key] = str(value)
         
@@ -295,11 +359,239 @@ async def get_technical_signals(
                 confidence=float(confidence)
             ))
         
+        # Signal Williams %R
+        if 'williams_r' in indicators_data and indicators_data['williams_r'] is not None:
+            williams_r = indicators_data['williams_r']
+            if williams_r > -20:
+                signal_direction = "SELL"
+                signal_strength = min(1.0, (williams_r + 20) / 20)
+                confidence = 0.6
+            elif williams_r < -80:
+                signal_direction = "BUY"
+                signal_strength = min(1.0, (-80 - williams_r) / 20)
+                confidence = 0.6
+            else:
+                signal_direction = "HOLD"
+                signal_strength = 0.0
+                confidence = 0.5
+            
+            signals_to_save.append(TechnicalSignalsModel(
+                symbol=symbol,
+                signal_type="WILLIAMS_R",
+                signal_value=float(williams_r),
+                signal_strength=float(signal_strength),
+                signal_direction=signal_direction,
+                indicator_value=float(williams_r),
+                threshold_upper=-20.0,
+                threshold_lower=-80.0,
+                confidence=float(confidence)
+            ))
+        
+        # Signal CCI
+        if 'cci' in indicators_data and indicators_data['cci'] is not None:
+            cci = indicators_data['cci']
+            if cci > 100:
+                signal_direction = "BUY"
+                signal_strength = min(1.0, (cci - 100) / 100)
+                confidence = 0.6
+            elif cci < -100:
+                signal_direction = "SELL"
+                signal_strength = min(1.0, (-100 - cci) / 100)
+                confidence = 0.6
+            else:
+                signal_direction = "HOLD"
+                signal_strength = 0.0
+                confidence = 0.5
+            
+            signals_to_save.append(TechnicalSignalsModel(
+                symbol=symbol,
+                signal_type="CCI",
+                signal_value=float(cci),
+                signal_strength=float(signal_strength),
+                signal_direction=signal_direction,
+                indicator_value=float(cci),
+                threshold_upper=100.0,
+                threshold_lower=-100.0,
+                confidence=float(confidence)
+            ))
+        
+        # Signal ADX
+        if 'adx' in indicators_data and indicators_data['adx']['adx'] is not None:
+            adx = indicators_data['adx']['adx']
+            plus_di = indicators_data['adx']['plus_di']
+            minus_di = indicators_data['adx']['minus_di']
+            
+            if adx > 25:  # Tendance forte
+                if plus_di and minus_di:
+                    if plus_di > minus_di:
+                        signal_direction = "BUY"
+                        signal_strength = min(1.0, (plus_di - minus_di) / 50)
+                        confidence = 0.8
+                    else:
+                        signal_direction = "SELL"
+                        signal_strength = min(1.0, (minus_di - plus_di) / 50)
+                        confidence = 0.8
+                else:
+                    signal_direction = "HOLD"
+                    signal_strength = 0.0
+                    confidence = 0.5
+            else:
+                signal_direction = "HOLD"
+                signal_strength = 0.0
+                confidence = 0.3
+            
+            signals_to_save.append(TechnicalSignalsModel(
+                symbol=symbol,
+                signal_type="ADX",
+                signal_value=float(adx),
+                signal_strength=float(signal_strength),
+                signal_direction=signal_direction,
+                indicator_value=float(adx),
+                threshold_upper=25.0,
+                threshold_lower=0.0,
+                confidence=float(confidence)
+            ))
+        
+        # Signal Parabolic SAR
+        if 'parabolic_sar' in indicators_data and indicators_data['parabolic_sar'] is not None:
+            sar = indicators_data['parabolic_sar']
+            current_price = safe_float(df['close'].iloc[-1])
+            
+            if current_price and sar:
+                if current_price > sar:
+                    signal_direction = "BUY"
+                    signal_strength = min(1.0, (current_price - sar) / current_price)
+                    confidence = 0.7
+                else:
+                    signal_direction = "SELL"
+                    signal_strength = min(1.0, (sar - current_price) / current_price)
+                    confidence = 0.7
+                
+                signals_to_save.append(TechnicalSignalsModel(
+                    symbol=symbol,
+                    signal_type="PARABOLIC_SAR",
+                    signal_value=float(current_price),
+                    signal_strength=float(signal_strength),
+                    signal_direction=signal_direction,
+                    indicator_value=float(sar),
+                    threshold_upper=float(current_price),
+                    threshold_lower=float(sar),
+                    confidence=float(confidence)
+                ))
+        
+        # Signal Ichimoku
+        if 'ichimoku' in indicators_data:
+            ichimoku = indicators_data['ichimoku']
+            current_price = safe_float(df['close'].iloc[-1])
+            
+            if (current_price and ichimoku['tenkan_sen'] and ichimoku['kijun_sen'] and 
+                ichimoku['senkou_span_a'] and ichimoku['senkou_span_b']):
+                
+                tenkan = ichimoku['tenkan_sen']
+                kijun = ichimoku['kijun_sen']
+                senkou_a = ichimoku['senkou_span_a']
+                senkou_b = ichimoku['senkou_span_b']
+                
+                # Logique Ichimoku simplifiée
+                if current_price > tenkan and current_price > kijun:
+                    if current_price > max(senkou_a, senkou_b):
+                        signal_direction = "BUY"
+                        signal_strength = 0.8
+                        confidence = 0.8
+                    else:
+                        signal_direction = "HOLD"
+                        signal_strength = 0.3
+                        confidence = 0.6
+                elif current_price < tenkan and current_price < kijun:
+                    if current_price < min(senkou_a, senkou_b):
+                        signal_direction = "SELL"
+                        signal_strength = 0.8
+                        confidence = 0.8
+                    else:
+                        signal_direction = "HOLD"
+                        signal_strength = 0.3
+                        confidence = 0.6
+                else:
+                    signal_direction = "HOLD"
+                    signal_strength = 0.0
+                    confidence = 0.5
+                
+                signals_to_save.append(TechnicalSignalsModel(
+                    symbol=symbol,
+                    signal_type="ICHIMOKU",
+                    signal_value=float(current_price),
+                    signal_strength=float(signal_strength),
+                    signal_direction=signal_direction,
+                    indicator_value=float(tenkan),
+                    threshold_upper=float(max(senkou_a, senkou_b)),
+                    threshold_lower=float(min(senkou_a, senkou_b)),
+                    confidence=float(confidence)
+                ))
+        
         # Sauvegarder tous les signaux
         for signal in signals_to_save:
             db.add(signal)
         
         db.commit()
+        
+        # Préparer les données de support/résistance de manière sécurisée
+        support_resistance_data = {
+            "pivot_points": {
+                "pivot": None,
+                "r1": None,
+                "r2": None,
+                "s1": None,
+                "s2": None
+            },
+            "support_levels": [],
+            "resistance_levels": []
+        }
+        
+        if 'pivot_points' in support_resistance:
+            pivot_data = support_resistance['pivot_points']
+            for key in ['pivot', 'r1', 'r2', 's1', 's2']:
+                if key in pivot_data and not pivot_data[key].empty:
+                    support_resistance_data["pivot_points"][key] = safe_float(pivot_data[key].iloc[-1])
+        
+        # Convertir les listes de niveaux de manière sécurisée (nouveau format multi-temporel)
+        if 'support_levels' in support_resistance:
+            for level in support_resistance['support_levels']:
+                if isinstance(level, dict):
+                    # Nouveau format avec métadonnées
+                    price = safe_float(level.get('price'))
+                    if price is not None:
+                        support_resistance_data["support_levels"].append(price)
+                else:
+                    # Ancien format simple
+                    converted_level = safe_float(level)
+                    if converted_level is not None:
+                        support_resistance_data["support_levels"].append(converted_level)
+        
+        if 'resistance_levels' in support_resistance:
+            for level in support_resistance['resistance_levels']:
+                if isinstance(level, dict):
+                    # Nouveau format avec métadonnées
+                    price = safe_float(level.get('price'))
+                    if price is not None:
+                        support_resistance_data["resistance_levels"].append(price)
+                else:
+                    # Ancien format simple
+                    converted_level = safe_float(level)
+                    if converted_level is not None:
+                        support_resistance_data["resistance_levels"].append(converted_level)
+        
+        # Préparer les signaux de patterns de manière sécurisée
+        pattern_signals = {}
+        try:
+            pattern_signals = CandlestickPatterns.get_pattern_signals(patterns)
+            # Convertir les valeurs numpy en types Python natifs
+            for key, value in pattern_signals.items():
+                if isinstance(value, np.integer):
+                    pattern_signals[key] = int(value)
+                elif isinstance(value, np.floating):
+                    pattern_signals[key] = float(value)
+        except Exception:
+            pattern_signals = {}
         
         return {
             "symbol": symbol,
@@ -307,22 +599,15 @@ async def get_technical_signals(
             "indicators": indicators_data,
             "patterns": {
                 "recent_patterns": patterns_data,
-                "pattern_signals": CandlestickPatterns.get_pattern_signals(patterns)
+                "pattern_signals": pattern_signals
             },
-            "support_resistance": {
-                "pivot_points": {
-                    "pivot": safe_float(support_resistance.get('pivot_points', {}).get('pivot', pd.Series()).iloc[-1]) if 'pivot_points' in support_resistance and not support_resistance.get('pivot_points', {}).get('pivot', pd.Series()).empty else None,
-                    "r1": safe_float(support_resistance.get('pivot_points', {}).get('r1', pd.Series()).iloc[-1]) if 'pivot_points' in support_resistance and not support_resistance.get('pivot_points', {}).get('r1', pd.Series()).empty else None,
-                    "r2": safe_float(support_resistance.get('pivot_points', {}).get('r2', pd.Series()).iloc[-1]) if 'pivot_points' in support_resistance and not support_resistance.get('pivot_points', {}).get('r2', pd.Series()).empty else None,
-                    "s1": safe_float(support_resistance.get('pivot_points', {}).get('s1', pd.Series()).iloc[-1]) if 'pivot_points' in support_resistance and not support_resistance.get('pivot_points', {}).get('s1', pd.Series()).empty else None,
-                    "s2": safe_float(support_resistance.get('pivot_points', {}).get('s2', pd.Series()).iloc[-1]) if 'pivot_points' in support_resistance and not support_resistance.get('pivot_points', {}).get('s2', pd.Series()).empty else None
-                },
-                "support_levels": [safe_float(level) for level in support_resistance.get('support_levels', [])],
-                "resistance_levels": [safe_float(level) for level in support_resistance.get('resistance_levels', [])]
-            },
+            "support_resistance": support_resistance_data,
             "composite_signal": signals_data,
             "persisted_signals": len(signals_to_save),
             "current_price": safe_float(df['close'].iloc[-1]),
+            "previous_price": safe_float(df['close'].iloc[-2]) if len(df) > 1 else None,
+            "last_update": df.index[-1].strftime('%Y-%m-%d %H:%M:%S') if hasattr(df.index[-1], 'strftime') else datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            "historical_prices": df[['close']].tail(30).to_dict('records'),  # 30 derniers cours
             "period": period
         }
         

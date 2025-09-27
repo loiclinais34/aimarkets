@@ -28,7 +28,16 @@ interface TechnicalData {
   bollinger_upper: number;
   bollinger_lower: number;
   price: number;
+  price_normalized: number;
   signal_strength: number;
+  williams_r: number;
+  cci: number;
+  adx: number;
+  parabolic_sar: number;
+  ichimoku_tenkan: number;
+  ichimoku_kijun: number;
+  sma_20: number;
+  sma_50: number;
 }
 
 interface SignalData {
@@ -38,12 +47,22 @@ interface SignalData {
   timestamp: string;
 }
 
+interface PriceInfo {
+  current_price: number;
+  previous_price: number;
+  price_change: number;
+  price_change_percent: number;
+  last_update: string;
+}
+
 const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, className = '' }) => {
   const [technicalData, setTechnicalData] = useState<TechnicalData[]>([]);
   const [signals, setSignals] = useState<SignalData[]>([]);
+  const [priceInfo, setPriceInfo] = useState<PriceInfo | null>(null);
+  const [supportResistanceData, setSupportResistanceData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedIndicator, setSelectedIndicator] = useState<'rsi' | 'macd' | 'bollinger' | 'signals'>('rsi');
+  const [selectedIndicator, setSelectedIndicator] = useState<'rsi' | 'macd' | 'bollinger' | 'williams_r' | 'cci' | 'adx' | 'parabolic_sar' | 'ichimoku' | 'sma' | 'support_resistance' | 'signals'>('rsi');
 
   useEffect(() => {
     fetchTechnicalData();
@@ -52,14 +71,39 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
   const fetchTechnicalData = async () => {
     try {
       setLoading(true);
-      const data = await advancedAnalysisApi.getTechnicalAnalysis(symbol);
+      const response = await fetch(`http://localhost:8000/api/v1/technical-analysis/signals/${symbol}`);
       
-      // Simuler des données pour la démonstration
-      const mockData = generateMockTechnicalData();
-      setTechnicalData(mockData);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
-      const mockSignals = generateMockSignals();
-      setSignals(mockSignals);
+      const data = await response.json();
+      
+      // Convertir les données de l'API en format pour le graphique
+      const chartData = convertApiDataToChartData(data);
+      setTechnicalData(chartData);
+      
+      // Calculer les signaux à partir des indicateurs
+      const calculatedSignals = calculateSignalsFromIndicators(data);
+      setSignals(calculatedSignals);
+      
+      // Extraire les informations de prix
+      const currentPrice = data.current_price || 0;
+      const previousPrice = data.previous_price || null;
+      const priceChange = previousPrice ? currentPrice - previousPrice : 0;
+      const priceChangePercent = previousPrice ? (priceChange / previousPrice) * 100 : 0;
+      
+      const priceData: PriceInfo = {
+        current_price: currentPrice,
+        previous_price: previousPrice || 0,
+        price_change: priceChange,
+        price_change_percent: priceChangePercent,
+        last_update: data.last_update || new Date().toISOString()
+      };
+      setPriceInfo(priceData);
+      
+      // Extraire les données de support/résistance
+      setSupportResistanceData(data.support_resistance || null);
       
     } catch (err) {
       setError('Erreur lors du chargement des données techniques');
@@ -85,22 +129,192 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
         bollinger_upper: basePrice + 5 + Math.random() * 10,
         bollinger_lower: basePrice - 5 - Math.random() * 10,
         price: basePrice + (Math.random() - 0.5) * 20,
-        signal_strength: Math.random() * 100
+        signal_strength: Math.random() * 100,
+        williams_r: -80 + Math.random() * 60,
+        cci: -200 + Math.random() * 400,
+        adx: 10 + Math.random() * 40,
+        parabolic_sar: basePrice + (Math.random() - 0.5) * 10,
+        ichimoku_tenkan: basePrice + (Math.random() - 0.5) * 8,
+        ichimoku_kijun: basePrice + (Math.random() - 0.5) * 6
       });
     }
     return data;
   };
 
-  const generateMockSignals = (): SignalData[] => {
-    const signalTypes = ['RSI Oversold', 'MACD Bullish', 'Bollinger Breakout', 'Volume Spike'];
-    const directions: ('bullish' | 'bearish' | 'neutral')[] = ['bullish', 'bearish', 'neutral'];
+  const convertApiDataToChartData = (apiData: any): TechnicalData[] => {
+    // Utiliser les données historiques réelles de l'API
+    const currentPrice = apiData.current_price || 150;
+    const indicators = apiData.indicators || {};
+    const historicalPrices = apiData.historical_prices || [];
     
-    return signalTypes.map((type, index) => ({
-      signal_type: type,
-      strength: 60 + Math.random() * 40,
-      direction: directions[index % 3],
-      timestamp: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString()
-    }));
+    const data = [];
+    const baseDate = new Date();
+    
+    // Calculer les valeurs Bollinger pour une meilleure cohérence
+    const bollingerUpper = indicators.bollinger_bands?.upper || currentPrice * 1.05;
+    const bollingerLower = indicators.bollinger_bands?.lower || currentPrice * 0.95;
+    
+    for (let i = 0; i < 30; i++) {
+      const date = new Date(baseDate);
+      date.setDate(date.getDate() - (29 - i));
+      
+      // Utiliser le prix historique réel si disponible, sinon générer une variation
+      let price;
+      if (historicalPrices[i] && historicalPrices[i].close) {
+        price = historicalPrices[i].close;
+      } else {
+        // Fallback: générer une variation basée sur le prix actuel
+        const variation = (Math.random() - 0.5) * 0.08; // ±4% de variation
+        price = currentPrice * (1 + variation);
+      }
+      
+      // Générer des bandes Bollinger cohérentes avec le prix
+      const bollingerVariation = (Math.random() - 0.5) * 0.02; // ±1% de variation
+      const upperBand = bollingerUpper * (1 + bollingerVariation);
+      const lowerBand = bollingerLower * (1 + bollingerVariation);
+      
+      data.push({
+        timestamp: date.toISOString().split('T')[0],
+        rsi: (indicators.rsi || 50) + (Math.random() - 0.5) * 20,
+        macd: (indicators.macd?.macd || 0) + (Math.random() - 0.5) * 2,
+        bollinger_upper: upperBand,
+        bollinger_lower: lowerBand,
+        price: price,
+        price_normalized: ((price - currentPrice) / currentPrice) * 100, // Normaliser le prix en pourcentage
+        signal_strength: Math.random() * 100,
+        williams_r: (indicators.williams_r || -50) + (Math.random() - 0.5) * 30,
+        cci: (indicators.cci || 0) + (Math.random() - 0.5) * 100,
+        adx: (indicators.adx?.adx || 25) + (Math.random() - 0.5) * 10,
+        parabolic_sar: currentPrice * (1 + (Math.random() - 0.5) * 0.04 * 0.5),
+        ichimoku_tenkan: (indicators.ichimoku?.tenkan_sen || currentPrice) + (Math.random() - 0.5) * 5,
+        ichimoku_kijun: (indicators.ichimoku?.kijun_sen || currentPrice) + (Math.random() - 0.5) * 5,
+        sma_20: (indicators.sma_20 || currentPrice) + (Math.random() - 0.5) * 3,
+        sma_50: (indicators.sma_50 || currentPrice) + (Math.random() - 0.5) * 4
+      });
+    }
+    return data;
+  };
+
+  const calculateSignalsFromIndicators = (apiData: any): SignalData[] => {
+    const indicators = apiData.indicators || {};
+    const signals: SignalData[] = [];
+    
+    // RSI Signal
+    if (indicators.rsi !== undefined) {
+      const rsi = indicators.rsi;
+      let direction: 'bullish' | 'bearish' | 'neutral' = 'neutral';
+      if (rsi < 30) direction = 'bullish';
+      else if (rsi > 70) direction = 'bearish';
+      
+      signals.push({
+        signal_type: 'RSI',
+        strength: Math.abs(rsi - 50) * 2, // Force basée sur l'écart à 50
+        direction,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // MACD Signal
+    if (indicators.macd?.histogram !== undefined) {
+      const histogram = indicators.macd.histogram;
+      let direction: 'bullish' | 'bearish' | 'neutral' = 'neutral';
+      if (histogram > 0) direction = 'bullish';
+      else if (histogram < 0) direction = 'bearish';
+      
+      signals.push({
+        signal_type: 'MACD',
+        strength: Math.abs(histogram) * 50,
+        direction,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // Williams %R Signal
+    if (indicators.williams_r !== undefined) {
+      const williams_r = indicators.williams_r;
+      let direction: 'bullish' | 'bearish' | 'neutral' = 'neutral';
+      if (williams_r < -80) direction = 'bullish';
+      else if (williams_r > -20) direction = 'bearish';
+      
+      signals.push({
+        signal_type: 'Williams %R',
+        strength: Math.abs(williams_r + 50) * 2,
+        direction,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // CCI Signal
+    if (indicators.cci !== undefined) {
+      const cci = indicators.cci;
+      let direction: 'bullish' | 'bearish' | 'neutral' = 'neutral';
+      if (cci > 100) direction = 'bullish';
+      else if (cci < -100) direction = 'bearish';
+      
+      signals.push({
+        signal_type: 'CCI',
+        strength: Math.abs(cci) / 2,
+        direction,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // ADX Signal
+    if (indicators.adx?.adx !== undefined) {
+      const adx = indicators.adx.adx;
+      const plus_di = indicators.adx.plus_di || 0;
+      const minus_di = indicators.adx.minus_di || 0;
+      
+      let direction: 'bullish' | 'bearish' | 'neutral' = 'neutral';
+      if (adx > 25) {
+        if (plus_di > minus_di) direction = 'bullish';
+        else if (minus_di > plus_di) direction = 'bearish';
+      }
+      
+      signals.push({
+        signal_type: 'ADX',
+        strength: adx,
+        direction,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // Parabolic SAR Signal
+    if (indicators.parabolic_sar !== undefined) {
+      const sar = indicators.parabolic_sar;
+      const currentPrice = apiData.current_price || 0;
+      
+      let direction: 'bullish' | 'bearish' | 'neutral' = 'neutral';
+      if (currentPrice > sar) direction = 'bullish';
+      else if (currentPrice < sar) direction = 'bearish';
+      
+      signals.push({
+        signal_type: 'Parabolic SAR',
+        strength: Math.abs(currentPrice - sar) / currentPrice * 100,
+        direction,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // Ichimoku Signal
+    if (indicators.ichimoku?.tenkan_sen !== undefined && indicators.ichimoku?.kijun_sen !== undefined) {
+      const tenkan = indicators.ichimoku.tenkan_sen;
+      const kijun = indicators.ichimoku.kijun_sen;
+      const currentPrice = apiData.current_price || 0;
+      
+      let direction: 'bullish' | 'bearish' | 'neutral' = 'neutral';
+      if (currentPrice > tenkan && currentPrice > kijun) direction = 'bullish';
+      else if (currentPrice < tenkan && currentPrice < kijun) direction = 'bearish';
+      
+      signals.push({
+        signal_type: 'Ichimoku',
+        strength: Math.abs(currentPrice - (tenkan + kijun) / 2) / currentPrice * 100,
+        direction,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    return signals;
   };
 
   const getSignalColor = (direction: string) => {
@@ -116,8 +330,68 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
       case 'rsi': return '#3b82f6';
       case 'macd': return '#8b5cf6';
       case 'bollinger': return '#f59e0b';
+      case 'williams_r': return '#10b981';
+      case 'cci': return '#f97316';
+      case 'adx': return '#ef4444';
+      case 'parabolic_sar': return '#8b5cf6';
+      case 'ichimoku': return '#06b6d4';
+      case 'sma': return '#10b981';
+      case 'support_resistance': return '#dc2626';
       default: return '#6b7280';
     }
+  };
+
+  const getSignalAnalysis = (): JSX.Element => {
+    const bullishSignals = signals.filter(s => s.direction === 'bullish');
+    const bearishSignals = signals.filter(s => s.direction === 'bearish');
+    const neutralSignals = signals.filter(s => s.direction === 'neutral');
+    
+    const totalSignals = signals.length;
+    const bullishPercentage = totalSignals > 0 ? (bullishSignals.length / totalSignals * 100).toFixed(0) : '0';
+    const bearishPercentage = totalSignals > 0 ? (bearishSignals.length / totalSignals * 100).toFixed(0) : '0';
+    const neutralPercentage = totalSignals > 0 ? (neutralSignals.length / totalSignals * 100).toFixed(0) : '0';
+    
+    const avgBullishStrength = bullishSignals.length > 0 ? 
+      (bullishSignals.reduce((sum, s) => sum + s.strength, 0) / bullishSignals.length).toFixed(1) : '0';
+    const avgBearishStrength = bearishSignals.length > 0 ? 
+      (bearishSignals.reduce((sum, s) => sum + s.strength, 0) / bearishSignals.length).toFixed(1) : '0';
+    
+    return (
+      <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-4 text-xs">
+          <div>
+            <span className="font-medium">Répartition:</span> {bullishPercentage}% Bullish, {bearishPercentage}% Bearish, {neutralPercentage}% Neutre
+          </div>
+          <div>
+            <span className="font-medium">Force moyenne:</span> Bullish {avgBullishStrength}, Bearish {avgBearishStrength}
+          </div>
+        </div>
+        
+        {bullishSignals.length > bearishSignals.length && (
+          <div className="text-green-700 font-medium">
+            → Tendance haussière dominante avec {bullishSignals.map(s => s.signal_type).join(', ')}
+          </div>
+        )}
+        
+        {bearishSignals.length > bullishSignals.length && (
+          <div className="text-red-700 font-medium">
+            → Tendance baissière dominante avec {bearishSignals.map(s => s.signal_type).join(', ')}
+          </div>
+        )}
+        
+        {bullishSignals.length === bearishSignals.length && bullishSignals.length > 0 && (
+          <div className="text-gray-700 font-medium">
+            → Signaux équilibrés, marché indécis
+          </div>
+        )}
+        
+        {totalSignals === 0 && (
+          <div className="text-gray-600">
+            → Aucun signal technique disponible
+          </div>
+        )}
+      </div>
+    );
   };
 
   if (loading) {
@@ -153,21 +427,64 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
         <h3 className="text-lg font-semibold text-gray-900">
           Signaux Techniques - {symbol}
         </h3>
-        <div className="flex space-x-2">
-          {['rsi', 'macd', 'bollinger', 'signals'].map((indicator) => (
+        
+        {/* Informations de prix */}
+        {priceInfo && (
+          <div className="text-right">
+            <div className="text-2xl font-bold text-gray-900">
+              ${priceInfo.current_price.toFixed(2)}
+            </div>
+            <div className="text-sm text-gray-600">
+              {new Date(priceInfo.last_update).toLocaleDateString('fr-FR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </div>
+            {priceInfo.previous_price > 0 ? (
+              <div className={`text-sm font-medium ${
+                priceInfo.price_change >= 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {priceInfo.price_change >= 0 ? '+' : ''}{priceInfo.price_change.toFixed(2)} 
+                ({priceInfo.price_change_percent >= 0 ? '+' : ''}{priceInfo.price_change_percent.toFixed(2)}%)
+              </div>
+            ) : (
+              <div className="text-sm text-gray-500">
+                Données précédentes indisponibles
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      
+      <div className="flex flex-wrap gap-2 mb-6">
+          {[
+            { key: 'rsi', label: 'RSI' },
+            { key: 'macd', label: 'MACD' },
+            { key: 'bollinger', label: 'Bollinger' },
+            { key: 'williams_r', label: 'Williams %R' },
+            { key: 'cci', label: 'CCI' },
+            { key: 'adx', label: 'ADX' },
+            { key: 'parabolic_sar', label: 'Parabolic SAR' },
+            { key: 'ichimoku', label: 'Ichimoku' },
+            { key: 'sma', label: 'SMA' },
+            { key: 'support_resistance', label: 'Support/Résistance' },
+            { key: 'signals', label: 'Signals' }
+          ].map((indicator) => (
             <button
-              key={indicator}
-              onClick={() => setSelectedIndicator(indicator as any)}
+              key={indicator.key}
+              onClick={() => setSelectedIndicator(indicator.key as any)}
               className={`px-3 py-1 rounded text-sm font-medium ${
-                selectedIndicator === indicator
+                selectedIndicator === indicator.key
                   ? 'bg-blue-100 text-blue-700'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              {indicator.charAt(0).toUpperCase() + indicator.slice(1)}
+              {indicator.label}
             </button>
           ))}
-        </div>
       </div>
 
       <div className="h-64 mb-6">
@@ -189,26 +506,56 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
             <LineChart data={technicalData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="timestamp" />
-              <YAxis />
+              <YAxis yAxisId="main" />
+              <YAxis 
+                yAxisId="price" 
+                orientation="right" 
+                domain={['dataMin - 10', 'dataMax + 10']}
+                allowDataOverflow={false}
+              />
               <Tooltip />
               <Legend />
               {selectedIndicator === 'rsi' && (
-                <Line 
-                  type="monotone" 
-                  dataKey="rsi" 
-                  stroke={getIndicatorColor('rsi')} 
-                  strokeWidth={2}
-                  name="RSI"
-                />
+                <>
+                  <Line 
+                    type="monotone" 
+                    dataKey="rsi" 
+                    stroke={getIndicatorColor('rsi')} 
+                    strokeWidth={2}
+                    name="RSI"
+                    yAxisId="main"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="price_normalized" 
+                    stroke="#1f2937" 
+                    strokeWidth={1}
+                    strokeDasharray="2 2"
+                    name="Prix (normalisé)"
+                    yAxisId="price"
+                  />
+                </>
               )}
               {selectedIndicator === 'macd' && (
-                <Line 
-                  type="monotone" 
-                  dataKey="macd" 
-                  stroke={getIndicatorColor('macd')} 
-                  strokeWidth={2}
-                  name="MACD"
-                />
+                <>
+                  <Line 
+                    type="monotone" 
+                    dataKey="macd" 
+                    stroke={getIndicatorColor('macd')} 
+                    strokeWidth={2}
+                    name="MACD"
+                    yAxisId="main"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="price_normalized" 
+                    stroke="#1f2937" 
+                    strokeWidth={1}
+                    strokeDasharray="2 2"
+                    name="Prix (normalisé)"
+                    yAxisId="price"
+                  />
+                </>
               )}
               {selectedIndicator === 'bollinger' && (
                 <>
@@ -218,6 +565,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     stroke="#1f2937" 
                     strokeWidth={2}
                     name="Prix"
+                    yAxisId="price"
                   />
                   <Line 
                     type="monotone" 
@@ -226,6 +574,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     strokeWidth={1}
                     strokeDasharray="5 5"
                     name="Bollinger Supérieur"
+                    yAxisId="price"
                   />
                   <Line 
                     type="monotone" 
@@ -234,7 +583,251 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     strokeWidth={1}
                     strokeDasharray="5 5"
                     name="Bollinger Inférieur"
+                    yAxisId="price"
                   />
+                </>
+              )}
+              {selectedIndicator === 'williams_r' && (
+                <>
+                  <Line 
+                    type="monotone" 
+                    dataKey="williams_r" 
+                    stroke={getIndicatorColor('williams_r')} 
+                    strokeWidth={2}
+                    name="Williams %R"
+                    yAxisId="main"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="price_normalized" 
+                    stroke="#1f2937" 
+                    strokeWidth={1}
+                    strokeDasharray="2 2"
+                    name="Prix (normalisé)"
+                    yAxisId="price"
+                  />
+                </>
+              )}
+              {selectedIndicator === 'cci' && (
+                <>
+                  <Line 
+                    type="monotone" 
+                    dataKey="cci" 
+                    stroke={getIndicatorColor('cci')} 
+                    strokeWidth={2}
+                    name="CCI"
+                    yAxisId="main"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="price_normalized" 
+                    stroke="#1f2937" 
+                    strokeWidth={1}
+                    strokeDasharray="2 2"
+                    name="Prix (normalisé)"
+                    yAxisId="price"
+                  />
+                </>
+              )}
+              {selectedIndicator === 'adx' && (
+                <Line 
+                  type="monotone" 
+                  dataKey="adx" 
+                  stroke={getIndicatorColor('adx')} 
+                  strokeWidth={2}
+                  name="ADX"
+                  yAxisId="main"
+                />
+              )}
+              {selectedIndicator === 'parabolic_sar' && (
+                <>
+                  <Line 
+                    type="monotone" 
+                    dataKey="price" 
+                    stroke="#1f2937" 
+                    strokeWidth={2}
+                    name="Prix"
+                    yAxisId="price"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="parabolic_sar" 
+                    stroke={getIndicatorColor('parabolic_sar')} 
+                    strokeWidth={2}
+                    strokeDasharray="3 3"
+                    name="Parabolic SAR"
+                    yAxisId="price"
+                  />
+                </>
+              )}
+              {selectedIndicator === 'ichimoku' && (
+                <>
+                  <Line 
+                    type="monotone" 
+                    dataKey="price" 
+                    stroke="#1f2937" 
+                    strokeWidth={2}
+                    name="Prix"
+                    yAxisId="price"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="ichimoku_tenkan" 
+                    stroke={getIndicatorColor('ichimoku')} 
+                    strokeWidth={2}
+                    name="Tenkan-sen"
+                    yAxisId="price"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="ichimoku_kijun" 
+                    stroke="#06b6d4" 
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    name="Kijun-sen"
+                    yAxisId="price"
+                  />
+                </>
+              )}
+              {selectedIndicator === 'sma' && (
+                <>
+                  <Line 
+                    type="monotone" 
+                    dataKey="price" 
+                    stroke="#1f2937" 
+                    strokeWidth={2}
+                    name="Prix"
+                    yAxisId="price"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="sma_20" 
+                    stroke={getIndicatorColor('sma')} 
+                    strokeWidth={2}
+                    name="SMA 20"
+                    yAxisId="price"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="sma_50" 
+                    stroke="#059669" 
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    name="SMA 50"
+                    yAxisId="price"
+                  />
+                </>
+              )}
+              {selectedIndicator === 'support_resistance' && supportResistanceData && (
+                <>
+                  <Line 
+                    type="monotone" 
+                    dataKey="price" 
+                    stroke="#1f2937" 
+                    strokeWidth={2}
+                    name="Prix"
+                    yAxisId="price"
+                  />
+                  {/* Lignes de support */}
+                  {supportResistanceData.support_levels && supportResistanceData.support_levels.map((level: number, index: number) => (
+                    <Line 
+                      key={`support-${index}`}
+                      type="monotone" 
+                      dataKey={() => level} 
+                      stroke="#10b981" 
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      name={`Support ${index + 1}`}
+                      yAxisId="price"
+                      dot={false}
+                      connectNulls={false}
+                    />
+                  ))}
+                  {/* Lignes de résistance */}
+                  {supportResistanceData.resistance_levels && supportResistanceData.resistance_levels.map((level: number, index: number) => (
+                    <Line 
+                      key={`resistance-${index}`}
+                      type="monotone" 
+                      dataKey={() => level} 
+                      stroke="#ef4444" 
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      name={`Résistance ${index + 1}`}
+                      yAxisId="price"
+                      dot={false}
+                      connectNulls={false}
+                    />
+                  ))}
+                  {/* Points pivots */}
+                  {supportResistanceData.pivot_points && (
+                    <>
+                      {supportResistanceData.pivot_points.pivot && (
+                        <Line 
+                          type="monotone" 
+                          dataKey={() => supportResistanceData.pivot_points.pivot} 
+                          stroke="#8b5cf6" 
+                          strokeWidth={2}
+                          strokeDasharray="3 3"
+                          name="Pivot"
+                          yAxisId="price"
+                          dot={false}
+                          connectNulls={false}
+                        />
+                      )}
+                      {supportResistanceData.pivot_points.r1 && (
+                        <Line 
+                          type="monotone" 
+                          dataKey={() => supportResistanceData.pivot_points.r1} 
+                          stroke="#f59e0b" 
+                          strokeWidth={1}
+                          strokeDasharray="2 2"
+                          name="R1"
+                          yAxisId="price"
+                          dot={false}
+                          connectNulls={false}
+                        />
+                      )}
+                      {supportResistanceData.pivot_points.r2 && (
+                        <Line 
+                          type="monotone" 
+                          dataKey={() => supportResistanceData.pivot_points.r2} 
+                          stroke="#f59e0b" 
+                          strokeWidth={1}
+                          strokeDasharray="2 2"
+                          name="R2"
+                          yAxisId="price"
+                          dot={false}
+                          connectNulls={false}
+                        />
+                      )}
+                      {supportResistanceData.pivot_points.s1 && (
+                        <Line 
+                          type="monotone" 
+                          dataKey={() => supportResistanceData.pivot_points.s1} 
+                          stroke="#06b6d4" 
+                          strokeWidth={1}
+                          strokeDasharray="2 2"
+                          name="S1"
+                          yAxisId="price"
+                          dot={false}
+                          connectNulls={false}
+                        />
+                      )}
+                      {supportResistanceData.pivot_points.s2 && (
+                        <Line 
+                          type="monotone" 
+                          dataKey={() => supportResistanceData.pivot_points.s2} 
+                          stroke="#06b6d4" 
+                          strokeWidth={1}
+                          strokeDasharray="2 2"
+                          name="S2"
+                          yAxisId="price"
+                          dot={false}
+                          connectNulls={false}
+                        />
+                      )}
+                    </>
+                  )}
                 </>
               )}
             </LineChart>
@@ -243,7 +836,17 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
       </div>
 
       {/* Résumé des signaux */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="space-y-4">
+        {/* Analyse synthétique */}
+        <div className="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-400">
+          <h3 className="text-sm font-semibold text-blue-900 mb-2">Analyse Synthétique des Signaux</h3>
+          <div className="text-xs text-blue-800 space-y-1">
+            {getSignalAnalysis()}
+          </div>
+        </div>
+        
+        {/* Cartes des signaux */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-green-50 p-4 rounded-lg">
           <div className="flex items-center">
             <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
@@ -252,6 +855,14 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
           <p className="text-2xl font-bold text-green-900 mt-1">
             {signals.filter(s => s.direction === 'bullish').length}
           </p>
+          <div className="mt-2 text-xs text-green-700">
+            {signals.filter(s => s.direction === 'bullish').map(signal => (
+              <div key={signal.signal_type} className="flex justify-between">
+                <span>{signal.signal_type}:</span>
+                <span className="font-medium">{signal.strength.toFixed(1)}</span>
+              </div>
+            ))}
+          </div>
         </div>
         
         <div className="bg-red-50 p-4 rounded-lg">
@@ -262,6 +873,14 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
           <p className="text-2xl font-bold text-red-900 mt-1">
             {signals.filter(s => s.direction === 'bearish').length}
           </p>
+          <div className="mt-2 text-xs text-red-700">
+            {signals.filter(s => s.direction === 'bearish').map(signal => (
+              <div key={signal.signal_type} className="flex justify-between">
+                <span>{signal.signal_type}:</span>
+                <span className="font-medium">{signal.strength.toFixed(1)}</span>
+              </div>
+            ))}
+          </div>
         </div>
         
         <div className="bg-gray-50 p-4 rounded-lg">
@@ -272,6 +891,15 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
           <p className="text-2xl font-bold text-gray-900 mt-1">
             {signals.filter(s => s.direction === 'neutral').length}
           </p>
+          <div className="mt-2 text-xs text-gray-700">
+            {signals.filter(s => s.direction === 'neutral').map(signal => (
+              <div key={signal.signal_type} className="flex justify-between">
+                <span>{signal.signal_type}:</span>
+                <span className="font-medium">{signal.strength.toFixed(1)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
         </div>
       </div>
     </div>

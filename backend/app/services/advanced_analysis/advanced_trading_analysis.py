@@ -165,7 +165,7 @@ class AdvancedTradingAnalysis:
             raise
     
     async def _analyze_technical(self, symbol: str, db: Session) -> Tuple[float, Dict[str, Any]]:
-        """Analyse technique simplifiée"""
+        """Analyse technique basée sur les vrais indicateurs"""
         try:
             # Récupérer les indicateurs techniques depuis la base
             indicators = db.query(TechnicalIndicators)\
@@ -177,15 +177,52 @@ class AdvancedTradingAnalysis:
             if not indicators:
                 return 0.5, {"status": "no_data", "message": "No technical indicators found"}
             
-            # Score basé sur les indicateurs disponibles
+            # Calculer un score basé sur les indicateurs réels
             score = 0.5  # Score neutre par défaut
+            signals = []
             
-            # Analyse simplifiée des indicateurs
+            # Analyser RSI
+            if indicators.rsi_14 is not None:
+                rsi = float(indicators.rsi_14)
+                if rsi < 30:
+                    signals.append("RSI oversold (bullish)")
+                    score += 0.1
+                elif rsi > 70:
+                    signals.append("RSI overbought (bearish)")
+                    score -= 0.1
+            
+            # Analyser MACD
+            if indicators.macd is not None and indicators.macd_signal is not None:
+                macd = float(indicators.macd)
+                macd_signal = float(indicators.macd_signal)
+                if macd > macd_signal:
+                    signals.append("MACD bullish crossover")
+                    score += 0.1
+                else:
+                    signals.append("MACD bearish crossover")
+                    score -= 0.1
+            
+            # Analyser Bollinger Bands
+            if indicators.bb_upper is not None and indicators.bb_lower is not None:
+                bb_upper = float(indicators.bb_upper)
+                bb_lower = float(indicators.bb_lower)
+                # Note: Nous aurions besoin du prix actuel pour une analyse complète
+                signals.append("Bollinger Bands available")
+            
+            # Normaliser le score entre 0 et 1
+            score = max(0.0, min(1.0, score))
+            
+            # Analyse détaillée des indicateurs
             analysis = {
-                "rsi": getattr(indicators, 'rsi', None),
-                "macd": getattr(indicators, 'macd', None),
-                "bollinger_upper": getattr(indicators, 'bollinger_upper', None),
-                "bollinger_lower": getattr(indicators, 'bollinger_lower', None),
+                "rsi_14": float(indicators.rsi_14) if indicators.rsi_14 is not None else None,
+                "macd": float(indicators.macd) if indicators.macd is not None else None,
+                "macd_signal": float(indicators.macd_signal) if indicators.macd_signal is not None else None,
+                "bb_upper": float(indicators.bb_upper) if indicators.bb_upper is not None else None,
+                "bb_lower": float(indicators.bb_lower) if indicators.bb_lower is not None else None,
+                "bb_middle": float(indicators.bb_middle) if indicators.bb_middle is not None else None,
+                "sma_20": float(indicators.sma_20) if indicators.sma_20 is not None else None,
+                "ema_20": float(indicators.ema_20) if indicators.ema_20 is not None else None,
+                "signals": signals,
                 "score": score
             }
             
@@ -196,26 +233,53 @@ class AdvancedTradingAnalysis:
             return 0.5, {"error": str(e)}
     
     async def _analyze_sentiment(self, symbol: str, db: Session) -> Tuple[float, Dict[str, Any]]:
-        """Analyse de sentiment simplifiée"""
+        """Analyse de sentiment basée sur les vrais indicateurs"""
         try:
             # Récupérer les indicateurs de sentiment depuis la base
+            # Chercher les données les plus récentes non-neutres (différentes de 50.0)
             indicators = db.query(SentimentIndicators)\
                 .filter(SentimentIndicators.symbol == symbol)\
+                .filter(SentimentIndicators.sentiment_score_normalized != 50.0)\
                 .order_by(SentimentIndicators.date.desc())\
                 .limit(1)\
                 .first()
             
+            # Si pas de données non-neutres, prendre les plus récentes
+            if not indicators:
+                indicators = db.query(SentimentIndicators)\
+                    .filter(SentimentIndicators.symbol == symbol)\
+                    .order_by(SentimentIndicators.date.desc())\
+                    .limit(1)\
+                    .first()
+            
             if not indicators:
                 return 0.5, {"status": "no_data", "message": "No sentiment indicators found"}
             
-            # Score basé sur les indicateurs disponibles
+            # Calculer un score basé sur les indicateurs réels
             score = 0.5  # Score neutre par défaut
             
-            # Analyse simplifiée des indicateurs
+            # Utiliser le score normalisé s'il existe
+            if indicators.sentiment_score_normalized is not None:
+                # Convertir de 0,100 vers 0,1
+                normalized_score = float(indicators.sentiment_score_normalized) / 100.0
+                score = normalized_score
+            
+            # Calculer la confiance basée sur la volatilité
+            confidence = 0.5
+            if indicators.sentiment_volatility_7d is not None:
+                # Plus la volatilité est faible, plus la confiance est élevée
+                volatility = abs(float(indicators.sentiment_volatility_7d))
+                confidence = max(0.1, min(1.0, 1.0 - volatility))
+            
+            # Analyse détaillée des indicateurs
             analysis = {
-                "sentiment_score": getattr(indicators, 'sentiment_score', None),
-                "confidence": getattr(indicators, 'confidence', None),
-                "score": score
+                "sentiment_score": float(indicators.sentiment_score_normalized) if indicators.sentiment_score_normalized is not None else None,
+                "sentiment_momentum_1d": float(indicators.sentiment_momentum_1d) if indicators.sentiment_momentum_1d is not None else None,
+                "sentiment_momentum_7d": float(indicators.sentiment_momentum_7d) if indicators.sentiment_momentum_7d is not None else None,
+                "sentiment_volatility_7d": float(indicators.sentiment_volatility_7d) if indicators.sentiment_volatility_7d is not None else None,
+                "confidence": confidence,
+                "score": score,
+                "data_date": indicators.date.isoformat()
             }
             
             return score, analysis
@@ -225,25 +289,77 @@ class AdvancedTradingAnalysis:
             return 0.5, {"error": str(e)}
     
     async def _analyze_market(self, symbol: str, db: Session) -> Tuple[float, Dict[str, Any]]:
-        """Analyse de marché simplifiée"""
+        """Analyse de marché basée sur les vrais indicateurs"""
         try:
             # Récupérer les indicateurs de marché depuis la base
             indicators = db.query(MarketIndicators)\
                 .filter(MarketIndicators.symbol == symbol)\
                 .order_by(MarketIndicators.analysis_date.desc())\
-                .limit(1)\
-                .first()
+                .limit(10)\
+                .all()
             
             if not indicators:
                 return 0.5, {"status": "no_data", "message": "No market indicators found"}
             
-            # Score basé sur les indicateurs disponibles
+            # Calculer un score basé sur les indicateurs réels
             score = 0.5  # Score neutre par défaut
+            market_data = {}
+            signals = []
             
-            # Analyse simplifiée des indicateurs
+            # Analyser les différents types d'indicateurs
+            for indicator in indicators:
+                indicator_type = indicator.indicator_type
+                value = float(indicator.indicator_value)
+                market_data[indicator_type] = value
+                
+                # Analyser RSI (indicateur technique de marché)
+                if indicator_type == "RSI_14D":
+                    if value < 30:
+                        signals.append("RSI oversold (bullish)")
+                        score += 0.15
+                    elif value > 70:
+                        signals.append("RSI overbought (bearish)")
+                        score -= 0.15
+                    elif 40 <= value <= 60:
+                        signals.append("RSI neutral")
+                        score += 0.05
+                
+                # Analyser le ratio de volume
+                elif indicator_type == "VOLUME_RATIO":
+                    if value > 1.5:
+                        signals.append("High volume activity")
+                        score += 0.1
+                    elif value < 0.5:
+                        signals.append("Low volume activity")
+                        score -= 0.05
+                
+                # Analyser le momentum
+                elif indicator_type == "MOMENTUM_20D":
+                    if value > 0.05:
+                        signals.append("Strong positive momentum")
+                        score += 0.1
+                    elif value < -0.05:
+                        signals.append("Strong negative momentum")
+                        score -= 0.1
+                
+                # Analyser la volatilité
+                elif indicator_type == "VOLATILITY_20D":
+                    if value < 0.15:
+                        signals.append("Low volatility (stable)")
+                        score += 0.05
+                    elif value > 0.3:
+                        signals.append("High volatility (risky)")
+                        score -= 0.1
+            
+            # Normaliser le score entre 0 et 1
+            score = max(0.0, min(1.0, score))
+            
+            # Analyse détaillée des indicateurs
             analysis = {
-                "indicator_type": getattr(indicators, 'indicator_type', None),
-                "indicator_value": getattr(indicators, 'indicator_value', None),
+                "indicators": market_data,
+                "indicator_count": len(indicators),
+                "latest_date": indicators[0].analysis_date.isoformat() if indicators else None,
+                "signals": signals,
                 "score": score
             }
             
@@ -539,15 +655,34 @@ class AdvancedTradingAnalysis:
         markov_score: float,
         volatility_score: float
     ) -> float:
-        """Calcule le niveau de confiance"""
-        # Confiance basée sur la cohérence des scores
-        scores = [technical_score, sentiment_score, market_score, ml_score,
-                 candlestick_score, garch_score, monte_carlo_score, markov_score, volatility_score]
-        score_std = np.std(scores)
-        
-        # Plus la variance est faible, plus la confiance est élevée
-        confidence = max(0.1, 1.0 - score_std)
-        return round(confidence, 3)
+        """Calcule le niveau de confiance basé sur la qualité des données"""
+        try:
+            # Calculer la confiance basée sur la cohérence des scores
+            scores = [technical_score, sentiment_score, market_score, ml_score,
+                     candlestick_score, garch_score, monte_carlo_score, markov_score, volatility_score]
+            
+            # Écart-type des scores (plus faible = plus cohérent = plus de confiance)
+            score_std = np.std(scores)
+            
+            # Confiance de base basée sur la cohérence
+            base_confidence = max(0.1, 1.0 - score_std)
+            
+            # Bonus pour les scores élevés (indique une forte conviction)
+            high_scores = sum(1 for score in scores if score > 0.7)
+            conviction_bonus = high_scores * 0.05
+            
+            # Bonus pour les scores faibles (indique une forte conviction négative)
+            low_scores = sum(1 for score in scores if score < 0.3)
+            conviction_bonus += low_scores * 0.05
+            
+            # Confiance finale
+            confidence = min(1.0, base_confidence + conviction_bonus)
+            
+            return round(confidence, 3)
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating confidence level: {e}")
+            return 0.5
     
     def get_analysis_summary(self, result: AnalysisResult) -> Dict[str, Any]:
         """Retourne un résumé de l'analyse"""

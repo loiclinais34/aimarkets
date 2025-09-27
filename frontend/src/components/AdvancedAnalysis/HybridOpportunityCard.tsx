@@ -22,15 +22,22 @@ interface HybridOpportunityCardProps {
     sentiment_score: number;
     market_score: number;
     ml_score: number;
+    candlestick_score: number;
+    garch_score: number;
+    monte_carlo_score: number;
+    markov_score: number;
+    volatility_score: number;
     analysis_timestamp?: string;
   };
   onAnalyze?: (symbol: string) => void;
+  onViewDetails?: (symbol: string, tab: 'technical' | 'sentiment' | 'market' | 'hybrid') => void;
   className?: string;
 }
 
 const HybridOpportunityCard: React.FC<HybridOpportunityCardProps> = ({ 
   opportunity, 
   onAnalyze,
+  onViewDetails,
   className = '' 
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -164,7 +171,7 @@ const HybridOpportunityCard: React.FC<HybridOpportunityCardProps> = ({
           </div>
           
           <div className="text-center">
-            <div className="text-lg font-semibold text-gray-700">
+            <div className="text-sm font-medium text-gray-700">
               {formatTimestamp(opportunity.analysis_timestamp)}
             </div>
             <div className="text-xs text-gray-600">Analyse</div>
@@ -178,7 +185,7 @@ const HybridOpportunityCard: React.FC<HybridOpportunityCardProps> = ({
           {/* Scores détaillés */}
           <div className="mb-6">
             <h4 className="text-md font-semibold text-gray-900 mb-3">Scores Détaillés</h4>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
               <div className="bg-blue-50 p-3 rounded-lg text-center">
                 <div className="text-sm font-medium text-blue-800">Technique</div>
                 <div className={`text-xl font-bold ${getScoreColor(opportunity.technical_score)}`}>
@@ -204,6 +211,41 @@ const HybridOpportunityCard: React.FC<HybridOpportunityCardProps> = ({
                 <div className="text-sm font-medium text-orange-800">ML</div>
                 <div className={`text-xl font-bold ${getScoreColor(opportunity.ml_score)}`}>
                   {opportunity.ml_score.toFixed(0)}
+                </div>
+              </div>
+
+              <div className="bg-indigo-50 p-3 rounded-lg text-center">
+                <div className="text-sm font-medium text-indigo-800">Chandeliers</div>
+                <div className={`text-xl font-bold ${getScoreColor(opportunity.candlestick_score)}`}>
+                  {opportunity.candlestick_score.toFixed(0)}
+                </div>
+              </div>
+
+              <div className="bg-pink-50 p-3 rounded-lg text-center">
+                <div className="text-sm font-medium text-pink-800">GARCH</div>
+                <div className={`text-xl font-bold ${getScoreColor(opportunity.garch_score)}`}>
+                  {opportunity.garch_score.toFixed(0)}
+                </div>
+              </div>
+
+              <div className="bg-teal-50 p-3 rounded-lg text-center">
+                <div className="text-sm font-medium text-teal-800">Monte Carlo</div>
+                <div className={`text-xl font-bold ${getScoreColor(opportunity.monte_carlo_score)}`}>
+                  {opportunity.monte_carlo_score.toFixed(0)}
+                </div>
+              </div>
+
+              <div className="bg-cyan-50 p-3 rounded-lg text-center">
+                <div className="text-sm font-medium text-cyan-800">Markov</div>
+                <div className={`text-xl font-bold ${getScoreColor(opportunity.markov_score)}`}>
+                  {opportunity.markov_score.toFixed(0)}
+                </div>
+              </div>
+
+              <div className="bg-amber-50 p-3 rounded-lg text-center">
+                <div className="text-sm font-medium text-amber-800">Volatilité</div>
+                <div className={`text-xl font-bold ${getScoreColor(opportunity.volatility_score)}`}>
+                  {opportunity.volatility_score.toFixed(0)}
                 </div>
               </div>
             </div>
@@ -295,6 +337,7 @@ const HybridOpportunityCard: React.FC<HybridOpportunityCardProps> = ({
               </button>
             )}
           </div>
+
         </div>
       )}
 
@@ -302,7 +345,7 @@ const HybridOpportunityCard: React.FC<HybridOpportunityCardProps> = ({
       {!isExpanded && (
         <div className="p-4 border-t border-gray-200">
           <button
-            onClick={() => setIsExpanded(true)}
+            onClick={() => onViewDetails && onViewDetails(opportunity.symbol, 'technical')}
             className="w-full text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
           >
             Voir les détails →

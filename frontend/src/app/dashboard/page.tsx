@@ -8,6 +8,13 @@ import OpportunitySearch from '@/components/OpportunitySearch';
 import OpportunityCart from '@/components/OpportunityCart';
 import CartDebug from '@/components/CartDebug';
 import dynamic from 'next/dynamic';
+import {
+  ChartBarIcon,
+  ClockIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  StarIcon
+} from '@heroicons/react/24/outline';
 
 // Import dynamique du composant OpportunitiesBySymbol
 const OpportunitiesBySymbol = dynamic(() => import('@/components/OpportunitiesBySymbol'), {
@@ -31,13 +38,6 @@ const OpportunitiesBySymbol = dynamic(() => import('@/components/OpportunitiesBy
     </div>
   )
 });
-import {
-  ChartBarIcon,
-  ClockIcon,
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
-  StarIcon
-} from '@heroicons/react/24/outline';
 
 const recentActivities = [
   {

@@ -98,6 +98,49 @@ class HybridScoringSystem:
             logger.error(f"Error calculating hybrid score: {e}")
             raise
     
+    def calculate_simple_hybrid_score(self, ml_score: float, technical_score: float, 
+                                    sentiment_score: float, market_score: float) -> float:
+        """
+        Calcule un score hybride simple à partir des scores individuels
+        
+        Args:
+            ml_score: Score ML
+            technical_score: Score technique
+            sentiment_score: Score de sentiment
+            market_score: Score de marché
+            
+        Returns:
+            float: Score hybride calculé
+        """
+        try:
+            # Score conventionnel moyen
+            conventional_score = (technical_score + sentiment_score + market_score) / 3
+            
+            # Score hybride pondéré
+            hybrid_score = (self.ml_weight * ml_score + 
+                           self.conventional_weight * conventional_score)
+            
+            return hybrid_score
+            
+        except Exception as e:
+            logger.error(f"Error calculating simple hybrid score: {e}")
+            return 0.5  # Score neutre en cas d'erreur
+            
+            return HybridScore(
+                symbol=symbol,
+                ml_score=ml_score,
+                conventional_score=conventional_score,
+                hybrid_score=hybrid_score,
+                confidence=confidence,
+                convergence_factor=convergence_factor,
+                recommendation=recommendation,
+                analysis_date=datetime.now()
+            )
+            
+        except Exception as e:
+            logger.error(f"Error calculating hybrid score: {e}")
+            raise
+    
     def _extract_ml_score(self, ml_analysis: Dict[str, Any]) -> float:
         """Extrait le score ML de l'analyse"""
         try:

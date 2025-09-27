@@ -108,6 +108,131 @@ class CompositeScoringEngine:
             score_breakdown = {}
             analysis_quality = {}
             
+            # Calculer le score composite pondéré
+            composite_score = 0.0
+            total_weight = 0.0
+            
+            for analysis_type, analysis_data in analyses.items():
+                if analysis_type in weights:
+                    score = self._extract_score(analysis_type, analysis_data)
+                    weight = weights[analysis_type]
+                    
+                    score_breakdown[analysis_type.value] = score
+                    composite_score += score * weight
+                    total_weight += weight
+                    
+                    # Évaluer la qualité de l'analyse
+                    quality = self._evaluate_analysis_quality(analysis_type, analysis_data)
+                    analysis_quality[analysis_type.value] = quality
+            
+            # Normaliser le score composite
+            if total_weight > 0:
+                composite_score = composite_score / total_weight
+            
+            # Calculer le niveau de confiance global
+            confidence = self._calculate_global_confidence(analysis_quality)
+            
+            # Déterminer le niveau de risque
+            risk_level = self.determine_risk_level(composite_score)
+            
+            # Générer la recommandation
+            recommendation = self._generate_recommendation(composite_score, confidence)
+            
+            return CompositeScore(
+                symbol=symbol,
+                composite_score=composite_score,
+                confidence_level=confidence,
+                risk_level=risk_level,
+                recommendation=recommendation,
+                score_breakdown=score_breakdown,
+                analysis_quality=analysis_quality,
+                weights_used=weights,
+                analysis_date=datetime.now()
+            )
+            
+        except Exception as e:
+            logger.error(f"Error calculating composite score: {e}")
+            raise
+    
+    def calculate_simple_composite_score(self, technical_score: float, sentiment_score: float,
+                                       market_score: float, ml_score: float, candlestick_score: float,
+                                       garch_score: float, monte_carlo_score: float, markov_score: float,
+                                       volatility_score: float, weights: Optional[Dict[str, float]] = None) -> float:
+        """
+        Calcule un score composite simple à partir des scores individuels
+        
+        Args:
+            technical_score: Score technique
+            sentiment_score: Score de sentiment
+            market_score: Score de marché
+            ml_score: Score ML
+            candlestick_score: Score des patterns de chandeliers
+            garch_score: Score GARCH
+            monte_carlo_score: Score Monte Carlo
+            markov_score: Score Markov
+            volatility_score: Score de volatilité
+            weights: Poids personnalisés
+            
+        Returns:
+            float: Score composite calculé
+        """
+        try:
+            # Poids par défaut
+            default_weights = {
+                'technical': 0.15,
+                'sentiment': 0.15,
+                'market': 0.15,
+                'ml': 0.10,
+                'candlestick': 0.10,
+                'garch': 0.10,
+                'monte_carlo': 0.10,
+                'markov': 0.10,
+                'volatility': 0.05
+            }
+            
+            # Utiliser les poids personnalisés ou par défaut
+            used_weights = weights or default_weights
+            
+            # Calculer le score composite pondéré
+            composite_score = (
+                used_weights.get('technical', 0.15) * technical_score +
+                used_weights.get('sentiment', 0.15) * sentiment_score +
+                used_weights.get('market', 0.15) * market_score +
+                used_weights.get('ml', 0.10) * ml_score +
+                used_weights.get('candlestick', 0.10) * candlestick_score +
+                used_weights.get('garch', 0.10) * garch_score +
+                used_weights.get('monte_carlo', 0.10) * monte_carlo_score +
+                used_weights.get('markov', 0.10) * markov_score +
+                used_weights.get('volatility', 0.05) * volatility_score
+            )
+            
+            return composite_score
+            
+        except Exception as e:
+            logger.error(f"Error calculating simple composite score: {e}")
+            return 0.5  # Score neutre en cas d'erreur
+    
+    def determine_risk_level(self, composite_score: float) -> str:
+        """
+        Détermine le niveau de risque basé sur le score composite
+        
+        Args:
+            composite_score: Score composite (0-1)
+            
+        Returns:
+            str: Niveau de risque (LOW, MEDIUM, HIGH)
+        """
+        try:
+            if composite_score >= 0.7:
+                return "LOW"
+            elif composite_score >= 0.4:
+                return "MEDIUM"
+            else:
+                return "HIGH"
+        except Exception as e:
+            logger.error(f"Error determining risk level: {e}")
+            return "MEDIUM"  # Niveau par défaut
+            
             for analysis_type, analysis_data in analyses.items():
                 if analysis_data:
                     score = self._calculate_individual_score(analysis_type, analysis_data)
