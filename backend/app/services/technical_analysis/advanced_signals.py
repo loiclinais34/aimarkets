@@ -413,6 +413,7 @@ class AdvancedSignalGenerator:
                 "value": prediction,
                 "reasoning": f"Modèle ML: {signal} (confiance: {confidence:.2f})",
                 "model_name": ml_prediction.get("model_name", "Unknown"),
+                "weight": self.config["ml_integration"]["ml_weight"],
                 "model_type": ml_prediction.get("model_type", "Unknown")
             }
             
@@ -503,12 +504,212 @@ class AdvancedSignalGenerator:
                     }
                     individual_signals.append(bb_signal)
             
+            # Stochastic Oscillator
+            if 'stochastic' in indicators:
+                stoch = indicators['stochastic']
+                if isinstance(stoch, dict) and 'k_percent' in stoch and 'd_percent' in stoch:
+                    if not stoch['k_percent'].empty and not stoch['d_percent'].empty:
+                        k_percent = stoch['k_percent'].iloc[-1]
+                        d_percent = stoch['d_percent'].iloc[-1]
+                        
+                        if k_percent > 80 and d_percent > 80:
+                            signal = "SELL"
+                            strength = min((k_percent - 80) / 20, 1.0)
+                        elif k_percent < 20 and d_percent < 20:
+                            signal = "BUY"
+                            strength = min((20 - k_percent) / 20, 1.0)
+                        elif k_percent > d_percent:
+                            signal = "BUY"
+                            strength = min((k_percent - d_percent) / 20, 0.5)
+                        elif k_percent < d_percent:
+                            signal = "SELL"
+                            strength = min((d_percent - k_percent) / 20, 0.5)
+                        else:
+                            signal = "HOLD"
+                            strength = 0.0
+                        
+                        stoch_signal = {
+                            "signal": signal,
+                            "strength": strength,
+                            "score": strength * 100,
+                            "indicator": "Stochastic",
+                            "value": k_percent,
+                            "reasoning": f"Stochastic K={k_percent:.1f}%, D={d_percent:.1f}%",
+                            "weight": weights['Stochastic']
+                        }
+                        individual_signals.append(stoch_signal)
+            
+            # Williams %R
+            if 'williams_r' in indicators:
+                try:
+                    williams_r_series = indicators['williams_r']
+                    if hasattr(williams_r_series, 'empty') and not williams_r_series.empty:
+                        williams_r = williams_r_series.iloc[-1]
+                        
+                        if williams_r > -20:
+                            signal = "SELL"
+                            strength = min((williams_r + 20) / 20, 1.0)
+                        elif williams_r < -80:
+                            signal = "BUY"
+                            strength = min((-80 - williams_r) / 20, 1.0)
+                        else:
+                            signal = "HOLD"
+                            strength = 0.0
+                        
+                        williams_signal = {
+                            "signal": signal,
+                            "strength": strength,
+                            "score": strength * 100,
+                            "indicator": "Williams_R",
+                            "value": williams_r,
+                            "reasoning": f"Williams %R = {williams_r:.1f}%",
+                            "weight": weights['Williams_R']
+                        }
+                        individual_signals.append(williams_signal)
+                except Exception as e:
+                    logger.warning(f"Erreur Williams %R: {e}")
+            
+            # CCI (Commodity Channel Index)
+            if 'cci' in indicators:
+                try:
+                    cci_series = indicators['cci']
+                    if hasattr(cci_series, 'empty') and not cci_series.empty:
+                        cci = cci_series.iloc[-1]
+                        
+                        if cci > 100:
+                            signal = "BUY"
+                            strength = min((cci - 100) / 100, 1.0)
+                        elif cci < -100:
+                            signal = "SELL"
+                            strength = min((-100 - cci) / 100, 1.0)
+                        else:
+                            signal = "HOLD"
+                            strength = 0.0
+                        
+                        cci_signal = {
+                            "signal": signal,
+                            "strength": strength,
+                            "score": strength * 100,
+                            "indicator": "CCI",
+                            "value": cci,
+                            "reasoning": f"CCI = {cci:.1f}",
+                            "weight": weights['CCI']
+                        }
+                        individual_signals.append(cci_signal)
+                except Exception as e:
+                    logger.warning(f"Erreur CCI: {e}")
+            
+            # ADX (Average Directional Index)
+            if 'adx' in indicators:
+                try:
+                    adx_series = indicators['adx']
+                    if hasattr(adx_series, 'empty') and not adx_series.empty:
+                        adx = adx_series.iloc[-1]
+                        
+                        if adx > 25:
+                            # ADX élevé = tendance forte
+                            signal = "HOLD"  # ADX ne donne pas de direction
+                            strength = min((adx - 25) / 25, 1.0)
+                        else:
+                            signal = "HOLD"
+                            strength = 0.0
+                        
+                        adx_signal = {
+                            "signal": signal,
+                            "strength": strength,
+                            "score": strength * 100,
+                            "indicator": "ADX",
+                            "value": adx,
+                            "reasoning": f"ADX = {adx:.1f} (force de tendance)",
+                            "weight": weights['ADX']
+                        }
+                        individual_signals.append(adx_signal)
+                except Exception as e:
+                    logger.warning(f"Erreur ADX: {e}")
+            
+            # Parabolic SAR
+            if 'parabolic_sar' in indicators:
+                try:
+                    sar_series = indicators['parabolic_sar']
+                    if hasattr(sar_series, 'empty') and not sar_series.empty:
+                        sar = sar_series.iloc[-1]
+                        current_price = close.iloc[-1]
+                        
+                        if current_price > sar:
+                            signal = "BUY"
+                            strength = min((current_price - sar) / sar * 10, 1.0)
+                        elif current_price < sar:
+                            signal = "SELL"
+                            strength = min((sar - current_price) / sar * 10, 1.0)
+                        else:
+                            signal = "HOLD"
+                            strength = 0.0
+                        
+                        sar_signal = {
+                            "signal": signal,
+                            "strength": strength,
+                            "score": strength * 100,
+                            "indicator": "Parabolic_SAR",
+                            "value": sar,
+                            "reasoning": f"SAR = {sar:.2f}, Prix = {current_price:.2f}",
+                            "weight": weights['Parabolic_SAR']
+                        }
+                        individual_signals.append(sar_signal)
+                except Exception as e:
+                    logger.warning(f"Erreur Parabolic SAR: {e}")
+            
+            # Ichimoku Cloud
+            if 'ichimoku' in indicators:
+                try:
+                    ichimoku = indicators['ichimoku']
+                    if isinstance(ichimoku, dict) and all(key in ichimoku for key in ['tenkan', 'kijun', 'senkou_a', 'senkou_b']):
+                        if all(hasattr(ichimoku[key], 'empty') and not ichimoku[key].empty for key in ['tenkan', 'kijun', 'senkou_a', 'senkou_b']):
+                            current_price = close.iloc[-1]
+                            tenkan = ichimoku['tenkan'].iloc[-1]
+                            kijun = ichimoku['kijun'].iloc[-1]
+                            senkou_a = ichimoku['senkou_a'].iloc[-1]
+                            senkou_b = ichimoku['senkou_b'].iloc[-1]
+                            
+                            # Logique Ichimoku simplifiée
+                            cloud_top = max(senkou_a, senkou_b)
+                            cloud_bottom = min(senkou_a, senkou_b)
+                            
+                            if current_price > cloud_top and tenkan > kijun:
+                                signal = "BUY"
+                                strength = 0.8
+                            elif current_price < cloud_bottom and tenkan < kijun:
+                                signal = "SELL"
+                                strength = 0.8
+                            elif current_price > cloud_bottom and current_price < cloud_top:
+                                signal = "HOLD"
+                                strength = 0.3
+                            else:
+                                signal = "HOLD"
+                                strength = 0.0
+                            
+                            ichimoku_signal = {
+                                "signal": signal,
+                                "strength": strength,
+                                "score": strength * 100,
+                                "indicator": "Ichimoku",
+                                "value": current_price,
+                                "reasoning": f"Prix dans le nuage Ichimoku (Tenkan={tenkan:.2f}, Kijun={kijun:.2f})",
+                                "weight": weights['Ichimoku']
+                            }
+                            individual_signals.append(ichimoku_signal)
+                except Exception as e:
+                    logger.warning(f"Erreur Ichimoku: {e}")
+            
             # Intégrer le signal ML si disponible
             ml_signal = None
             if ml_prediction and self.config["ml_integration"]["enabled"]:
                 ml_signal = self.integrate_ml_signal(ml_prediction)
-                ml_signal['weight'] = self.config["ml_integration"]["ml_weight"]
                 individual_signals.append(ml_signal)
+            
+            # S'assurer que tous les signaux ont une clé 'weight'
+            for signal in individual_signals:
+                if 'weight' not in signal:
+                    signal['weight'] = 0.1  # Poids par défaut
             
             # Calculer le score composite pondéré
             total_score = 0.0
