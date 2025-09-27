@@ -1,0 +1,14 @@
+# Project Rules
+
+Règles de lancement pour le projet AIMarkets.
+
+```jsonc cursor
+{
+  "commands": {
+    "start-celery": {
+      "cwd": "aimarkets/backend",
+      "run": "bash -c 'echo \"✅ Démarrage de Celery worker...\"; celery -A app.core.celery_app worker --loglevel=info --concurrency=4'"
+    }
+  }
+}
+```
