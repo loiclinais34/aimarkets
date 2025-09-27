@@ -11,7 +11,8 @@ import {
   Cog6ToothIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  DocumentTextIcon
+  DocumentTextIcon,
+  SparklesIcon
 } from '@heroicons/react/24/outline';
 
 interface NavigationItem {
@@ -26,6 +27,33 @@ const navigation: NavigationItem[] = [
     name: 'Dashboard',
     href: '/dashboard',
     icon: HomeIcon,
+  },
+  {
+    name: 'Analyse Avancée',
+    href: '/advanced-analysis',
+    icon: SparklesIcon,
+    children: [
+      {
+        name: 'Vue d\'ensemble',
+        href: '/advanced-analysis',
+        icon: ChartBarIcon,
+      },
+      {
+        name: 'Signaux Techniques',
+        href: '/advanced-analysis/technical-signals',
+        icon: ChartBarIcon,
+      },
+      {
+        name: 'Analyse de Sentiment',
+        href: '/advanced-analysis/sentiment-analysis',
+        icon: BeakerIcon,
+      },
+      {
+        name: 'Opportunités Hybrides',
+        href: '/advanced-analysis/hybrid-opportunities',
+        icon: Cog6ToothIcon,
+      },
+    ],
   },
   {
     name: 'Analyse',
@@ -68,7 +96,7 @@ const navigation: NavigationItem[] = [
 
 export default function Navigation() {
   const pathname = usePathname();
-  const [expandedItems, setExpandedItems] = useState<string[]>(['Modèles ML']);
+  const [expandedItems, setExpandedItems] = useState<string[]>(['Analyse Avancée', 'Modèles ML']);
 
   const toggleExpanded = (itemName: string) => {
     setExpandedItems(prev => 
@@ -81,6 +109,9 @@ export default function Navigation() {
   const isActive = (href: string) => {
     if (href === '/ml') {
       return pathname.startsWith('/ml');
+    }
+    if (href === '/advanced-analysis') {
+      return pathname.startsWith('/advanced-analysis');
     }
     return pathname === href;
   };

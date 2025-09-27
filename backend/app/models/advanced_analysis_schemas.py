@@ -56,6 +56,19 @@ class AnalysisResponse(BaseModel):
     summary: Dict[str, Any]
     detailed_analysis: Dict[str, Any]
 
+class HybridSearchRequest(BaseModel):
+    """Requête de recherche hybride"""
+    symbols: List[str] = Field(..., description="Liste des symboles à analyser")
+    analysis_types: List[str] = Field(default=["technical", "sentiment"], description="Types d'analyse à effectuer")
+    time_horizon: int = Field(default=30, ge=1, le=365, description="Horizon temporel en jours")
+    weights: Optional[Dict[str, float]] = Field(default=None, description="Poids pour le scoring hybride")
+    
+    @validator('symbols')
+    def validate_symbols(cls, v):
+        if not v or len(v) == 0:
+            raise ValueError('Au moins un symbole doit être fourni')
+        return [symbol.upper() for symbol in v]
+
 class HybridAnalysisRequest(BaseModel):
     """Requête d'analyse hybride"""
     symbol: str = Field(..., description="Symbole à analyser")

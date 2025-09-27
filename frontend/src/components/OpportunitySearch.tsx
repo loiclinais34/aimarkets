@@ -101,8 +101,8 @@ export default function OpportunitySearch({ className = '', onSearchCompleted }:
           setCurrentTaskId(null);
           setCurrentSearchId(null);
         } else if (response.state === 'FAILURE') {
-          console.log('Task failed:', response.error);
-          toast.error(`Erreur lors de la recherche: ${response.error || 'Erreur inconnue'}`);
+          console.log('Task failed:', (response as any).error);
+          toast.error(`Erreur lors de la recherche: ${(response as any).error || 'Erreur inconnue'}`);
           setIsSearching(false);
           setCurrentTaskId(null);
           setCurrentSearchId(null);

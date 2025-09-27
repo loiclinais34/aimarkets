@@ -12,13 +12,14 @@ from datetime import datetime, timedelta
 import logging
 
 from ...core.database import get_db
-from ...models.advanced_analysis_schemas import AnalysisRequest, AnalysisResponse, HybridAnalysisRequest
-from ...services.advanced_analysis import AdvancedTradingAnalysis, HybridScoringSystem, CompositeScoringEngine
-from ...services.advanced_analysis.composite_scoring import AnalysisType, RiskLevel
+from ...models.advanced_analysis_schemas import AnalysisRequest, AnalysisResponse, HybridAnalysisRequest, HybridSearchRequest
+from ...services.advanced_analysis.advanced_trading_analysis import AdvancedTradingAnalysis
+from ...services.advanced_analysis.hybrid_scoring import HybridScoringSystem
+from ...services.advanced_analysis.composite_scoring import CompositeScoringEngine, AnalysisType, RiskLevel
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/advanced-analysis", tags=["Advanced Analysis"])
+router = APIRouter(tags=["Advanced Analysis"])
 
 # Initialiser les services
 advanced_analyzer = AdvancedTradingAnalysis()
@@ -75,6 +76,81 @@ async def analyze_opportunity(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erreur lors de l'analyse complète: {str(e)}"
+        )
+
+@router.post("/hybrid-search")
+async def hybrid_search(
+    request: HybridSearchRequest,
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Recherche hybride d'opportunités combinant ML et analyse conventionnelle
+    
+    Args:
+        request: Requête contenant les symboles et types d'analyse
+        
+    Returns:
+        Dict contenant les opportunités hybrides trouvées
+    """
+    try:
+        logger.info(f"Hybrid search for symbols: {request.symbols}")
+        
+        opportunities = []
+        
+        for symbol in request.symbols:
+            try:
+                # Analyse avancée pour chaque symbole
+                analysis_result = await advanced_analyzer.analyze_symbol(
+                    symbol=symbol,
+                    time_horizon=request.time_horizon,
+                    analysis_types=request.analysis_types,
+                    db=db
+                )
+                
+                # Calculer le score hybride
+                hybrid_score = hybrid_scorer.calculate_hybrid_score(
+                    ml_score=analysis_result.get('ml_score', 0.5),
+                    technical_score=analysis_result.get('technical_score', 0.5),
+                    sentiment_score=analysis_result.get('sentiment_score', 0.5),
+                    market_score=analysis_result.get('market_score', 0.5),
+                    weights=request.weights
+                )
+                
+                opportunity = {
+                    "symbol": symbol,
+                    "hybrid_score": hybrid_score,
+                    "confidence": analysis_result.get('confidence', 0.5),
+                    "recommendation": analysis_result.get('recommendation', 'HOLD'),
+                    "risk_level": analysis_result.get('risk_level', 'MEDIUM'),
+                    "technical_score": analysis_result.get('technical_score', 0.5),
+                    "sentiment_score": analysis_result.get('sentiment_score', 0.5),
+                    "market_score": analysis_result.get('market_score', 0.5),
+                    "ml_score": analysis_result.get('ml_score', 0.5),
+                    "analysis_details": analysis_result
+                }
+                
+                opportunities.append(opportunity)
+                
+            except Exception as e:
+                logger.error(f"Error analyzing {symbol}: {str(e)}")
+                continue
+        
+        # Trier par score hybride décroissant
+        opportunities.sort(key=lambda x: x['hybrid_score'], reverse=True)
+        
+        return {
+            "opportunities": opportunities,
+            "total_found": len(opportunities),
+            "search_timestamp": datetime.now().isoformat(),
+            "analysis_types": request.analysis_types,
+            "time_horizon": request.time_horizon
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in hybrid search: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la recherche hybride: {str(e)}"
         )
 
 @router.post("/hybrid-score")

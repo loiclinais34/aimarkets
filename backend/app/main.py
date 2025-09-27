@@ -220,7 +220,7 @@ from app.api.endpoints import advanced_analysis
 
 app.include_router(
     advanced_analysis.router,
-    prefix="/api/v1",
+    prefix="/api/v1/advanced-analysis",
     tags=["Analyse Avancée"]
 )
 
