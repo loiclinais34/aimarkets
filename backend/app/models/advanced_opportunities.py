@@ -20,7 +20,12 @@ class AdvancedOpportunity(Base):
     sentiment_score = Column(Float, nullable=False)
     market_score = Column(Float, nullable=False)
     ml_score = Column(Float, nullable=False)
-    hybrid_score = Column(Float, nullable=False)
+    candlestick_score = Column(Float, nullable=False)
+    garch_score = Column(Float, nullable=False)
+    monte_carlo_score = Column(Float, nullable=False)
+    markov_score = Column(Float, nullable=False)
+    volatility_score = Column(Float, nullable=False)
+    composite_score = Column(Float, nullable=False)
     
     # Métadonnées
     confidence_level = Column(Float, nullable=False)
@@ -32,6 +37,11 @@ class AdvancedOpportunity(Base):
     sentiment_analysis = Column(JSON)
     market_analysis = Column(JSON)
     ml_analysis = Column(JSON)
+    candlestick_analysis = Column(JSON)
+    garch_analysis = Column(JSON)
+    monte_carlo_analysis = Column(JSON)
+    markov_analysis = Column(JSON)
+    volatility_analysis = Column(JSON)
     
     # Configuration de l'analyse
     time_horizon = Column(Integer, nullable=False, default=30)
@@ -44,7 +54,7 @@ class AdvancedOpportunity(Base):
     # Index pour les requêtes fréquentes
     __table_args__ = (
         Index('idx_symbol_analysis_date', 'symbol', 'analysis_date'),
-        Index('idx_hybrid_score', 'hybrid_score'),
+        Index('idx_composite_score', 'composite_score'),
         Index('idx_recommendation', 'recommendation'),
         Index('idx_analysis_date', 'analysis_date'),
     )

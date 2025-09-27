@@ -21,6 +21,7 @@ from app.core.database import get_db
 from app.models.database import HistoricalData
 from app.models.advanced_opportunities import AdvancedOpportunity
 from app.services.advanced_analysis.advanced_trading_analysis import AdvancedTradingAnalysis
+from decimal import Decimal
 
 # Configuration du logging
 logging.basicConfig(
@@ -28,6 +29,19 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+def _convert_decimals_to_floats(obj):
+    """
+    Convertit récursivement tous les objets Decimal en float pour la sérialisation JSON
+    """
+    if isinstance(obj, Decimal):
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {key: _convert_decimals_to_floats(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [_convert_decimals_to_floats(item) for item in obj]
+    else:
+        return obj
 
 def get_all_symbols(db: Session) -> List[str]:
     """Récupère tous les symboles disponibles dans la base de données"""
@@ -75,10 +89,24 @@ async def analyze_opportunity_for_symbol(
             existing_opportunity.sentiment_score = analysis_result.sentiment_score
             existing_opportunity.market_score = analysis_result.market_score
             existing_opportunity.ml_score = getattr(analysis_result, 'ml_score', 0.5)
-            existing_opportunity.hybrid_score = analysis_result.composite_score
+            existing_opportunity.candlestick_score = analysis_result.candlestick_score
+            existing_opportunity.garch_score = analysis_result.garch_score
+            existing_opportunity.monte_carlo_score = analysis_result.monte_carlo_score
+            existing_opportunity.markov_score = analysis_result.markov_score
+            existing_opportunity.volatility_score = analysis_result.volatility_score
+            existing_opportunity.composite_score = analysis_result.composite_score
             existing_opportunity.confidence_level = analysis_result.confidence_level
             existing_opportunity.recommendation = analysis_result.recommendation
             existing_opportunity.risk_level = analysis_result.risk_level
+            existing_opportunity.technical_analysis = _convert_decimals_to_floats(analysis_result.technical_analysis)
+            existing_opportunity.sentiment_analysis = _convert_decimals_to_floats(analysis_result.sentiment_analysis)
+            existing_opportunity.market_analysis = _convert_decimals_to_floats(analysis_result.market_indicators)
+            existing_opportunity.ml_analysis = _convert_decimals_to_floats(getattr(analysis_result, 'ml_analysis', {}))
+            existing_opportunity.candlestick_analysis = _convert_decimals_to_floats(analysis_result.candlestick_analysis)
+            existing_opportunity.garch_analysis = _convert_decimals_to_floats(analysis_result.garch_analysis)
+            existing_opportunity.monte_carlo_analysis = _convert_decimals_to_floats(analysis_result.monte_carlo_analysis)
+            existing_opportunity.markov_analysis = _convert_decimals_to_floats(analysis_result.markov_analysis)
+            existing_opportunity.volatility_analysis = _convert_decimals_to_floats(analysis_result.volatility_analysis)
             existing_opportunity.updated_at = datetime.now()
             
             logger.info(f"Updated existing opportunity for {symbol}")
@@ -91,16 +119,26 @@ async def analyze_opportunity_for_symbol(
                 sentiment_score=analysis_result.sentiment_score,
                 market_score=analysis_result.market_score,
                 ml_score=getattr(analysis_result, 'ml_score', 0.5),
-                hybrid_score=analysis_result.composite_score,
+                candlestick_score=analysis_result.candlestick_score,
+                garch_score=analysis_result.garch_score,
+                monte_carlo_score=analysis_result.monte_carlo_score,
+                markov_score=analysis_result.markov_score,
+                volatility_score=analysis_result.volatility_score,
+                composite_score=analysis_result.composite_score,
                 confidence_level=analysis_result.confidence_level,
                 recommendation=analysis_result.recommendation,
                 risk_level=analysis_result.risk_level,
-                technical_analysis=analysis_result.technical_analysis,
-                sentiment_analysis=analysis_result.sentiment_analysis,
-                market_analysis=analysis_result.market_indicators,
-                ml_analysis=getattr(analysis_result, 'ml_analysis', {}),
+                technical_analysis=_convert_decimals_to_floats(analysis_result.technical_analysis),
+                sentiment_analysis=_convert_decimals_to_floats(analysis_result.sentiment_analysis),
+                market_analysis=_convert_decimals_to_floats(analysis_result.market_indicators),
+                ml_analysis=_convert_decimals_to_floats(getattr(analysis_result, 'ml_analysis', {})),
+                candlestick_analysis=_convert_decimals_to_floats(analysis_result.candlestick_analysis),
+                garch_analysis=_convert_decimals_to_floats(analysis_result.garch_analysis),
+                monte_carlo_analysis=_convert_decimals_to_floats(analysis_result.monte_carlo_analysis),
+                markov_analysis=_convert_decimals_to_floats(analysis_result.markov_analysis),
+                volatility_analysis=_convert_decimals_to_floats(analysis_result.volatility_analysis),
                 time_horizon=time_horizon,
-                analysis_types=["technical", "sentiment", "market", "ml"]
+                analysis_types=["technical", "sentiment", "market", "ml", "candlestick", "garch", "monte_carlo", "markov", "volatility"]
             )
             
             db.add(new_opportunity)
