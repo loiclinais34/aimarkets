@@ -6,6 +6,7 @@ from celery import Celery
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 import logging
+import numpy as np
 from datetime import datetime, timedelta
 
 from app.core.database import get_db
@@ -14,6 +15,7 @@ from app.services.data_freshness_service import DataFreshnessService
 from app.services.advanced_analysis.advanced_trading_analysis import AdvancedTradingAnalysis
 from app.models.advanced_opportunities import AdvancedOpportunity, AdvancedAnalysisConfig
 from app.models.database import HistoricalData, SentimentData, TechnicalIndicators, SentimentIndicators
+from app.models.market_indicators import MarketIndicators
 
 logger = logging.getLogger(__name__)
 
@@ -367,12 +369,152 @@ def calculate_market_indicators_for_symbol(self, symbol: str, force_update: bool
         
         db = next(get_db())
         
-        # Ici, nous utiliserions le service d'indicateurs de marché existant
-        logger.info(f"Market indicators calculated for {symbol}")
-        return {"status": "success", "symbol": symbol}
+        # Vérifier si les indicateurs existent déjà et sont récents
+        if not force_update:
+            latest_indicator = db.query(MarketIndicators)\
+                .filter(MarketIndicators.symbol == symbol)\
+                .order_by(MarketIndicators.analysis_date.desc())\
+                .first()
+            
+            if latest_indicator and latest_indicator.analysis_date >= datetime.now().date() - timedelta(days=1):
+                logger.info(f"Market indicators for {symbol} are already up to date")
+                return {"status": "skipped", "reason": "already_up_to_date"}
+        
+        # Vérifier si les indicateurs existent déjà (même anciens)
+        existing_count = db.query(MarketIndicators)\
+            .filter(MarketIndicators.symbol == symbol)\
+            .count()
+        
+        if existing_count > 0 and not force_update:
+            logger.info(f"Market indicators for {symbol} already exist ({existing_count} records)")
+            return {"status": "success", "symbol": symbol, "reason": "already_exists", "count": existing_count}
+        
+        # Récupérer les données historiques pour calculer les indicateurs de marché
+        historical_data = db.query(HistoricalData).filter(
+            HistoricalData.symbol == symbol
+        ).order_by(HistoricalData.date.desc()).limit(252).all()
+        
+        if not historical_data:
+            logger.warning(f"No historical data found for {symbol}")
+            return {"status": "error", "symbol": symbol, "error": "No historical data"}
+        
+        # Calculer des indicateurs de marché basiques
+        indicators_created = 0
+        
+        # Supprimer les anciens indicateurs si force_update
+        if force_update:
+            db.query(MarketIndicators).filter(MarketIndicators.symbol == symbol).delete()
+        
+        # Calculer la volatilité historique (20 jours)
+        if len(historical_data) >= 20:
+            recent_prices = [float(data.close) for data in historical_data[:20]]
+            returns = [np.log(recent_prices[i] / recent_prices[i+1]) for i in range(len(recent_prices)-1)]
+            volatility_20d = np.std(returns) * np.sqrt(252)  # Annualisée
+            
+            market_indicator = MarketIndicators(
+                symbol=symbol,
+                indicator_type="VOLATILITY_20D",
+                indicator_value=float(volatility_20d),
+                indicator_name="Volatilité Historique 20 jours",
+                analysis_date=datetime.now()
+            )
+            db.add(market_indicator)
+            indicators_created += 1
+        
+        # Calculer le momentum de prix (5 jours)
+        if len(historical_data) >= 5:
+            current_price = float(historical_data[0].close)
+            price_5d_ago = float(historical_data[4].close)
+            momentum_5d = (current_price - price_5d_ago) / price_5d_ago
+            
+            market_indicator = MarketIndicators(
+                symbol=symbol,
+                indicator_type="MOMENTUM_5D",
+                indicator_value=float(momentum_5d),
+                indicator_name="Momentum Prix 5 jours",
+                analysis_date=datetime.now()
+            )
+            db.add(market_indicator)
+            indicators_created += 1
+        
+        # Calculer le momentum de prix (20 jours)
+        if len(historical_data) >= 20:
+            current_price = float(historical_data[0].close)
+            price_20d_ago = float(historical_data[19].close)
+            momentum_20d = (current_price - price_20d_ago) / price_20d_ago
+            
+            market_indicator = MarketIndicators(
+                symbol=symbol,
+                indicator_type="MOMENTUM_20D",
+                indicator_value=float(momentum_20d),
+                indicator_name="Momentum Prix 20 jours",
+                analysis_date=datetime.now()
+            )
+            db.add(market_indicator)
+            indicators_created += 1
+        
+        # Calculer le ratio de volume moyen
+        if len(historical_data) >= 20:
+            recent_volumes = [float(data.volume) for data in historical_data[:5]]
+            avg_volumes_20d = [float(data.volume) for data in historical_data[5:25]]
+            
+            if avg_volumes_20d:
+                avg_recent_volume = np.mean(recent_volumes)
+                avg_volume_20d = np.mean(avg_volumes_20d)
+                volume_ratio = avg_recent_volume / avg_volume_20d if avg_volume_20d > 0 else 1.0
+                
+                market_indicator = MarketIndicators(
+                    symbol=symbol,
+                    indicator_type="VOLUME_RATIO",
+                    indicator_value=float(volume_ratio),
+                    indicator_name="Ratio Volume Moyen",
+                    analysis_date=datetime.now()
+                )
+                db.add(market_indicator)
+                indicators_created += 1
+        
+        # Calculer le RSI basique (14 jours)
+        if len(historical_data) >= 15:
+            prices = [float(data.close) for data in historical_data[:15]]
+            gains = []
+            losses = []
+            
+            for i in range(1, len(prices)):
+                change = prices[i-1] - prices[i]
+                if change > 0:
+                    gains.append(change)
+                    losses.append(0)
+                else:
+                    gains.append(0)
+                    losses.append(abs(change))
+            
+            if gains and losses:
+                avg_gain = np.mean(gains)
+                avg_loss = np.mean(losses)
+                
+                if avg_loss > 0:
+                    rs = avg_gain / avg_loss
+                    rsi = 100 - (100 / (1 + rs))
+                    
+                    market_indicator = MarketIndicators(
+                        symbol=symbol,
+                        indicator_type="RSI_14D",
+                        indicator_value=float(rsi),
+                        indicator_name="RSI 14 jours",
+                        analysis_date=datetime.now()
+                    )
+                    db.add(market_indicator)
+                    indicators_created += 1
+        
+        # Commit des changements
+        db.commit()
+        
+        logger.info(f"Market indicators calculated for {symbol}: {indicators_created} indicators created")
+        return {"status": "success", "symbol": symbol, "indicators_created": indicators_created}
         
     except Exception as e:
         logger.error(f"Error calculating market indicators for {symbol}: {e}")
+        db.rollback()
         return {"status": "error", "symbol": symbol, "error": str(e)}
     finally:
         db.close()
