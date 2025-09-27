@@ -20,6 +20,8 @@ from sqlalchemy.orm import Session
 # Import des modèles de base de données
 from app.models.database import HistoricalData, SentimentData, TechnicalIndicators, SentimentIndicators
 from app.models.market_indicators import MarketIndicators, MomentumIndicators, VolatilityIndicators
+from app.models.technical_analysis import CandlestickPatterns
+from app.models.sentiment_analysis import GARCHModels, MonteCarloSimulations, MarkovChainAnalysis
 from app.models.advanced_opportunities import AdvancedOpportunity
 
 logger = logging.getLogger(__name__)
@@ -33,6 +35,11 @@ class AnalysisResult:
     sentiment_score: float
     market_score: float
     ml_score: float
+    candlestick_score: float
+    garch_score: float
+    monte_carlo_score: float
+    markov_score: float
+    volatility_score: float
     composite_score: float
     confidence_level: float
     recommendation: str
@@ -41,6 +48,11 @@ class AnalysisResult:
     sentiment_analysis: Dict[str, Any]
     market_indicators: Dict[str, Any]
     ml_analysis: Dict[str, Any]
+    candlestick_analysis: Dict[str, Any]
+    garch_analysis: Dict[str, Any]
+    monte_carlo_analysis: Dict[str, Any]
+    markov_analysis: Dict[str, Any]
+    volatility_analysis: Dict[str, Any]
 
 class AdvancedTradingAnalysis:
     """
@@ -84,6 +96,21 @@ class AdvancedTradingAnalysis:
             # Analyse de marché simplifiée
             market_score, market_indicators = await self._analyze_market(symbol, db)
             
+            # Analyse des patterns de candlesticks
+            candlestick_score, candlestick_analysis = await self._analyze_candlestick_patterns(symbol, db)
+            
+            # Analyse des modèles GARCH
+            garch_score, garch_analysis = await self._analyze_garch_models(symbol, db)
+            
+            # Analyse des simulations Monte Carlo
+            monte_carlo_score, monte_carlo_analysis = await self._analyze_monte_carlo(symbol, db)
+            
+            # Analyse des chaînes de Markov
+            markov_score, markov_analysis = await self._analyze_markov_chains(symbol, db)
+            
+            # Analyse de la volatilité
+            volatility_score, volatility_analysis = await self._analyze_volatility(symbol, db)
+            
             # Analyse ML (si demandée)
             ml_score = 0.5  # Score neutre par défaut
             ml_analysis = {}
@@ -92,13 +119,15 @@ class AdvancedTradingAnalysis:
             
             # Calcul du score composite
             composite_score = self._calculate_composite_score(
-                technical_score, sentiment_score, market_score, ml_score
+                technical_score, sentiment_score, market_score, ml_score,
+                candlestick_score, garch_score, monte_carlo_score, markov_score, volatility_score
             )
             
             # Détermination de la recommandation et du niveau de risque
             recommendation, risk_level = self._determine_recommendation(composite_score)
             confidence_level = self._calculate_confidence_level(
-                technical_score, sentiment_score, market_score, ml_score
+                technical_score, sentiment_score, market_score, ml_score,
+                candlestick_score, garch_score, monte_carlo_score, markov_score, volatility_score
             )
             
             result = AnalysisResult(
@@ -108,6 +137,11 @@ class AdvancedTradingAnalysis:
                 sentiment_score=sentiment_score,
                 market_score=market_score,
                 ml_score=ml_score,
+                candlestick_score=candlestick_score,
+                garch_score=garch_score,
+                monte_carlo_score=monte_carlo_score,
+                markov_score=markov_score,
+                volatility_score=volatility_score,
                 composite_score=composite_score,
                 confidence_level=confidence_level,
                 recommendation=recommendation,
@@ -115,7 +149,12 @@ class AdvancedTradingAnalysis:
                 technical_analysis=technical_analysis,
                 sentiment_analysis=sentiment_analysis,
                 market_indicators=market_indicators,
-                ml_analysis=ml_analysis
+                ml_analysis=ml_analysis,
+                candlestick_analysis=candlestick_analysis,
+                garch_analysis=garch_analysis,
+                monte_carlo_analysis=monte_carlo_analysis,
+                markov_analysis=markov_analysis,
+                volatility_analysis=volatility_analysis
             )
             
             self.logger.info(f"Analysis completed for {symbol}: {recommendation}")
@@ -231,27 +270,246 @@ class AdvancedTradingAnalysis:
             self.logger.error(f"Error in ML analysis for {symbol}: {e}")
             return 0.5, {"error": str(e)}
     
+    async def _analyze_candlestick_patterns(self, symbol: str, db: Session) -> Tuple[float, Dict[str, Any]]:
+        """Analyse des patterns de candlesticks"""
+        try:
+            # Récupérer les patterns de candlesticks depuis la base
+            patterns = db.query(CandlestickPatterns)\
+                .filter(CandlestickPatterns.symbol == symbol)\
+                .order_by(CandlestickPatterns.created_at.desc())\
+                .limit(10)\
+                .all()
+            
+            if not patterns:
+                return 0.5, {"status": "no_data", "message": "No candlestick patterns found"}
+            
+            # Calculer le score basé sur les patterns
+            bullish_patterns = sum(1 for p in patterns if p.pattern_direction == 'BULLISH')
+            bearish_patterns = sum(1 for p in patterns if p.pattern_direction == 'BEARISH')
+            neutral_patterns = sum(1 for p in patterns if p.pattern_direction == 'NEUTRAL')
+            
+            total_patterns = len(patterns)
+            if total_patterns == 0:
+                score = 0.5
+            else:
+                # Score basé sur la proportion de patterns haussiers vs baissiers
+                bullish_ratio = bullish_patterns / total_patterns
+                bearish_ratio = bearish_patterns / total_patterns
+                score = 0.5 + (bullish_ratio - bearish_ratio) * 0.3  # Score entre 0.2 et 0.8
+            
+            analysis = {
+                "total_patterns": total_patterns,
+                "bullish_patterns": bullish_patterns,
+                "bearish_patterns": bearish_patterns,
+                "neutral_patterns": neutral_patterns,
+                "latest_patterns": [
+                    {
+                        "type": p.pattern_type,
+                        "direction": p.pattern_direction,
+                        "strength": float(p.pattern_strength)
+                    } for p in patterns[:3]
+                ],
+                "score": score
+            }
+            
+            return score, analysis
+            
+        except Exception as e:
+            self.logger.error(f"Error in candlestick analysis for {symbol}: {e}")
+            return 0.5, {"error": str(e)}
+    
+    async def _analyze_garch_models(self, symbol: str, db: Session) -> Tuple[float, Dict[str, Any]]:
+        """Analyse des modèles GARCH"""
+        try:
+            # Récupérer les modèles GARCH depuis la base
+            models = db.query(GARCHModels)\
+                .filter(GARCHModels.symbol == symbol)\
+                .order_by(GARCHModels.created_at.desc())\
+                .limit(5)\
+                .all()
+            
+            if not models:
+                return 0.5, {"status": "no_data", "message": "No GARCH models found"}
+            
+            # Calculer le score basé sur la volatilité prévue
+            best_model = next((m for m in models if m.is_best_model), models[0])
+            volatility_forecast = float(best_model.volatility_forecast)
+            
+            # Score basé sur la volatilité (plus la volatilité est élevée, plus le risque est élevé)
+            if volatility_forecast < 0.2:
+                score = 0.8  # Faible volatilité = bon score
+            elif volatility_forecast < 0.4:
+                score = 0.6  # Volatilité modérée
+            elif volatility_forecast < 0.6:
+                score = 0.4  # Volatilité élevée
+            else:
+                score = 0.2  # Très haute volatilité
+            
+            analysis = {
+                "volatility_forecast": volatility_forecast,
+                "var_95": float(best_model.var_95),
+                "var_99": float(best_model.var_99),
+                "model_type": best_model.model_type,
+                "aic": float(best_model.aic) if best_model.aic else None,
+                "bic": float(best_model.bic) if best_model.bic else None,
+                "total_models": len(models),
+                "score": score
+            }
+            
+            return score, analysis
+            
+        except Exception as e:
+            self.logger.error(f"Error in GARCH analysis for {symbol}: {e}")
+            return 0.5, {"error": str(e)}
+    
+    async def _analyze_monte_carlo(self, symbol: str, db: Session) -> Tuple[float, Dict[str, Any]]:
+        """Analyse des simulations Monte Carlo"""
+        try:
+            # Récupérer les simulations Monte Carlo depuis la base
+            simulations = db.query(MonteCarloSimulations)\
+                .filter(MonteCarloSimulations.symbol == symbol)\
+                .order_by(MonteCarloSimulations.created_at.desc())\
+                .limit(1)\
+                .first()
+            
+            if not simulations:
+                return 0.5, {"status": "no_data", "message": "No Monte Carlo simulations found"}
+            
+            # Calculer le score basé sur la probabilité de rendement positif
+            prob_positive = float(simulations.probability_positive_return)
+            score = prob_positive  # Score direct basé sur la probabilité
+            
+            analysis = {
+                "probability_positive_return": prob_positive,
+                "var_95": float(simulations.var_95),
+                "var_99": float(simulations.var_99),
+                "expected_shortfall_95": float(simulations.expected_shortfall_95),
+                "expected_shortfall_99": float(simulations.expected_shortfall_99),
+                "mean_return": float(simulations.mean_return),
+                "std_return": float(simulations.std_return),
+                "simulations_count": simulations.simulations_count,
+                "time_horizon": simulations.time_horizon,
+                "score": score
+            }
+            
+            return score, analysis
+            
+        except Exception as e:
+            self.logger.error(f"Error in Monte Carlo analysis for {symbol}: {e}")
+            return 0.5, {"error": str(e)}
+    
+    async def _analyze_markov_chains(self, symbol: str, db: Session) -> Tuple[float, Dict[str, Any]]:
+        """Analyse des chaînes de Markov"""
+        try:
+            # Récupérer l'analyse Markov depuis la base
+            analysis = db.query(MarkovChainAnalysis)\
+                .filter(MarkovChainAnalysis.symbol == symbol)\
+                .order_by(MarkovChainAnalysis.created_at.desc())\
+                .first()
+            
+            if not analysis:
+                return 0.5, {"status": "no_data", "message": "No Markov chain analysis found"}
+            
+            # Calculer le score basé sur l'état actuel
+            current_state = analysis.current_state
+            if current_state == 0:  # BULL
+                score = 0.8
+            elif current_state == 1:  # BEAR
+                score = 0.2
+            else:  # SIDEWAYS
+                score = 0.5
+            
+            analysis_data = {
+                "current_state": current_state,
+                "state_probabilities": analysis.state_probabilities,
+                "transition_matrix": analysis.transition_matrix,
+                "stationary_probabilities": analysis.stationary_probabilities,
+                "n_states": analysis.n_states,
+                "score": score
+            }
+            
+            return score, analysis_data
+            
+        except Exception as e:
+            self.logger.error(f"Error in Markov analysis for {symbol}: {e}")
+            return 0.5, {"error": str(e)}
+    
+    async def _analyze_volatility(self, symbol: str, db: Session) -> Tuple[float, Dict[str, Any]]:
+        """Analyse de la volatilité"""
+        try:
+            # Récupérer les indicateurs de volatilité depuis la base
+            volatility = db.query(VolatilityIndicators)\
+                .filter(VolatilityIndicators.symbol == symbol)\
+                .order_by(VolatilityIndicators.created_at.desc())\
+                .first()
+            
+            if not volatility:
+                return 0.5, {"status": "no_data", "message": "No volatility indicators found"}
+            
+            # Calculer le score basé sur le niveau de risque
+            risk_level = volatility.risk_level
+            if risk_level == "LOW":
+                score = 0.8
+            elif risk_level == "MEDIUM":
+                score = 0.6
+            elif risk_level == "HIGH":
+                score = 0.4
+            else:  # VERY_HIGH
+                score = 0.2
+            
+            analysis = {
+                "current_volatility": float(volatility.current_volatility),
+                "historical_volatility": float(volatility.historical_volatility),
+                "volatility_ratio": float(volatility.volatility_ratio),
+                "volatility_percentile": float(volatility.volatility_percentile),
+                "risk_level": risk_level,
+                "vix_value": float(volatility.vix_value),
+                "regime_analysis": volatility.regime_analysis,
+                "score": score
+            }
+            
+            return score, analysis
+            
+        except Exception as e:
+            self.logger.error(f"Error in volatility analysis for {symbol}: {e}")
+            return 0.5, {"error": str(e)}
+    
     def _calculate_composite_score(
         self, 
         technical_score: float, 
         sentiment_score: float, 
         market_score: float, 
-        ml_score: float
+        ml_score: float,
+        candlestick_score: float,
+        garch_score: float,
+        monte_carlo_score: float,
+        markov_score: float,
+        volatility_score: float
     ) -> float:
         """Calcule le score composite"""
-        # Poids égaux pour tous les types d'analyse
+        # Poids pour tous les types d'analyse
         weights = {
-            'technical': 0.25,
-            'sentiment': 0.25,
-            'market': 0.25,
-            'ml': 0.25
+            'technical': 0.15,
+            'sentiment': 0.15,
+            'market': 0.15,
+            'ml': 0.10,
+            'candlestick': 0.10,
+            'garch': 0.10,
+            'monte_carlo': 0.10,
+            'markov': 0.10,
+            'volatility': 0.05
         }
         
         composite_score = (
             technical_score * weights['technical'] +
             sentiment_score * weights['sentiment'] +
             market_score * weights['market'] +
-            ml_score * weights['ml']
+            ml_score * weights['ml'] +
+            candlestick_score * weights['candlestick'] +
+            garch_score * weights['garch'] +
+            monte_carlo_score * weights['monte_carlo'] +
+            markov_score * weights['markov'] +
+            volatility_score * weights['volatility']
         )
         
         return round(composite_score, 3)
@@ -274,11 +532,17 @@ class AdvancedTradingAnalysis:
         technical_score: float, 
         sentiment_score: float, 
         market_score: float, 
-        ml_score: float
+        ml_score: float,
+        candlestick_score: float,
+        garch_score: float,
+        monte_carlo_score: float,
+        markov_score: float,
+        volatility_score: float
     ) -> float:
         """Calcule le niveau de confiance"""
         # Confiance basée sur la cohérence des scores
-        scores = [technical_score, sentiment_score, market_score, ml_score]
+        scores = [technical_score, sentiment_score, market_score, ml_score,
+                 candlestick_score, garch_score, monte_carlo_score, markov_score, volatility_score]
         score_std = np.std(scores)
         
         # Plus la variance est faible, plus la confiance est élevée
@@ -297,6 +561,11 @@ class AdvancedTradingAnalysis:
                 "technical": result.technical_score,
                 "sentiment": result.sentiment_score,
                 "market": result.market_score,
-                "ml": result.ml_score
+                "ml": result.ml_score,
+                "candlestick": result.candlestick_score,
+                "garch": result.garch_score,
+                "monte_carlo": result.monte_carlo_score,
+                "markov": result.markov_score,
+                "volatility": result.volatility_score
             }
         }

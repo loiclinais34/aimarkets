@@ -289,6 +289,12 @@ class TechnicalIndicatorsCalculator:
         volume_roc = ((volume - volume.shift(period)) / volume.shift(period)) * 100
         return volume_roc
     
+    def _convert_nan_to_none(self, value):
+        """Convertir les valeurs NaN en None pour la base de données"""
+        if pd.isna(value) or np.isnan(value) if isinstance(value, (int, float)) else False:
+            return None
+        return value
+    
     def _save_indicators(self, symbol: str, indicators_df: pd.DataFrame) -> None:
         """Sauvegarder les indicateurs dans la base de données"""
         for _, row in indicators_df.iterrows():
@@ -300,67 +306,67 @@ class TechnicalIndicatorsCalculator:
             
             if existing:
                 # Mettre à jour l'enregistrement existant
-                existing.sma_5 = row.get('sma_5')
-                existing.sma_10 = row.get('sma_10')
-                existing.sma_20 = row.get('sma_20')
-                existing.sma_50 = row.get('sma_50')
-                existing.sma_200 = row.get('sma_200')
-                existing.ema_5 = row.get('ema_5')
-                existing.ema_10 = row.get('ema_10')
-                existing.ema_20 = row.get('ema_20')
-                existing.ema_50 = row.get('ema_50')
-                existing.ema_200 = row.get('ema_200')
-                existing.rsi_14 = row.get('rsi_14')
-                existing.macd = row.get('macd')
-                existing.macd_signal = row.get('macd_signal')
-                existing.macd_histogram = row.get('macd_histogram')
-                existing.stochastic_k = row.get('stochastic_k')
-                existing.stochastic_d = row.get('stochastic_d')
-                existing.williams_r = row.get('williams_r')
-                existing.roc = row.get('roc')
-                existing.cci = row.get('cci')
-                existing.bb_upper = row.get('bb_upper')
-                existing.bb_middle = row.get('bb_middle')
-                existing.bb_lower = row.get('bb_lower')
-                existing.bb_width = row.get('bb_width')
-                existing.bb_position = row.get('bb_position')
-                existing.obv = row.get('obv')
-                existing.volume_roc = row.get('volume_roc')
-                existing.volume_sma_20 = row.get('volume_sma_20')
-                existing.atr_14 = row.get('atr_14')
+                existing.sma_5 = self._convert_nan_to_none(row.get('sma_5'))
+                existing.sma_10 = self._convert_nan_to_none(row.get('sma_10'))
+                existing.sma_20 = self._convert_nan_to_none(row.get('sma_20'))
+                existing.sma_50 = self._convert_nan_to_none(row.get('sma_50'))
+                existing.sma_200 = self._convert_nan_to_none(row.get('sma_200'))
+                existing.ema_5 = self._convert_nan_to_none(row.get('ema_5'))
+                existing.ema_10 = self._convert_nan_to_none(row.get('ema_10'))
+                existing.ema_20 = self._convert_nan_to_none(row.get('ema_20'))
+                existing.ema_50 = self._convert_nan_to_none(row.get('ema_50'))
+                existing.ema_200 = self._convert_nan_to_none(row.get('ema_200'))
+                existing.rsi_14 = self._convert_nan_to_none(row.get('rsi_14'))
+                existing.macd = self._convert_nan_to_none(row.get('macd'))
+                existing.macd_signal = self._convert_nan_to_none(row.get('macd_signal'))
+                existing.macd_histogram = self._convert_nan_to_none(row.get('macd_histogram'))
+                existing.stochastic_k = self._convert_nan_to_none(row.get('stochastic_k'))
+                existing.stochastic_d = self._convert_nan_to_none(row.get('stochastic_d'))
+                existing.williams_r = self._convert_nan_to_none(row.get('williams_r'))
+                existing.roc = self._convert_nan_to_none(row.get('roc'))
+                existing.cci = self._convert_nan_to_none(row.get('cci'))
+                existing.bb_upper = self._convert_nan_to_none(row.get('bb_upper'))
+                existing.bb_middle = self._convert_nan_to_none(row.get('bb_middle'))
+                existing.bb_lower = self._convert_nan_to_none(row.get('bb_lower'))
+                existing.bb_width = self._convert_nan_to_none(row.get('bb_width'))
+                existing.bb_position = self._convert_nan_to_none(row.get('bb_position'))
+                existing.obv = self._convert_nan_to_none(row.get('obv'))
+                existing.volume_roc = self._convert_nan_to_none(row.get('volume_roc'))
+                existing.volume_sma_20 = self._convert_nan_to_none(row.get('volume_sma_20'))
+                existing.atr_14 = self._convert_nan_to_none(row.get('atr_14'))
             else:
                 # Créer un nouvel enregistrement
                 new_indicator = TechnicalIndicators(
                     symbol=symbol.upper(),
                     date=row['date'],
-                    sma_5=row.get('sma_5'),
-                    sma_10=row.get('sma_10'),
-                    sma_20=row.get('sma_20'),
-                    sma_50=row.get('sma_50'),
-                    sma_200=row.get('sma_200'),
-                    ema_5=row.get('ema_5'),
-                    ema_10=row.get('ema_10'),
-                    ema_20=row.get('ema_20'),
-                    ema_50=row.get('ema_50'),
-                    ema_200=row.get('ema_200'),
-                    rsi_14=row.get('rsi_14'),
-                    macd=row.get('macd'),
-                    macd_signal=row.get('macd_signal'),
-                    macd_histogram=row.get('macd_histogram'),
-                    stochastic_k=row.get('stochastic_k'),
-                    stochastic_d=row.get('stochastic_d'),
-                    williams_r=row.get('williams_r'),
-                    roc=row.get('roc'),
-                    cci=row.get('cci'),
-                    bb_upper=row.get('bb_upper'),
-                    bb_middle=row.get('bb_middle'),
-                    bb_lower=row.get('bb_lower'),
-                    bb_width=row.get('bb_width'),
-                    bb_position=row.get('bb_position'),
-                    obv=row.get('obv'),
-                    volume_roc=row.get('volume_roc'),
-                    volume_sma_20=row.get('volume_sma_20'),
-                    atr_14=row.get('atr_14')
+                    sma_5=self._convert_nan_to_none(row.get('sma_5')),
+                    sma_10=self._convert_nan_to_none(row.get('sma_10')),
+                    sma_20=self._convert_nan_to_none(row.get('sma_20')),
+                    sma_50=self._convert_nan_to_none(row.get('sma_50')),
+                    sma_200=self._convert_nan_to_none(row.get('sma_200')),
+                    ema_5=self._convert_nan_to_none(row.get('ema_5')),
+                    ema_10=self._convert_nan_to_none(row.get('ema_10')),
+                    ema_20=self._convert_nan_to_none(row.get('ema_20')),
+                    ema_50=self._convert_nan_to_none(row.get('ema_50')),
+                    ema_200=self._convert_nan_to_none(row.get('ema_200')),
+                    rsi_14=self._convert_nan_to_none(row.get('rsi_14')),
+                    macd=self._convert_nan_to_none(row.get('macd')),
+                    macd_signal=self._convert_nan_to_none(row.get('macd_signal')),
+                    macd_histogram=self._convert_nan_to_none(row.get('macd_histogram')),
+                    stochastic_k=self._convert_nan_to_none(row.get('stochastic_k')),
+                    stochastic_d=self._convert_nan_to_none(row.get('stochastic_d')),
+                    williams_r=self._convert_nan_to_none(row.get('williams_r')),
+                    roc=self._convert_nan_to_none(row.get('roc')),
+                    cci=self._convert_nan_to_none(row.get('cci')),
+                    bb_upper=self._convert_nan_to_none(row.get('bb_upper')),
+                    bb_middle=self._convert_nan_to_none(row.get('bb_middle')),
+                    bb_lower=self._convert_nan_to_none(row.get('bb_lower')),
+                    bb_width=self._convert_nan_to_none(row.get('bb_width')),
+                    bb_position=self._convert_nan_to_none(row.get('bb_position')),
+                    obv=self._convert_nan_to_none(row.get('obv')),
+                    volume_roc=self._convert_nan_to_none(row.get('volume_roc')),
+                    volume_sma_20=self._convert_nan_to_none(row.get('volume_sma_20')),
+                    atr_14=self._convert_nan_to_none(row.get('atr_14'))
                 )
                 self.db.add(new_indicator)
         
