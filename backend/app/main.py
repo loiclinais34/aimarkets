@@ -215,6 +215,15 @@ app.include_router(
     tags=["Signaux Avancés"]
 )
 
+# Import du router advanced_analysis
+from app.api.endpoints import advanced_analysis
+
+app.include_router(
+    advanced_analysis.router,
+    prefix="/api/v1",
+    tags=["Analyse Avancée"]
+)
+
 # Endpoints LightGBM temporairement désactivés à cause de problèmes de stabilité
 # app.include_router(
 #     lightgbm_models.router,
