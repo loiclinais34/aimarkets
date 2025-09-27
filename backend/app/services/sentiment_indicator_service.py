@@ -71,8 +71,8 @@ class SentimentIndicatorService:
             # Sauvegarder les indicateurs
             self._save_indicators(db, symbol, df)
             
-            # Mettre à jour les colonnes manquantes dans SentimentData
-            self._update_sentiment_data_columns(db, symbol, df)
+            # Mettre à jour les colonnes manquantes dans SentimentData (sans Polygon)
+            self._update_sentiment_data_columns_safe(db, symbol, df)
             
             logger.info(f"Indicateurs de sentiment calculés pour {symbol}: {len(df)} enregistrements")
             return True
@@ -292,6 +292,37 @@ class SentimentIndicatorService:
         
         db.commit()
     
+    def _update_sentiment_data_columns_safe(self, db: Session, symbol: str, df: pd.DataFrame) -> None:
+        """Mettre à jour les colonnes manquantes dans SentimentData - Version Base de Données Uniquement"""
+        try:
+            logger.info(f"Mise à jour des colonnes SentimentData pour {symbol} - Base de données uniquement")
+            
+            for _, row in df.iterrows():
+                # Trouver l'enregistrement SentimentData correspondant
+                sentiment_record = db.query(SentimentData).filter(
+                    SentimentData.symbol == symbol,
+                    SentimentData.date == row['date']
+                ).first()
+                
+                if sentiment_record:
+                    # Mettre à jour les colonnes manquantes avec les données calculées
+                    sentiment_record.sentiment_momentum_5d = row.get('sentiment_momentum_7d', 0.0)  # Utiliser 7d comme approximation
+                    sentiment_record.sentiment_momentum_20d = row.get('sentiment_momentum_14d', 0.0)  # Utiliser 14d comme approximation
+                    sentiment_record.sentiment_volatility_5d = row.get('sentiment_volatility_7d', 0.0)  # Utiliser 7d comme approximation
+                    sentiment_record.sentiment_relative_strength = row.get('sentiment_relative_strength', 0.0)
+                    sentiment_record.processing_notes = f"Calculé le {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - Base de données uniquement"
+                    
+                    # Ne pas utiliser Polygon - utiliser les données existantes
+                    logger.debug(f"Colonnes SentimentData mises à jour pour {symbol} le {row['date']}")
+            
+            db.commit()
+            logger.info(f"Colonnes SentimentData mises à jour pour {symbol}")
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de la mise à jour des colonnes SentimentData pour {symbol}: {e}")
+            db.rollback()
+            raise
+
     def _update_sentiment_data_columns(self, db: Session, symbol: str, df: pd.DataFrame) -> None:
         """Mettre à jour les colonnes manquantes dans SentimentData"""
         try:

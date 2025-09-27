@@ -179,6 +179,23 @@ app.include_router(
     tags=["Comparaison Asynchrone de Modèles"]
 )
 
+# Import du router advanced_analysis_pipeline
+from app.api.endpoints import advanced_analysis_pipeline
+
+app.include_router(
+    advanced_analysis_pipeline.router,
+    tags=["Pipeline d'Analyse Avancée"]
+)
+
+# Import du router advanced_analysis
+from app.api.endpoints import advanced_analysis
+
+app.include_router(
+    advanced_analysis.router,
+    prefix="/api/v1/advanced-analysis",
+    tags=["Analyse Avancée"]
+)
+
 # Endpoints LightGBM temporairement désactivés à cause de problèmes de stabilité
 # app.include_router(
 #     lightgbm_models.router,
