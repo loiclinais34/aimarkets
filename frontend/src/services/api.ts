@@ -49,6 +49,9 @@ export interface APIResponse<T> {
   data?: T
 }
 
+// Export de l'API d'analyse avancée
+export { advancedAnalysisApi } from './advancedAnalysisApi'
+
 // Types pour les métadonnées des symboles
 export interface SymbolMetadata {
   id: number

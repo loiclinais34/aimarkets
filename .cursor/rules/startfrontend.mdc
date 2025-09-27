@@ -1,0 +1,14 @@
+# Project Rules
+
+Règles de lancement pour le projet AIMarkets.
+
+```jsonc cursor
+{
+  "commands": {
+    "start-frontend": {
+      "cwd": "aimarkets/frontend",
+      "run": "bash -c 'if lsof -i:3000 > /dev/null; then echo \"❌ Port 3000 déjà utilisé. Arrêt.\"; exit 1; else echo \"✅ Démarrage du frontend Next.js sur port 3000...\"; npm run dev; fi'"
+    }
+  }
+}
+```

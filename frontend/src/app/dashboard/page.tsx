@@ -97,7 +97,7 @@ export default function Dashboard() {
 
           {/* Opportunités par titre */}
           <div className="lg:col-span-2">
-            <OpportunitiesBySymbol searchId={currentSearchId} />
+            <OpportunitiesBySymbol searchId={currentSearchId || undefined} />
           </div>
         </div>
 
