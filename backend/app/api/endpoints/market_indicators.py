@@ -9,11 +9,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
 
 from ...core.database import get_db
 from ...services.market_indicators import VolatilityIndicators, CorrelationAnalyzer, MomentumIndicators
 from ...models.market_indicators import MarketIndicators as MarketIndicatorsModel, VolatilityIndicators as VolatilityIndicatorsModel, CorrelationAnalysis, MomentumIndicators as MomentumIndicatorsModel, MarketSentimentSummary
+from ...utils.json_encoder import make_json_safe
 
 router = APIRouter()
 
@@ -37,16 +39,16 @@ async def get_volatility_indicators(
     """
     try:
         # Récupérer les données historiques
-        from ...services.data_service import DataService
-        data_service = DataService(db)
+        from ...services.polygon_service import PolygonService
+        data_service = PolygonService()
         
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=period + 50)
+        start_date = end_date - timedelta(days=365)  # 1 an de données
         
         historical_data = data_service.get_historical_data(
             symbol=symbol,
-            start_date=start_date.strftime('%Y-%m-%d'),
-            end_date=end_date.strftime('%Y-%m-%d')
+            from_date=start_date.strftime('%Y-%m-%d'),
+            to_date=end_date.strftime('%Y-%m-%d')
         )
         
         if not historical_data:
@@ -65,13 +67,13 @@ async def get_volatility_indicators(
             df['close'], df['close'].pct_change().dropna()
         )
         
-        return {
+        return make_json_safe({
             "symbol": symbol,
             "analysis_date": datetime.now().isoformat(),
             "period": period,
             "analysis": volatility_analysis,
             "current_price": float(df['close'].iloc[-1])
-        }
+        })
         
     except Exception as e:
         raise HTTPException(
@@ -101,11 +103,11 @@ async def get_correlation_analysis(
     """
     try:
         # Récupérer les données historiques
-        from ...services.data_service import DataService
-        data_service = DataService(db)
+        from ...services.polygon_service import PolygonService
+        data_service = PolygonService()
         
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=period + 50)
+        start_date = end_date - timedelta(days=365)  # 1 an de données
         
         # Si pas de symboles spécifiés, utiliser des symboles par défaut
         if symbols is None:
@@ -116,8 +118,8 @@ async def get_correlation_analysis(
         for sym in [symbol] + symbols:
             historical_data = data_service.get_historical_data(
                 symbol=sym,
-                start_date=start_date.strftime('%Y-%m-%d'),
-                end_date=end_date.strftime('%Y-%m-%d')
+                from_date=start_date.strftime('%Y-%m-%d'),
+                to_date=end_date.strftime('%Y-%m-%d')
             )
             
             if historical_data:
@@ -182,16 +184,16 @@ async def get_momentum_indicators(
     """
     try:
         # Récupérer les données historiques
-        from ...services.data_service import DataService
-        data_service = DataService(db)
+        from ...services.polygon_service import PolygonService
+        data_service = PolygonService()
         
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=period + 50)
+        start_date = end_date - timedelta(days=365)  # 1 an de données
         
         historical_data = data_service.get_historical_data(
             symbol=symbol,
-            start_date=start_date.strftime('%Y-%m-%d'),
-            end_date=end_date.strftime('%Y-%m-%d')
+            from_date=start_date.strftime('%Y-%m-%d'),
+            to_date=end_date.strftime('%Y-%m-%d')
         )
         
         if not historical_data:
@@ -310,16 +312,16 @@ async def get_comprehensive_market_analysis(
     """
     try:
         # Récupérer les données historiques
-        from ...services.data_service import DataService
-        data_service = DataService(db)
+        from ...services.polygon_service import PolygonService
+        data_service = PolygonService()
         
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=period + 50)
+        start_date = end_date - timedelta(days=365)  # 1 an de données
         
         historical_data = data_service.get_historical_data(
             symbol=symbol,
-            start_date=start_date.strftime('%Y-%m-%d'),
-            end_date=end_date.strftime('%Y-%m-%d')
+            from_date=start_date.strftime('%Y-%m-%d'),
+            to_date=end_date.strftime('%Y-%m-%d')
         )
         
         if not historical_data:

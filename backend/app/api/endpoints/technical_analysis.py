@@ -9,11 +9,24 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 import pandas as pd
+import numpy as np
+import json
 from datetime import datetime, timedelta
 
 from ...core.database import get_db
 from ...services.technical_analysis import TechnicalIndicators, CandlestickPatterns, SupportResistanceAnalyzer, SignalGenerator
 from ...models.technical_analysis import TechnicalSignals, CandlestickPatterns as CandlestickPatternsModel, SupportResistanceLevels, TechnicalAnalysisSummary
+
+# Encoder personnalisé pour les types NumPy
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NumpyEncoder, self).default(obj)
 
 router = APIRouter()
 
@@ -37,8 +50,8 @@ async def get_technical_signals(
     """
     try:
         # Récupérer les données historiques
-        from ...services.data_service import DataService
-        data_service = DataService(db)
+        from ...services.polygon_service import PolygonService
+        data_service = PolygonService()
         
         # Récupérer les données OHLCV
         end_date = datetime.now()
@@ -46,8 +59,8 @@ async def get_technical_signals(
         
         historical_data = data_service.get_historical_data(
             symbol=symbol,
-            start_date=start_date.strftime('%Y-%m-%d'),
-            end_date=end_date.strftime('%Y-%m-%d')
+            from_date=start_date.strftime('%Y-%m-%d'),
+            to_date=end_date.strftime('%Y-%m-%d')
         )
         
         if not historical_data:
@@ -80,46 +93,92 @@ async def get_technical_signals(
             df['high'], df['low'], df['close'], df.get('volume')
         )
         
+        # Fonctions utilitaires pour la sérialisation
+        def safe_float(value):
+            """Convertit une valeur en float de manière sécurisée."""
+            if pd.isna(value) or value is None:
+                return None
+            try:
+                return float(value)
+            except (ValueError, TypeError):
+                return None
+        
+        def safe_int(value):
+            """Convertit une valeur en int de manière sécurisée."""
+            if pd.isna(value) or value is None:
+                return None
+            try:
+                return int(value)
+            except (ValueError, TypeError):
+                return None
+        
+        # Préparer les indicateurs
+        indicators_data = {}
+        if 'rsi' in indicators and not indicators['rsi'].empty:
+            indicators_data['rsi'] = safe_float(indicators['rsi'].iloc[-1])
+        
+        if 'macd' in indicators:
+            macd_data = indicators['macd']
+            indicators_data['macd'] = {
+                "macd": safe_float(macd_data.get('macd', pd.Series()).iloc[-1]) if not macd_data.get('macd', pd.Series()).empty else None,
+                "signal": safe_float(macd_data.get('signal', pd.Series()).iloc[-1]) if not macd_data.get('signal', pd.Series()).empty else None,
+                "histogram": safe_float(macd_data.get('histogram', pd.Series()).iloc[-1]) if not macd_data.get('histogram', pd.Series()).empty else None
+            }
+        
+        if 'bollinger_bands' in indicators:
+            bb_data = indicators['bollinger_bands']
+            indicators_data['bollinger_bands'] = {
+                "upper": safe_float(bb_data.get('upper', pd.Series()).iloc[-1]) if not bb_data.get('upper', pd.Series()).empty else None,
+                "middle": safe_float(bb_data.get('middle', pd.Series()).iloc[-1]) if not bb_data.get('middle', pd.Series()).empty else None,
+                "lower": safe_float(bb_data.get('lower', pd.Series()).iloc[-1]) if not bb_data.get('lower', pd.Series()).empty else None
+            }
+        
+        if 'stochastic' in indicators:
+            stoch_data = indicators['stochastic']
+            indicators_data['stochastic'] = {
+                "k_percent": safe_float(stoch_data.get('k_percent', pd.Series()).iloc[-1]) if not stoch_data.get('k_percent', pd.Series()).empty else None,
+                "d_percent": safe_float(stoch_data.get('d_percent', pd.Series()).iloc[-1]) if not stoch_data.get('d_percent', pd.Series()).empty else None
+            }
+        
+        # Préparer les patterns
+        patterns_data = {}
+        for pattern_name, pattern_data in patterns.items():
+            if isinstance(pattern_data, pd.Series) and not pattern_data.empty:
+                patterns_data[pattern_name] = safe_int(pattern_data.iloc[-5:].sum())
+            else:
+                patterns_data[pattern_name] = 0
+        
+        # Préparer les signaux
+        signals_data = {}
+        for key, value in composite_signal.items():
+            if isinstance(value, (int, float, np.number)):
+                signals_data[key] = safe_float(value)
+            elif isinstance(value, str):
+                signals_data[key] = value
+            else:
+                signals_data[key] = str(value)
+        
         return {
             "symbol": symbol,
             "analysis_date": datetime.now().isoformat(),
-            "indicators": {
-                "rsi": indicators.get('rsi', {}).iloc[-1] if 'rsi' in indicators and not indicators['rsi'].empty else None,
-                "macd": {
-                    "macd": indicators.get('macd', {}).get('macd', pd.Series()).iloc[-1] if 'macd' in indicators else None,
-                    "signal": indicators.get('macd', {}).get('signal', pd.Series()).iloc[-1] if 'macd' in indicators else None,
-                    "histogram": indicators.get('macd', {}).get('histogram', pd.Series()).iloc[-1] if 'macd' in indicators else None
-                },
-                "bollinger_bands": {
-                    "upper": indicators.get('bollinger_bands', {}).get('upper', pd.Series()).iloc[-1] if 'bollinger_bands' in indicators else None,
-                    "middle": indicators.get('bollinger_bands', {}).get('middle', pd.Series()).iloc[-1] if 'bollinger_bands' in indicators else None,
-                    "lower": indicators.get('bollinger_bands', {}).get('lower', pd.Series()).iloc[-1] if 'bollinger_bands' in indicators else None
-                },
-                "stochastic": {
-                    "k_percent": indicators.get('stochastic', {}).get('k_percent', pd.Series()).iloc[-1] if 'stochastic' in indicators else None,
-                    "d_percent": indicators.get('stochastic', {}).get('d_percent', pd.Series()).iloc[-1] if 'stochastic' in indicators else None
-                }
-            },
+            "indicators": indicators_data,
             "patterns": {
-                "recent_patterns": {
-                    pattern_name: pattern_data.iloc[-5:].sum() if isinstance(pattern_data, pd.Series) else 0
-                    for pattern_name, pattern_data in patterns.items()
-                },
+                "recent_patterns": patterns_data,
                 "pattern_signals": CandlestickPatterns.get_pattern_signals(patterns)
             },
             "support_resistance": {
                 "pivot_points": {
-                    "pivot": support_resistance.get('pivot_points', {}).get('pivot', pd.Series()).iloc[-1] if 'pivot_points' in support_resistance else None,
-                    "r1": support_resistance.get('pivot_points', {}).get('r1', pd.Series()).iloc[-1] if 'pivot_points' in support_resistance else None,
-                    "r2": support_resistance.get('pivot_points', {}).get('r2', pd.Series()).iloc[-1] if 'pivot_points' in support_resistance else None,
-                    "s1": support_resistance.get('pivot_points', {}).get('s1', pd.Series()).iloc[-1] if 'pivot_points' in support_resistance else None,
-                    "s2": support_resistance.get('pivot_points', {}).get('s2', pd.Series()).iloc[-1] if 'pivot_points' in support_resistance else None
+                    "pivot": safe_float(support_resistance.get('pivot_points', {}).get('pivot', pd.Series()).iloc[-1]) if 'pivot_points' in support_resistance and not support_resistance.get('pivot_points', {}).get('pivot', pd.Series()).empty else None,
+                    "r1": safe_float(support_resistance.get('pivot_points', {}).get('r1', pd.Series()).iloc[-1]) if 'pivot_points' in support_resistance and not support_resistance.get('pivot_points', {}).get('r1', pd.Series()).empty else None,
+                    "r2": safe_float(support_resistance.get('pivot_points', {}).get('r2', pd.Series()).iloc[-1]) if 'pivot_points' in support_resistance and not support_resistance.get('pivot_points', {}).get('r2', pd.Series()).empty else None,
+                    "s1": safe_float(support_resistance.get('pivot_points', {}).get('s1', pd.Series()).iloc[-1]) if 'pivot_points' in support_resistance and not support_resistance.get('pivot_points', {}).get('s1', pd.Series()).empty else None,
+                    "s2": safe_float(support_resistance.get('pivot_points', {}).get('s2', pd.Series()).iloc[-1]) if 'pivot_points' in support_resistance and not support_resistance.get('pivot_points', {}).get('s2', pd.Series()).empty else None
                 },
-                "support_levels": support_resistance.get('support_resistance', {}).get('support_levels', []),
-                "resistance_levels": support_resistance.get('support_resistance', {}).get('resistance_levels', [])
+                "support_levels": [safe_float(level) for level in support_resistance.get('support_levels', [])],
+                "resistance_levels": [safe_float(level) for level in support_resistance.get('resistance_levels', [])]
             },
-            "composite_signal": composite_signal,
-            "current_price": df['close'].iloc[-1],
+            "composite_signal": signals_data,
+            "current_price": safe_float(df['close'].iloc[-1]),
             "period": period
         }
         
@@ -149,16 +208,16 @@ async def get_candlestick_patterns(
     """
     try:
         # Récupérer les données historiques
-        from ...services.data_service import DataService
-        data_service = DataService(db)
+        from ...services.polygon_service import PolygonService
+        data_service = PolygonService()
         
         end_date = datetime.now()
         start_date = end_date - timedelta(days=period + 20)
         
         historical_data = data_service.get_historical_data(
             symbol=symbol,
-            start_date=start_date.strftime('%Y-%m-%d'),
-            end_date=end_date.strftime('%Y-%m-%d')
+            from_date=start_date.strftime('%Y-%m-%d'),
+            to_date=end_date.strftime('%Y-%m-%d')
         )
         
         if not historical_data:
@@ -224,16 +283,16 @@ async def get_support_resistance_levels(
     """
     try:
         # Récupérer les données historiques
-        from ...services.data_service import DataService
-        data_service = DataService(db)
+        from ...services.polygon_service import PolygonService
+        data_service = PolygonService()
         
         end_date = datetime.now()
         start_date = end_date - timedelta(days=period + 30)
         
         historical_data = data_service.get_historical_data(
             symbol=symbol,
-            start_date=start_date.strftime('%Y-%m-%d'),
-            end_date=end_date.strftime('%Y-%m-%d')
+            from_date=start_date.strftime('%Y-%m-%d'),
+            to_date=end_date.strftime('%Y-%m-%d')
         )
         
         if not historical_data:
@@ -304,16 +363,16 @@ async def get_comprehensive_technical_analysis(
     """
     try:
         # Récupérer les données historiques
-        from ...services.data_service import DataService
-        data_service = DataService(db)
+        from ...services.polygon_service import PolygonService
+        data_service = PolygonService()
         
         end_date = datetime.now()
         start_date = end_date - timedelta(days=period + 50)
         
         historical_data = data_service.get_historical_data(
             symbol=symbol,
-            start_date=start_date.strftime('%Y-%m-%d'),
-            end_date=end_date.strftime('%Y-%m-%d')
+            from_date=start_date.strftime('%Y-%m-%d'),
+            to_date=end_date.strftime('%Y-%m-%d')
         )
         
         if not historical_data:

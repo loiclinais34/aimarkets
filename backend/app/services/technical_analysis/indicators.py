@@ -35,7 +35,9 @@ class TechnicalIndicators:
             Série pandas contenant les valeurs RSI
         """
         try:
-            return pd.Series(talib.RSI(prices.values, timeperiod=period), index=prices.index)
+            # Convertir en float64 pour TA-Lib
+            prices_float = prices.astype('float64')
+            return pd.Series(talib.RSI(prices_float.values, timeperiod=period), index=prices.index)
         except Exception as e:
             logger.error(f"Erreur lors du calcul du RSI: {e}")
             return pd.Series(index=prices.index, dtype=float)
@@ -55,8 +57,10 @@ class TechnicalIndicators:
             Dictionnaire contenant MACD, signal et histogramme
         """
         try:
+            # Convertir en float64 pour TA-Lib
+            prices_float = prices.astype('float64')
             macd_line, signal_line, histogram = talib.MACD(
-                prices.values, 
+                prices_float.values, 
                 fastperiod=fast, 
                 slowperiod=slow, 
                 signalperiod=signal
@@ -89,8 +93,10 @@ class TechnicalIndicators:
             Dictionnaire contenant les bandes supérieure, moyenne et inférieure
         """
         try:
+            # Convertir en float64 pour TA-Lib
+            prices_float = prices.astype('float64')
             upper, middle, lower = talib.BBANDS(
-                prices.values, 
+                prices_float.values, 
                 timeperiod=period, 
                 nbdevup=std_dev, 
                 nbdevdn=std_dev
@@ -126,10 +132,14 @@ class TechnicalIndicators:
             Dictionnaire contenant %K et %D
         """
         try:
+            # Convertir en float64 pour TA-Lib
+            high_float = high.astype('float64')
+            low_float = low.astype('float64')
+            close_float = close.astype('float64')
             k_percent, d_percent = talib.STOCH(
-                high.values, 
-                low.values, 
-                close.values,
+                high_float.values, 
+                low_float.values, 
+                close_float.values,
                 fastk_period=k_period,
                 slowk_period=d_period,
                 slowd_period=d_period
@@ -161,8 +171,12 @@ class TechnicalIndicators:
             Série pandas contenant les valeurs Williams %R
         """
         try:
+            # Convertir en float64 pour TA-Lib
+            high_float = high.astype('float64')
+            low_float = low.astype('float64')
+            close_float = close.astype('float64')
             return pd.Series(
-                talib.WILLR(high.values, low.values, close.values, timeperiod=period),
+                talib.WILLR(high_float.values, low_float.values, close_float.values, timeperiod=period),
                 index=close.index
             )
         except Exception as e:
@@ -184,8 +198,12 @@ class TechnicalIndicators:
             Série pandas contenant les valeurs CCI
         """
         try:
+            # Convertir en float64 pour TA-Lib
+            high_float = high.astype('float64')
+            low_float = low.astype('float64')
+            close_float = close.astype('float64')
             return pd.Series(
-                talib.CCI(high.values, low.values, close.values, timeperiod=period),
+                talib.CCI(high_float.values, low_float.values, close_float.values, timeperiod=period),
                 index=close.index
             )
         except Exception as e:
@@ -207,9 +225,13 @@ class TechnicalIndicators:
             Dictionnaire contenant ADX, +DI et -DI
         """
         try:
-            adx_values = talib.ADX(high.values, low.values, close.values, timeperiod=period)
-            plus_di = talib.PLUS_DI(high.values, low.values, close.values, timeperiod=period)
-            minus_di = talib.MINUS_DI(high.values, low.values, close.values, timeperiod=period)
+            # Convertir en float64 pour TA-Lib
+            high_float = high.astype('float64')
+            low_float = low.astype('float64')
+            close_float = close.astype('float64')
+            adx_values = talib.ADX(high_float.values, low_float.values, close_float.values, timeperiod=period)
+            plus_di = talib.PLUS_DI(high_float.values, low_float.values, close_float.values, timeperiod=period)
+            minus_di = talib.MINUS_DI(high_float.values, low_float.values, close_float.values, timeperiod=period)
             
             return {
                 'adx': pd.Series(adx_values, index=close.index),
@@ -240,8 +262,11 @@ class TechnicalIndicators:
             Série pandas contenant les valeurs Parabolic SAR
         """
         try:
+            # Convertir en float64 pour TA-Lib
+            high_float = high.astype('float64')
+            low_float = low.astype('float64')
             return pd.Series(
-                talib.SAR(high.values, low.values, acceleration=acceleration, maximum=maximum),
+                talib.SAR(high_float.values, low_float.values, acceleration=acceleration, maximum=maximum),
                 index=high.index
             )
         except Exception as e:

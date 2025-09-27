@@ -40,10 +40,13 @@ class GARCHModels:
             Série des rendements
         """
         try:
+            # Convertir en float64 pour éviter les erreurs de type
+            prices_float = prices.astype('float64')
+            
             if method == 'log':
-                returns = np.log(prices / prices.shift(1))
+                returns = np.log(prices_float / prices_float.shift(1))
             else:  # simple
-                returns = (prices - prices.shift(1)) / prices.shift(1)
+                returns = (prices_float - prices_float.shift(1)) / prices_float.shift(1)
             
             return returns.dropna()
         except Exception as e:
@@ -400,10 +403,10 @@ class GARCHModels:
                 "volatility_forecast": volatility_forecast,
                 "clustering_analysis": clustering_analysis,
                 "descriptive_stats": descriptive_stats,
-                "analysis_timestamp": pd.Timestamp.now(),
+                "analysis_timestamp": pd.Timestamp.now().isoformat(),
                 "data_period": {
-                    "start": returns.index[0],
-                    "end": returns.index[-1],
+                    "start": returns.index[0].isoformat() if hasattr(returns.index[0], 'isoformat') else str(returns.index[0]),
+                    "end": returns.index[-1].isoformat() if hasattr(returns.index[-1], 'isoformat') else str(returns.index[-1]),
                     "duration_days": (returns.index[-1] - returns.index[0]).days
                 }
             }

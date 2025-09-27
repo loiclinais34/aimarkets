@@ -9,11 +9,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
 
 from ...core.database import get_db
 from ...services.sentiment_analysis import GARCHModels, MonteCarloSimulation, MarkovChainAnalysis, VolatilityForecaster
 from ...models.sentiment_analysis import SentimentAnalysis, GARCHModels as GARCHModelsModel, MonteCarloSimulations, MarkovChainAnalysis as MarkovChainAnalysisModel, VolatilityForecasts
+from ...utils.json_encoder import make_json_safe
 
 router = APIRouter()
 
@@ -39,16 +41,16 @@ async def get_garch_analysis(
     """
     try:
         # Récupérer les données historiques
-        from ...services.data_service import DataService
-        data_service = DataService(db)
+        from ...services.polygon_service import PolygonService
+        data_service = PolygonService()
         
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=period + 50)
+        start_date = end_date - timedelta(days=365)  # 1 an de données pour GARCH
         
         historical_data = data_service.get_historical_data(
             symbol=symbol,
-            start_date=start_date.strftime('%Y-%m-%d'),
-            end_date=end_date.strftime('%Y-%m-%d')
+            from_date=start_date.strftime('%Y-%m-%d'),
+            to_date=end_date.strftime('%Y-%m-%d')
         )
         
         if not historical_data:
@@ -65,23 +67,23 @@ async def get_garch_analysis(
         # Calculer les rendements
         returns = GARCHModels.calculate_returns(df['close'])
         
-        if len(returns) < 50:
+        if len(returns) < 100:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Pas assez de données pour ajuster un modèle GARCH"
+                detail=f"Pas assez de données pour ajuster un modèle GARCH. Requis: 100, Disponible: {len(returns)}"
             )
         
         # Effectuer l'analyse GARCH
         garch_analysis = GARCHModels.comprehensive_analysis(returns)
         
-        return {
+        return make_json_safe({
             "symbol": symbol,
             "analysis_date": datetime.now().isoformat(),
             "model_type": model_type,
             "period": period,
             "analysis": garch_analysis,
             "current_price": float(df['close'].iloc[-1])
-        }
+        })
         
     except Exception as e:
         raise HTTPException(
@@ -111,16 +113,16 @@ async def get_monte_carlo_simulation(
     """
     try:
         # Récupérer les données historiques
-        from ...services.data_service import DataService
-        data_service = DataService(db)
+        from ...services.polygon_service import PolygonService
+        data_service = PolygonService()
         
         end_date = datetime.now()
         start_date = end_date - timedelta(days=252 + 50)  # 1 an de données
         
         historical_data = data_service.get_historical_data(
             symbol=symbol,
-            start_date=start_date.strftime('%Y-%m-%d'),
-            end_date=end_date.strftime('%Y-%m-%d')
+            from_date=start_date.strftime('%Y-%m-%d'),
+            to_date=end_date.strftime('%Y-%m-%d')
         )
         
         if not historical_data:
@@ -186,16 +188,16 @@ async def get_markov_analysis(
     """
     try:
         # Récupérer les données historiques
-        from ...services.data_service import DataService
-        data_service = DataService(db)
+        from ...services.polygon_service import PolygonService
+        data_service = PolygonService()
         
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=period + 50)
+        start_date = end_date - timedelta(days=365)  # 1 an de données pour GARCH
         
         historical_data = data_service.get_historical_data(
             symbol=symbol,
-            start_date=start_date.strftime('%Y-%m-%d'),
-            end_date=end_date.strftime('%Y-%m-%d')
+            from_date=start_date.strftime('%Y-%m-%d'),
+            to_date=end_date.strftime('%Y-%m-%d')
         )
         
         if not historical_data:
@@ -258,16 +260,16 @@ async def get_volatility_forecast(
     """
     try:
         # Récupérer les données historiques
-        from ...services.data_service import DataService
-        data_service = DataService(db)
+        from ...services.polygon_service import PolygonService
+        data_service = PolygonService()
         
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=period + 50)
+        start_date = end_date - timedelta(days=365)  # 1 an de données pour GARCH
         
         historical_data = data_service.get_historical_data(
             symbol=symbol,
-            start_date=start_date.strftime('%Y-%m-%d'),
-            end_date=end_date.strftime('%Y-%m-%d')
+            from_date=start_date.strftime('%Y-%m-%d'),
+            to_date=end_date.strftime('%Y-%m-%d')
         )
         
         if not historical_data:
@@ -329,16 +331,16 @@ async def get_comprehensive_sentiment_analysis(
     """
     try:
         # Récupérer les données historiques
-        from ...services.data_service import DataService
-        data_service = DataService(db)
+        from ...services.polygon_service import PolygonService
+        data_service = PolygonService()
         
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=period + 50)
+        start_date = end_date - timedelta(days=365)  # 1 an de données pour GARCH
         
         historical_data = data_service.get_historical_data(
             symbol=symbol,
-            start_date=start_date.strftime('%Y-%m-%d'),
-            end_date=end_date.strftime('%Y-%m-%d')
+            from_date=start_date.strftime('%Y-%m-%d'),
+            to_date=end_date.strftime('%Y-%m-%d')
         )
         
         if not historical_data:

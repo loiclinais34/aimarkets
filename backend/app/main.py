@@ -6,7 +6,7 @@ import uvicorn
 
 from .core.config import settings
 from .core.database import init_db, close_db
-from .api.endpoints import data, target_parameters, ml_models, lightgbm_models, lightgbm_test, symbol_metadata, backtesting, trading_strategies, model_comparison, async_model_comparison, financial_ratios
+from .api.endpoints import data, target_parameters, ml_models, lightgbm_models, lightgbm_test, symbol_metadata, backtesting, trading_strategies, model_comparison, async_model_comparison, financial_ratios, technical_analysis, sentiment_analysis, market_indicators
 
 
 @asynccontextmanager
@@ -177,6 +177,33 @@ app.include_router(
     async_model_comparison.router,
     prefix="/api/v1/model-comparison",
     tags=["Comparaison Asynchrone de Modèles"]
+)
+
+# Import du router technical_analysis
+from app.api.endpoints import technical_analysis_simple
+
+app.include_router(
+    technical_analysis_simple.router,
+    prefix="/api/v1/technical-analysis",
+    tags=["Analyse Technique"]
+)
+
+# Import du router sentiment_analysis
+from app.api.endpoints import sentiment_analysis_simple
+
+app.include_router(
+    sentiment_analysis_simple.router,
+    prefix="/api/v1/sentiment-analysis",
+    tags=["Analyse de Sentiment"]
+)
+
+# Import du router market_indicators
+from app.api.endpoints import market_indicators
+
+app.include_router(
+    market_indicators.router,
+    prefix="/api/v1/market-indicators",
+    tags=["Indicateurs de Marché"]
 )
 
 # Endpoints LightGBM temporairement désactivés à cause de problèmes de stabilité
