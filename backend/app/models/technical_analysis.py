@@ -26,8 +26,8 @@ class TechnicalSignals(Base):
     threshold_upper = Column(DECIMAL(10, 6), nullable=True)  # Seuil supérieur
     threshold_lower = Column(DECIMAL(10, 6), nullable=True)  # Seuil inférieur
     confidence = Column(DECIMAL(3, 2), nullable=True)  # Niveau de confiance
-    timestamp = Column(TIMESTAMP, server_default=func.now(), nullable=False)
-    created_at = Column(TIMESTAMP, server_default=func.now())
+    created_at = Column(TIMESTAMP, server_default=func.now(), nullable=False)
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now(), nullable=False)
 
     __table_args__ = ({"schema": "public"},)
 

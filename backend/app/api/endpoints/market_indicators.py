@@ -28,6 +28,7 @@ async def get_volatility_indicators(
 ):
     """
     Récupère les indicateurs de volatilité pour un symbole.
+    Calcule et persiste les indicateurs en base de données.
     
     Args:
         symbol: Symbole à analyser
@@ -38,44 +39,161 @@ async def get_volatility_indicators(
         Dictionnaire contenant les indicateurs de volatilité
     """
     try:
-        # Récupérer les données historiques
-        from ...services.polygon_service import PolygonService
-        data_service = PolygonService()
+        # Récupérer les données historiques depuis la base de données
+        from ...models.database import HistoricalData, TechnicalIndicators
         
-        end_date = datetime.now()
+        # Récupérer les données historiques stockées
+        end_date = datetime.now().date()
         start_date = end_date - timedelta(days=365)  # 1 an de données
         
-        historical_data = data_service.get_historical_data(
-            symbol=symbol,
-            from_date=start_date.strftime('%Y-%m-%d'),
-            to_date=end_date.strftime('%Y-%m-%d')
-        )
+        historical_records = db.query(HistoricalData).filter(
+            HistoricalData.symbol == symbol,
+            HistoricalData.date >= start_date,
+            HistoricalData.date <= end_date
+        ).order_by(HistoricalData.date).all()
         
-        if not historical_data:
+        if not historical_records:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Aucune donnée historique trouvée pour {symbol}"
+                detail=f"Aucune donnée historique trouvée pour {symbol} en base de données"
             )
         
         # Convertir en DataFrame
-        df = pd.DataFrame(historical_data)
+        data = []
+        for record in historical_records:
+            data.append({
+                'date': record.date,
+                'open': float(record.open),
+                'high': float(record.high),
+                'low': float(record.low),
+                'close': float(record.close),
+                'volume': int(record.volume)
+            })
+        
+        df = pd.DataFrame(data)
         df['date'] = pd.to_datetime(df['date'])
         df.set_index('date', inplace=True)
+        
+        # Récupérer les indicateurs techniques stockés
+        technical_records = db.query(TechnicalIndicators).filter(
+            TechnicalIndicators.symbol == symbol,
+            TechnicalIndicators.date >= start_date,
+            TechnicalIndicators.date <= end_date
+        ).order_by(TechnicalIndicators.date).all()
         
         # Effectuer l'analyse de volatilité
         volatility_analysis = VolatilityIndicators.comprehensive_volatility_analysis(
             df['close'], df['close'].pct_change().dropna()
         )
         
+        # Extraire les valeurs clés pour la persistance
+        current_volatility = volatility_analysis.get('current_volatility', 0.0)
+        current_vix = volatility_analysis.get('current_vix', 0.0)
+        vol_ratio = volatility_analysis.get('volatility_ratio', {})
+        risk_premium = volatility_analysis.get('risk_premium', {})
+        
+        # Calculer les métriques supplémentaires
+        historical_vol = volatility_analysis.get('historical_volatility', pd.Series(dtype=float))
+        historical_vol_mean = historical_vol.mean() if not historical_vol.empty else 0.0
+        historical_vol_std = historical_vol.std() if not historical_vol.empty else 0.0
+        
+        # Calculer le percentile de volatilité
+        volatility_percentile = vol_ratio.get('percentile', 50.0)
+        
+        # Calculer le ratio de volatilité
+        volatility_ratio_value = vol_ratio.get('ratio_to_mean', 1.0)
+        
+        # Déterminer le niveau de risque
+        if current_volatility > historical_vol_mean + 2 * historical_vol_std:
+            risk_level = "VERY_HIGH"
+        elif current_volatility > historical_vol_mean + historical_vol_std:
+            risk_level = "HIGH"
+        elif current_volatility > historical_vol_mean:
+            risk_level = "MEDIUM"
+        else:
+            risk_level = "LOW"
+        
+        # Préparer les données pour la persistance
+        regime_analysis = volatility_analysis.get('regime_analysis', {})
+        
+        # Nettoyer les données pour la sérialisation JSON
+        if 'regimes' in regime_analysis and hasattr(regime_analysis['regimes'], 'tolist'):
+            regime_analysis['regimes'] = regime_analysis['regimes'].tolist()
+        
+        if 'model' in regime_analysis:
+            # Supprimer le modèle sklearn qui n'est pas sérialisable
+            del regime_analysis['model']
+        
+        # Nettoyer les valeurs numériques dans regime_analysis
+        if 'regime_analysis' in regime_analysis:
+            for regime_key, regime_data in regime_analysis['regime_analysis'].items():
+                if isinstance(regime_data, dict):
+                    for key, value in regime_data.items():
+                        if hasattr(value, 'item'):  # numpy scalar
+                            regime_data[key] = value.item()
+                        elif hasattr(value, 'tolist'):  # numpy array
+                            regime_data[key] = value.tolist()
+        
+        # Nettoyer current_regime et n_regimes
+        if 'current_regime' in regime_analysis and hasattr(regime_analysis['current_regime'], 'item'):
+            regime_analysis['current_regime'] = regime_analysis['current_regime'].item()
+        if 'n_regimes' in regime_analysis and hasattr(regime_analysis['n_regimes'], 'item'):
+            regime_analysis['n_regimes'] = regime_analysis['n_regimes'].item()
+        
+        volatility_data = {
+            'symbol': symbol,
+            'analysis_date': datetime.now(),
+            'current_volatility': float(current_volatility),
+            'historical_volatility': float(historical_vol_mean),
+            'implied_volatility': float(current_vix / 100) if current_vix > 0 else None,
+            'vix_value': float(current_vix),
+            'volatility_ratio': float(volatility_ratio_value),
+            'volatility_percentile': float(volatility_percentile),
+            'volatility_skew': 0.0,  # À calculer si nécessaire
+            'risk_premium': float(risk_premium.get('risk_premium', 0.0)),
+            'risk_level': risk_level,
+            'regime_analysis': regime_analysis
+        }
+        
+        # Vérifier si un enregistrement existe déjà pour aujourd'hui
+        existing_record = db.query(VolatilityIndicatorsModel).filter(
+            VolatilityIndicatorsModel.symbol == symbol,
+            VolatilityIndicatorsModel.analysis_date >= datetime.now().date()
+        ).first()
+        
+        if existing_record:
+            # Mettre à jour l'enregistrement existant
+            for key, value in volatility_data.items():
+                if hasattr(existing_record, key):
+                    setattr(existing_record, key, value)
+            existing_record.updated_at = datetime.now()
+        else:
+            # Créer un nouvel enregistrement
+            new_record = VolatilityIndicatorsModel(**volatility_data)
+            db.add(new_record)
+        
+        # Sauvegarder en base de données
+        db.commit()
+        
         return make_json_safe({
             "symbol": symbol,
             "analysis_date": datetime.now().isoformat(),
             "period": period,
             "analysis": volatility_analysis,
-            "current_price": float(df['close'].iloc[-1])
+            "current_price": float(df['close'].iloc[-1]),
+            "persisted": True,
+            "risk_level": risk_level,
+            "volatility_metrics": {
+                "current_volatility": current_volatility,
+                "historical_mean": historical_vol_mean,
+                "volatility_ratio": volatility_ratio_value,
+                "percentile": volatility_percentile,
+                "vix": current_vix
+            }
         })
         
     except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erreur lors de l'analyse de volatilité: {str(e)}"
@@ -173,6 +291,7 @@ async def get_momentum_indicators(
 ):
     """
     Récupère les indicateurs de momentum pour un symbole.
+    Calcule et persiste les indicateurs en base de données.
     
     Args:
         symbol: Symbole à analyser
@@ -183,27 +302,38 @@ async def get_momentum_indicators(
         Dictionnaire contenant les indicateurs de momentum
     """
     try:
-        # Récupérer les données historiques
-        from ...services.polygon_service import PolygonService
-        data_service = PolygonService()
+        # Récupérer les données historiques depuis la base de données
+        from ...models.database import HistoricalData, TechnicalIndicators
         
-        end_date = datetime.now()
+        # Récupérer les données historiques stockées
+        end_date = datetime.now().date()
         start_date = end_date - timedelta(days=365)  # 1 an de données
         
-        historical_data = data_service.get_historical_data(
-            symbol=symbol,
-            from_date=start_date.strftime('%Y-%m-%d'),
-            to_date=end_date.strftime('%Y-%m-%d')
-        )
+        historical_records = db.query(HistoricalData).filter(
+            HistoricalData.symbol == symbol,
+            HistoricalData.date >= start_date,
+            HistoricalData.date <= end_date
+        ).order_by(HistoricalData.date).all()
         
-        if not historical_data:
+        if not historical_records:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Aucune donnée historique trouvée pour {symbol}"
+                detail=f"Aucune donnée historique trouvée pour {symbol} en base de données"
             )
         
         # Convertir en DataFrame
-        df = pd.DataFrame(historical_data)
+        data = []
+        for record in historical_records:
+            data.append({
+                'date': record.date,
+                'open': float(record.open),
+                'high': float(record.high),
+                'low': float(record.low),
+                'close': float(record.close),
+                'volume': int(record.volume)
+            })
+        
+        df = pd.DataFrame(data)
         df['date'] = pd.to_datetime(df['date'])
         df.set_index('date', inplace=True)
         
@@ -212,15 +342,122 @@ async def get_momentum_indicators(
             df['close'], df.get('volume')
         )
         
-        return {
+        # Extraire les valeurs clés pour la persistance
+        momentum_score = momentum_analysis.get('momentum_score', {})
+        price_momentum = momentum_analysis.get('price_momentum', {})
+        volume_momentum = momentum_analysis.get('volume_momentum', {})
+        momentum_divergence = momentum_analysis.get('momentum_divergence', {})
+        
+        # Extraire les valeurs spécifiques
+        composite_score = momentum_score.get('composite_score', 0.0)
+        momentum_class = momentum_score.get('momentum_class', 'Unknown')
+        
+        # Momentum des prix sur différentes périodes
+        price_momentum_5d = price_momentum.get('momentum_5', pd.Series(dtype=float)).iloc[-1] if 'momentum_5' in price_momentum and not price_momentum['momentum_5'].empty else None
+        price_momentum_10d = price_momentum.get('momentum_10', pd.Series(dtype=float)).iloc[-1] if 'momentum_10' in price_momentum and not price_momentum['momentum_10'].empty else None
+        price_momentum_20d = price_momentum.get('momentum_20', pd.Series(dtype=float)).iloc[-1] if 'momentum_20' in price_momentum and not price_momentum['momentum_20'].empty else None
+        price_momentum_50d = price_momentum.get('momentum_50', pd.Series(dtype=float)).iloc[-1] if 'momentum_50' in price_momentum and not price_momentum['momentum_50'].empty else None
+        
+        # Momentum du volume
+        volume_momentum_value = volume_momentum.get('volume_momentum_10', pd.Series(dtype=float)).iloc[-1] if 'volume_momentum_10' in volume_momentum and not volume_momentum['volume_momentum_10'].empty else None
+        relative_volume_value = volume_momentum.get('relative_volume_10', pd.Series(dtype=float)).iloc[-1] if 'relative_volume_10' in volume_momentum and not volume_momentum['relative_volume_10'].empty else None
+        
+        # Divergence de momentum
+        momentum_divergence_value = momentum_divergence.get('divergence', 0.0)
+        
+        # Calculer le percentile de momentum (approximation)
+        momentum_percentile = 50.0  # Valeur par défaut
+        if composite_score > 5:
+            momentum_percentile = 90.0
+        elif composite_score > 2:
+            momentum_percentile = 75.0
+        elif composite_score > 0:
+            momentum_percentile = 60.0
+        elif composite_score > -2:
+            momentum_percentile = 40.0
+        elif composite_score > -5:
+            momentum_percentile = 25.0
+        else:
+            momentum_percentile = 10.0
+        
+        # Préparer les données pour la persistance (version simplifiée)
+        analysis_details = {
+            'momentum_score': {
+                'composite_score': float(composite_score),
+                'momentum_class': momentum_class,
+                'individual_scores': momentum_score.get('individual_scores', []),
+                'volume_momentum_score': momentum_score.get('volume_momentum_score', 0.0)
+            },
+            'momentum_divergence': {
+                'divergence': float(momentum_divergence_value),
+                'signal': momentum_divergence.get('signal', 'No Data'),
+                'price_trend': momentum_divergence.get('price_trend', 0.0),
+                'momentum_trend': momentum_divergence.get('momentum_trend', 0.0)
+            },
+            'analysis_timestamp': datetime.now().isoformat()
+        }
+        
+        momentum_data = {
+            'symbol': symbol,
+            'analysis_date': datetime.now(),
+            'price_momentum_5d': float(price_momentum_5d) if price_momentum_5d is not None else None,
+            'price_momentum_10d': float(price_momentum_10d) if price_momentum_10d is not None else None,
+            'price_momentum_20d': float(price_momentum_20d) if price_momentum_20d is not None else None,
+            'price_momentum_50d': float(price_momentum_50d) if price_momentum_50d is not None else None,
+            'volume_momentum': float(volume_momentum_value) if volume_momentum_value is not None else None,
+            'relative_volume': float(relative_volume_value) if relative_volume_value is not None else None,
+            'relative_strength': None,  # À calculer si nécessaire
+            'momentum_score': float(composite_score),
+            'momentum_class': momentum_class,
+            'momentum_divergence': float(momentum_divergence_value),
+            'momentum_ranking': None,  # À calculer si nécessaire
+            'momentum_percentile': float(momentum_percentile),
+            'analysis_details': analysis_details
+        }
+        
+        # Vérifier si un enregistrement existe déjà pour aujourd'hui
+        existing_record = db.query(MomentumIndicatorsModel).filter(
+            MomentumIndicatorsModel.symbol == symbol,
+            MomentumIndicatorsModel.analysis_date >= datetime.now().date()
+        ).first()
+        
+        if existing_record:
+            # Mettre à jour l'enregistrement existant
+            for key, value in momentum_data.items():
+                if hasattr(existing_record, key):
+                    setattr(existing_record, key, value)
+            existing_record.updated_at = datetime.now()
+        else:
+            # Créer un nouvel enregistrement
+            new_record = MomentumIndicatorsModel(**momentum_data)
+            db.add(new_record)
+        
+        # Sauvegarder en base de données
+        db.commit()
+        
+        return make_json_safe({
             "symbol": symbol,
             "analysis_date": datetime.now().isoformat(),
             "period": period,
             "analysis": momentum_analysis,
-            "current_price": float(df['close'].iloc[-1])
-        }
+            "current_price": float(df['close'].iloc[-1]),
+            "persisted": True,
+            "momentum_class": momentum_class,
+            "momentum_metrics": {
+                "composite_score": composite_score,
+                "price_momentum_5d": price_momentum_5d,
+                "price_momentum_10d": price_momentum_10d,
+                "price_momentum_20d": price_momentum_20d,
+                "price_momentum_50d": price_momentum_50d,
+                "volume_momentum": volume_momentum_value,
+                "relative_volume": relative_volume_value,
+                "momentum_divergence": momentum_divergence_value,
+                "momentum_percentile": momentum_percentile
+            }
+        })
         
     except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erreur lors de l'analyse de momentum: {str(e)}"

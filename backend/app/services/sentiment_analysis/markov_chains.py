@@ -90,7 +90,8 @@ class MarkovChainAnalysis:
                 "state_info": state_info,
                 "state_analysis": state_analysis,
                 "method": method,
-                "n_states": n_states
+                "n_states": n_states,
+                "state_labels": list(range(n_states))
             }
             
         except Exception as e:

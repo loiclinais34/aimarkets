@@ -23,6 +23,14 @@ from .patterns import CandlestickPatterns
 
 logger = logging.getLogger(__name__)
 
+# Import des modèles de sentiment pour la Phase 3
+try:
+    from app.services.sentiment_analysis import GARCHModels, MonteCarloSimulation, MarkovChainAnalysis, VolatilityForecaster
+    SENTIMENT_ANALYSIS_AVAILABLE = True
+except ImportError:
+    SENTIMENT_ANALYSIS_AVAILABLE = False
+    logger.warning("Modèles de sentiment non disponibles - Phase 3 non intégrée")
+
 
 class SignalType(Enum):
     """Types de signaux possibles."""
@@ -456,6 +464,10 @@ class AdvancedSignalGenerator:
             # Détecter tous les patterns
             patterns = self.patterns.detect_all_patterns(open_prices, high, low, close)
             
+            # Analyser les modèles de sentiment (Phase 3)
+            returns = close.pct_change().dropna()
+            sentiment_analysis = self._analyze_sentiment_models(close, returns)
+            
             # Générer les signaux individuels améliorés
             individual_signals = []
             weights = self.calculate_dynamic_weights(symbol)
@@ -759,12 +771,16 @@ class AdvancedSignalGenerator:
                 strength=strength,
                 timestamp=datetime.now(),
                 indicators_used=[s['indicator'] for s in individual_signals],
-                reasoning=f"Signal {signal_type.value} basé sur {len(individual_signals)} indicateurs",
+                reasoning=f"Signal {signal_type.value} basé sur {len(individual_signals)} indicateurs" + 
+                         (f" + sentiment ({sentiment_analysis['reasoning']})" if sentiment_analysis['sentiment_available'] else ""),
                 individual_signals=individual_signals,
                 ml_signal=ml_signal,
                 risk_level="MEDIUM",  # TODO: Calculer basé sur la volatilité
                 time_horizon="SHORT_TERM"  # TODO: Déterminer basé sur les indicateurs
             )
+            
+            # Ajouter les analyses de sentiment au résultat
+            result.sentiment_analysis = sentiment_analysis
             
             # Ajouter à l'historique
             self.signal_history.append(result)
@@ -929,3 +945,91 @@ class AdvancedSignalGenerator:
         except Exception as e:
             logger.error(f"Erreur lors de l'export de l'historique: {e}")
             return False
+    
+    def _analyze_sentiment_models(self, prices: pd.Series, returns: pd.Series) -> Dict[str, Any]:
+        """
+        Analyse les modèles de sentiment pour enrichir les signaux techniques.
+        
+        Args:
+            prices: Série des prix
+            returns: Série des rendements
+            
+        Returns:
+            Dictionnaire contenant les analyses de sentiment
+        """
+        if not SENTIMENT_ANALYSIS_AVAILABLE:
+            return {
+                "sentiment_available": False,
+                "reasoning": "Modèles de sentiment non disponibles"
+            }
+        
+        try:
+            sentiment_analysis = {}
+            
+            # Analyse GARCH
+            try:
+                garch_analyzer = GARCHModels()
+                garch_result = garch_analyzer.fit_garch(returns, model_type="GARCH")
+                sentiment_analysis["garch"] = {
+                    "volatility_forecast": garch_result.get("volatility_forecast", 0),
+                    "var_95": garch_result.get("var_95", 0),
+                    "var_99": garch_result.get("var_99", 0),
+                    "confidence": min(abs(garch_result.get("var_95", 0)) * 2, 1.0)
+                }
+            except Exception as e:
+                logger.warning(f"Erreur analyse GARCH: {e}")
+                sentiment_analysis["garch"] = {"error": str(e)}
+            
+            # Simulation Monte Carlo
+            try:
+                mc_simulator = MonteCarloSimulation()
+                volatility = returns.std() * np.sqrt(252)
+                drift = returns.mean() * 252
+                
+                paths = mc_simulator.simulate_price_paths(
+                    current_price=float(prices.iloc[-1]),
+                    volatility=volatility,
+                    drift=drift,
+                    time_horizon=30,
+                    simulations=5000
+                )
+                
+                var_95 = mc_simulator.calculate_var(paths, 0.05)
+                var_99 = mc_simulator.calculate_var(paths, 0.01)
+                
+                sentiment_analysis["monte_carlo"] = {
+                    "var_95": var_95,
+                    "var_99": var_99,
+                    "volatility": volatility,
+                    "risk_level": "HIGH" if abs(var_95) > 0.15 else "MEDIUM" if abs(var_95) > 0.10 else "LOW"
+                }
+            except Exception as e:
+                logger.warning(f"Erreur simulation Monte Carlo: {e}")
+                sentiment_analysis["monte_carlo"] = {"error": str(e)}
+            
+            # Chaînes de Markov
+            try:
+                markov_analyzer = MarkovChainAnalysis()
+                states_result = markov_analyzer.identify_market_states(returns, n_states=3)
+                
+                sentiment_analysis["markov"] = {
+                    "current_state": states_result["states"].iloc[-1],
+                    "n_states": states_result["n_states"],
+                    "state_labels": states_result["state_labels"]
+                }
+            except Exception as e:
+                logger.warning(f"Erreur analyse Markov: {e}")
+                sentiment_analysis["markov"] = {"error": str(e)}
+            
+            return {
+                "sentiment_available": True,
+                "analysis": sentiment_analysis,
+                "reasoning": "Analyses de sentiment intégrées avec succès"
+            }
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de l'analyse de sentiment: {e}")
+            return {
+                "sentiment_available": False,
+                "reasoning": f"Erreur analyse sentiment: {str(e)}"
+            }

@@ -44,6 +44,11 @@ class MonteCarloSimulation:
             Array 2D contenant les trajectoires simulées
         """
         try:
+            # Convertir les paramètres en float pour éviter les erreurs de type
+            current_price = float(current_price)
+            volatility = float(volatility)
+            drift = float(drift)
+            
             # Initialiser l'array des trajectoires
             paths = np.zeros((simulations, time_horizon + 1))
             paths[:, 0] = current_price
@@ -180,6 +185,49 @@ class MonteCarloSimulation:
                 "portfolio_volatility": 0.0,
                 "confidence_level": confidence_level
             }
+    
+    @staticmethod
+    def stress_test(paths: np.ndarray, stress_scenarios: Dict[str, float]) -> Dict[str, Any]:
+        """
+        Effectue des tests de stress sur les trajectoires simulées.
+        
+        Args:
+            paths: Trajectoires simulées
+            stress_scenarios: Dictionnaire des scénarios de stress
+            
+        Returns:
+            Dictionnaire contenant les résultats des tests de stress
+        """
+        try:
+            results = {}
+            
+            for scenario_name, stress_factor in stress_scenarios.items():
+                # Appliquer le facteur de stress
+                stressed_paths = paths * (1 + stress_factor)
+                
+                # Calculer les métriques de risque
+                final_prices = stressed_paths[:, -1]
+                initial_price = paths[0, 0]
+                returns = (final_prices - initial_price) / initial_price
+                
+                var_95 = np.percentile(returns, 5)
+                var_99 = np.percentile(returns, 1)
+                expected_shortfall = np.mean(returns[returns <= var_95])
+                
+                results[scenario_name] = {
+                    "stress_factor": stress_factor,
+                    "var_95": var_95,
+                    "var_99": var_99,
+                    "expected_shortfall": expected_shortfall,
+                    "mean_return": np.mean(returns),
+                    "volatility": np.std(returns)
+                }
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Erreur lors du test de stress: {e}")
+            return {}
     
     @staticmethod
     def stress_testing(paths: np.ndarray, stress_scenarios: Dict[str, float]) -> Dict[str, Any]:

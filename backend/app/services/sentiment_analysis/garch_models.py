@@ -41,7 +41,11 @@ class GARCHModels:
         """
         try:
             # Convertir en float64 pour éviter les erreurs de type
-            prices_float = prices.astype('float64')
+            # Gérer les types Decimal et autres types non-numériques
+            if hasattr(prices.iloc[0], 'item'):  # numpy scalar
+                prices_float = prices.apply(lambda x: float(x.item()) if hasattr(x, 'item') else float(x))
+            else:
+                prices_float = prices.astype('float64')
             
             if method == 'log':
                 returns = np.log(prices_float / prices_float.shift(1))
@@ -107,7 +111,7 @@ class GARCHModels:
                 "parameters": fitted_model.params.to_dict(),
                 "residuals": fitted_model.resid,
                 "conditional_volatility": fitted_model.conditional_volatility,
-                "fitted_values": fitted_model.fittedvalues
+                "fitted_values": fitted_model.fittedvalues if hasattr(fitted_model, 'fittedvalues') else fitted_model.resid
             }
             
         except Exception as e:
@@ -178,6 +182,17 @@ class GARCHModels:
             for model_type in models:
                 try:
                     result = GARCHModels.fit_garch(returns, model_type)
+                    
+                    # Convertir les pandas Series en listes pour la sérialisation JSON
+                    residuals_list = None
+                    conditional_volatility_list = None
+                    
+                    if result["residuals"] is not None and hasattr(result["residuals"], 'tolist'):
+                        residuals_list = result["residuals"].tolist()
+                    
+                    if result["conditional_volatility"] is not None and hasattr(result["conditional_volatility"], 'tolist'):
+                        conditional_volatility_list = result["conditional_volatility"].tolist()
+                    
                     results[model_type] = {
                         "aic": result["aic"],
                         "bic": result["bic"],
@@ -185,6 +200,8 @@ class GARCHModels:
                         "volatility_forecast": result["volatility_forecast"],
                         "var_95": result["var_95"],
                         "var_99": result["var_99"],
+                        "residuals": residuals_list,
+                        "conditional_volatility": conditional_volatility_list,
                         "success": True
                     }
                 except Exception as e:

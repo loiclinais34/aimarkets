@@ -49,28 +49,38 @@ async def get_technical_signals(
         Dictionnaire contenant les signaux techniques
     """
     try:
-        # Récupérer les données historiques
-        from ...services.polygon_service import PolygonService
-        data_service = PolygonService()
+        # Récupérer les données historiques depuis la base de données
+        from ...models.database import HistoricalData
         
-        # Récupérer les données OHLCV
-        end_date = datetime.now()
+        # Récupérer les données historiques stockées
+        end_date = datetime.now().date()
         start_date = end_date - timedelta(days=period + 50)  # Buffer pour les calculs
         
-        historical_data = data_service.get_historical_data(
-            symbol=symbol,
-            from_date=start_date.strftime('%Y-%m-%d'),
-            to_date=end_date.strftime('%Y-%m-%d')
-        )
+        historical_records = db.query(HistoricalData).filter(
+            HistoricalData.symbol == symbol,
+            HistoricalData.date >= start_date,
+            HistoricalData.date <= end_date
+        ).order_by(HistoricalData.date).all()
         
-        if not historical_data:
+        if not historical_records:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Aucune donnée historique trouvée pour {symbol}"
+                detail=f"Aucune donnée historique trouvée pour {symbol} en base de données"
             )
         
         # Convertir en DataFrame
-        df = pd.DataFrame(historical_data)
+        data = []
+        for record in historical_records:
+            data.append({
+                'date': record.date,
+                'open': float(record.open),
+                'high': float(record.high),
+                'low': float(record.low),
+                'close': float(record.close),
+                'volume': int(record.volume)
+            })
+        
+        df = pd.DataFrame(data)
         df['date'] = pd.to_datetime(df['date'])
         df.set_index('date', inplace=True)
         
@@ -158,6 +168,139 @@ async def get_technical_signals(
             else:
                 signals_data[key] = str(value)
         
+        # Persister les signaux techniques en base de données
+        from ...models.technical_analysis import TechnicalSignals as TechnicalSignalsModel
+        
+        # Supprimer les anciens signaux pour ce symbole (garder seulement les plus récents)
+        db.query(TechnicalSignalsModel).filter(
+            TechnicalSignalsModel.symbol == symbol,
+            TechnicalSignalsModel.created_at < datetime.now() - timedelta(hours=1)
+        ).delete()
+        
+        # Créer les nouveaux signaux
+        signals_to_save = []
+        
+        # Signal RSI
+        if 'rsi' in indicators_data and indicators_data['rsi'] is not None:
+            rsi_value = indicators_data['rsi']
+            if rsi_value > 70:
+                signal_direction = "SELL"
+                signal_strength = min(1.0, (rsi_value - 70) / 30)
+                confidence = 0.8
+            elif rsi_value < 30:
+                signal_direction = "BUY"
+                signal_strength = min(1.0, (30 - rsi_value) / 30)
+                confidence = 0.8
+            else:
+                signal_direction = "HOLD"
+                signal_strength = 0.0
+                confidence = 0.5
+            
+            signals_to_save.append(TechnicalSignalsModel(
+                symbol=symbol,
+                signal_type="RSI",
+                signal_value=float(rsi_value),
+                signal_strength=float(signal_strength),
+                signal_direction=signal_direction,
+                indicator_value=float(rsi_value),
+                threshold_upper=70.0,
+                threshold_lower=30.0,
+                confidence=float(confidence)
+            ))
+        
+        # Signal MACD
+        if 'macd' in indicators_data and indicators_data['macd']['histogram'] is not None:
+            histogram = indicators_data['macd']['histogram']
+            if histogram > 0:
+                signal_direction = "BUY"
+                signal_strength = min(1.0, abs(histogram) / 0.1)
+                confidence = 0.7
+            elif histogram < 0:
+                signal_direction = "SELL"
+                signal_strength = min(1.0, abs(histogram) / 0.1)
+                confidence = 0.7
+            else:
+                signal_direction = "HOLD"
+                signal_strength = 0.0
+                confidence = 0.5
+            
+            signals_to_save.append(TechnicalSignalsModel(
+                symbol=symbol,
+                signal_type="MACD",
+                signal_value=float(histogram),
+                signal_strength=float(signal_strength),
+                signal_direction=signal_direction,
+                indicator_value=float(histogram),
+                threshold_upper=0.1,
+                threshold_lower=-0.1,
+                confidence=float(confidence)
+            ))
+        
+        # Signal Bollinger Bands
+        if 'bollinger_bands' in indicators_data:
+            bb = indicators_data['bollinger_bands']
+            current_price = safe_float(df['close'].iloc[-1])
+            
+            if bb['upper'] and bb['lower'] and current_price:
+                if current_price > bb['upper']:
+                    signal_direction = "SELL"
+                    signal_strength = min(1.0, (current_price - bb['upper']) / (bb['upper'] - bb['lower']) * 2)
+                    confidence = 0.8
+                elif current_price < bb['lower']:
+                    signal_direction = "BUY"
+                    signal_strength = min(1.0, (bb['lower'] - current_price) / (bb['upper'] - bb['lower']) * 2)
+                    confidence = 0.8
+                else:
+                    signal_direction = "HOLD"
+                    signal_strength = 0.0
+                    confidence = 0.5
+                
+                signals_to_save.append(TechnicalSignalsModel(
+                    symbol=symbol,
+                    signal_type="BOLLINGER_BANDS",
+                    signal_value=float(current_price),
+                    signal_strength=float(signal_strength),
+                    signal_direction=signal_direction,
+                    indicator_value=float(current_price),
+                    threshold_upper=float(bb['upper']),
+                    threshold_lower=float(bb['lower']),
+                    confidence=float(confidence)
+                ))
+        
+        # Signal Stochastic
+        if 'stochastic' in indicators_data and indicators_data['stochastic']['k_percent'] is not None:
+            k_percent = indicators_data['stochastic']['k_percent']
+            if k_percent > 80:
+                signal_direction = "SELL"
+                signal_strength = min(1.0, (k_percent - 80) / 20)
+                confidence = 0.7
+            elif k_percent < 20:
+                signal_direction = "BUY"
+                signal_strength = min(1.0, (20 - k_percent) / 20)
+                confidence = 0.7
+            else:
+                signal_direction = "HOLD"
+                signal_strength = 0.0
+                confidence = 0.5
+            
+            signals_to_save.append(TechnicalSignalsModel(
+                symbol=symbol,
+                signal_type="STOCHASTIC",
+                signal_value=float(k_percent),
+                signal_strength=float(signal_strength),
+                signal_direction=signal_direction,
+                indicator_value=float(k_percent),
+                threshold_upper=80.0,
+                threshold_lower=20.0,
+                confidence=float(confidence)
+            ))
+        
+        # Sauvegarder tous les signaux
+        for signal in signals_to_save:
+            db.add(signal)
+        
+        db.commit()
+        
         return {
             "symbol": symbol,
             "analysis_date": datetime.now().isoformat(),
@@ -178,11 +321,13 @@ async def get_technical_signals(
                 "resistance_levels": [safe_float(level) for level in support_resistance.get('resistance_levels', [])]
             },
             "composite_signal": signals_data,
+            "persisted_signals": len(signals_to_save),
             "current_price": safe_float(df['close'].iloc[-1]),
             "period": period
         }
         
     except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erreur lors de l'analyse technique: {str(e)}"

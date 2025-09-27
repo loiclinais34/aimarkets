@@ -47,8 +47,8 @@ class VolatilityIndicators(Base):
     risk_premium = Column(DECIMAL(10, 6), nullable=True)  # Prime de risque de volatilité
     risk_level = Column(String(20), nullable=True)  # Niveau de risque
     regime_analysis = Column(JSON, nullable=True)  # Analyse des régimes
-    timestamp = Column(TIMESTAMP, server_default=func.now(), nullable=False)
-    created_at = Column(TIMESTAMP, server_default=func.now())
+    created_at = Column(TIMESTAMP, server_default=func.now(), nullable=False)
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now(), nullable=False)
 
     __table_args__ = ({"schema": "public"},)
 
@@ -98,8 +98,8 @@ class MomentumIndicators(Base):
     momentum_ranking = Column(Integer, nullable=True)  # Classement dans le secteur
     momentum_percentile = Column(DECIMAL(5, 2), nullable=True)  # Percentile
     analysis_details = Column(JSON, nullable=True)  # Détails de l'analyse
-    timestamp = Column(TIMESTAMP, server_default=func.now(), nullable=False)
-    created_at = Column(TIMESTAMP, server_default=func.now())
+    created_at = Column(TIMESTAMP, server_default=func.now(), nullable=False)
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now(), nullable=False)
 
     __table_args__ = ({"schema": "public"},)
 

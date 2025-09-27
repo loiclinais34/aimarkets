@@ -189,10 +189,10 @@ app.include_router(
 )
 
 # Import du router sentiment_analysis
-from app.api.endpoints import sentiment_analysis_simple
+from app.api.endpoints import sentiment_analysis
 
 app.include_router(
-    sentiment_analysis_simple.router,
+    sentiment_analysis.router,
     prefix="/api/v1/sentiment-analysis",
     tags=["Analyse de Sentiment"]
 )
