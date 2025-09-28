@@ -592,7 +592,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
               />
             </BarChart>
           ) : (
-            <LineChart data={technicalData}>
+            <ComposedChart data={technicalData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis 
                 dataKey="timestamp" 
@@ -609,15 +609,21 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                 allowDataOverflow={false}
               />
               <Tooltip />
-              <Legend />
+              <Legend 
+                payload={selectedIndicator === 'bollinger' ? [
+                  { value: 'Prix', type: 'line', color: '#1f2937' },
+                  { value: 'Bollinger Supérieur', type: 'line', color: getIndicatorColor('bollinger') },
+                  { value: 'Bollinger Inférieur', type: 'line', color: getIndicatorColor('bollinger') }
+                ] : undefined}
+              />
               {selectedIndicator === 'rsi' && (
                 <>
-                  <Line 
-                    type="monotone" 
-                    dataKey="rsi" 
-                    stroke={getIndicatorColor('rsi')} 
-                    strokeWidth={2}
-                    name="RSI"
+                <Line 
+                  type="monotone" 
+                  dataKey="rsi" 
+                  stroke={getIndicatorColor('rsi')} 
+                  strokeWidth={2}
+                  name="RSI"
                     yAxisId="main"
                     dot={false}
                   />
@@ -635,12 +641,12 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
               )}
               {selectedIndicator === 'macd' && (
                 <>
-                  <Line 
-                    type="monotone" 
-                    dataKey="macd" 
-                    stroke={getIndicatorColor('macd')} 
-                    strokeWidth={2}
-                    name="MACD"
+                <Line 
+                  type="monotone" 
+                  dataKey="macd" 
+                  stroke={getIndicatorColor('macd')} 
+                  strokeWidth={2}
+                  name="MACD"
                     yAxisId="main"
                     dot={false}
                   />
@@ -658,6 +664,29 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
               )}
               {selectedIndicator === 'bollinger' && (
                 <>
+                  {/* Zone colorisée entre les bandes de Bollinger */}
+                  <Area
+                    type="monotone"
+                    dataKey="bollinger_upper"
+                    stroke="none"
+                    fill="#f59e0b"
+                    fillOpacity={0.3}
+                    yAxisId="price"
+                    connectNulls={false}
+                    isAnimationActive={false}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="bollinger_lower"
+                    stroke="none"
+                    fill="#ffffff"
+                    fillOpacity={1}
+                    yAxisId="price"
+                    connectNulls={false}
+                    isAnimationActive={false}
+                  />
+                  
+                  {/* Ligne de prix */}
                   <Line 
                     type="monotone" 
                     dataKey="price" 
@@ -667,6 +696,8 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     yAxisId="price"
                     dot={false}
                   />
+                  
+                  {/* Lignes des bandes de Bollinger */}
                   <Line 
                     type="monotone" 
                     dataKey="bollinger_upper" 
@@ -988,7 +1019,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                   )}
                 </>
               )}
-            </LineChart>
+            </ComposedChart>
           )}
         </ResponsiveContainer>
       </div>
@@ -1004,7 +1035,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
         </div>
         
         {/* Cartes des signaux */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-green-50 p-4 rounded-lg">
           <div className="flex items-center">
             <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
