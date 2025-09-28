@@ -563,6 +563,162 @@ async def search_opportunities(
             detail=f"Erreur lors de la recherche d'opportunités: {str(e)}"
         )
 
+@router.post("/generate-daily-opportunities")
+async def generate_daily_opportunities(
+    symbols: Optional[List[str]] = Query(None, description="Liste des symboles à analyser (optionnel)"),
+    limit_symbols: int = Query(50, ge=1, le=200, description="Nombre maximum de symboles à analyser"),
+    time_horizon: int = Query(30, ge=1, le=365, description="Horizon temporel en jours"),
+    include_ml: bool = Query(True, description="Inclure l'analyse ML"),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Génère les opportunités du jour pour tous les symboles disponibles
+    
+    Args:
+        symbols: Liste des symboles à analyser (si None, utilise tous les symboles disponibles)
+        limit_symbols: Nombre maximum de symboles à analyser
+        time_horizon: Horizon temporel en jours
+        include_ml: Inclure l'analyse ML
+        
+    Returns:
+        Dict contenant les opportunités générées avec statistiques
+    """
+    try:
+        from app.models.database import HistoricalData
+        from datetime import date
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        logger.info("Démarrage de la génération des opportunités du jour")
+        
+        # Récupérer les symboles disponibles
+        if symbols:
+            # Utiliser les symboles fournis
+            available_symbols = [sym.upper() for sym in symbols]
+        else:
+            # Récupérer tous les symboles disponibles depuis la base de données
+            symbol_query = db.query(HistoricalData.symbol).distinct().limit(limit_symbols)
+            available_symbols = [row.symbol for row in symbol_query.all()]
+        
+        if not available_symbols:
+            raise HTTPException(
+                status_code=404,
+                detail="Aucun symbole disponible pour l'analyse"
+            )
+        
+        logger.info(f"Analyse de {len(available_symbols)} symboles: {available_symbols[:10]}...")
+        
+        # Générer les opportunités pour chaque symbole
+        opportunities = []
+        errors = []
+        
+        for symbol in available_symbols:
+            try:
+                # Effectuer l'analyse complète avec les optimisations récentes
+                result = await advanced_analyzer.analyze_opportunity(
+                    symbol=symbol,
+                    time_horizon=time_horizon,
+                    include_ml=include_ml,
+                    db=db
+                )
+                
+                # Ajouter l'opportunité à la liste
+                opportunities.append({
+                    "symbol": symbol,
+                    "analysis_date": result.analysis_date,
+                    "recommendation": result.recommendation,
+                    "risk_level": result.risk_level,
+                    "composite_score": result.composite_score,
+                    "confidence_level": result.confidence_level,
+                    "scores": {
+                        "technical": result.technical_score,
+                        "sentiment": result.sentiment_score,
+                        "market": result.market_score,
+                        "ml": result.ml_score,
+                        "candlestick": result.candlestick_score,
+                        "garch": result.garch_score,
+                        "monte_carlo": result.monte_carlo_score,
+                        "markov": result.markov_score,
+                        "volatility": result.volatility_score
+                    },
+                    "analysis_details": {
+                        "technical": result.technical_analysis,
+                        "sentiment": result.sentiment_analysis,
+                        "market": result.market_indicators,
+                        "ml": result.ml_analysis,
+                        "candlestick": result.candlestick_analysis,
+                        "garch": result.garch_analysis,
+                        "monte_carlo": result.monte_carlo_analysis,
+                        "markov": result.markov_analysis,
+                        "volatility": result.volatility_analysis
+                    }
+                })
+                
+            except Exception as e:
+                logger.warning(f"Erreur lors de l'analyse de {symbol}: {e}")
+                errors.append({
+                    "symbol": symbol,
+                    "error": str(e)
+                })
+                continue
+        
+        # Trier par score composite décroissant
+        opportunities.sort(key=lambda x: x["composite_score"], reverse=True)
+        
+        # Calculer les statistiques
+        total_analyzed = len(opportunities)
+        total_errors = len(errors)
+        
+        # Statistiques par recommandation
+        recommendation_stats = {}
+        for opp in opportunities:
+            rec = opp["recommendation"]
+            if rec not in recommendation_stats:
+                recommendation_stats[rec] = 0
+            recommendation_stats[rec] += 1
+        
+        # Statistiques par niveau de risque
+        risk_stats = {}
+        for opp in opportunities:
+            risk = opp["risk_level"]
+            if risk not in risk_stats:
+                risk_stats[risk] = 0
+            risk_stats[risk] += 1
+        
+        # Top 10 des meilleures opportunités
+        top_opportunities = opportunities[:10]
+        
+        logger.info(f"Génération terminée: {total_analyzed} opportunités, {total_errors} erreurs")
+        
+        return {
+            "status": "success",
+            "generation_date": date.today().isoformat(),
+            "summary": {
+                "total_symbols_requested": len(available_symbols),
+                "total_opportunities_generated": total_analyzed,
+                "total_errors": total_errors,
+                "success_rate": round((total_analyzed / len(available_symbols)) * 100, 2) if available_symbols else 0
+            },
+            "statistics": {
+                "recommendations": recommendation_stats,
+                "risk_levels": risk_stats,
+                "average_composite_score": round(sum(opp["composite_score"] for opp in opportunities) / total_analyzed, 3) if total_analyzed > 0 else 0,
+                "average_confidence": round(sum(opp["confidence_level"] for opp in opportunities) / total_analyzed, 3) if total_analyzed > 0 else 0
+            },
+            "top_opportunities": top_opportunities,
+            "all_opportunities": opportunities,
+            "errors": errors
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur lors de la génération des opportunités du jour: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la génération des opportunités du jour: {str(e)}"
+        )
+
 @router.get("/health")
 async def health_check():
     """Vérification de l'état du service d'analyse avancée"""
