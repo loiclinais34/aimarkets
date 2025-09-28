@@ -585,7 +585,7 @@ async def generate_daily_opportunities(
     """
     try:
         from app.models.database import HistoricalData
-        from datetime import date
+        from datetime import date, datetime
         import logging
         
         logger = logging.getLogger(__name__)
@@ -622,7 +622,57 @@ async def generate_daily_opportunities(
                     db=db
                 )
                 
-                # Ajouter l'opportunité à la liste
+                # Sauvegarder l'opportunité en base de données
+                from app.models.advanced_opportunities import AdvancedOpportunity
+                from sqlalchemy import func
+                
+                # Vérifier si une opportunité existe déjà pour ce symbole aujourd'hui
+                existing_opportunity = db.query(AdvancedOpportunity).filter(
+                    AdvancedOpportunity.symbol == symbol,
+                    func.date(AdvancedOpportunity.updated_at) == date.today()
+                ).first()
+                
+                if existing_opportunity:
+                    # Mettre à jour l'opportunité existante
+                    existing_opportunity.analysis_date = result.analysis_date
+                    existing_opportunity.recommendation = result.recommendation
+                    existing_opportunity.risk_level = result.risk_level
+                    existing_opportunity.composite_score = result.composite_score
+                    existing_opportunity.confidence_level = result.confidence_level
+                    existing_opportunity.technical_score = result.technical_score
+                    existing_opportunity.sentiment_score = result.sentiment_score
+                    existing_opportunity.market_score = result.market_score
+                    existing_opportunity.ml_score = result.ml_score
+                    existing_opportunity.candlestick_score = result.candlestick_score
+                    existing_opportunity.garch_score = result.garch_score
+                    existing_opportunity.monte_carlo_score = result.monte_carlo_score
+                    existing_opportunity.markov_score = result.markov_score
+                    existing_opportunity.volatility_score = result.volatility_score
+                    existing_opportunity.updated_at = datetime.now()
+                else:
+                    # Créer une nouvelle opportunité
+                    new_opportunity = AdvancedOpportunity(
+                        symbol=symbol,
+                        analysis_date=result.analysis_date,
+                        recommendation=result.recommendation,
+                        risk_level=result.risk_level,
+                        composite_score=result.composite_score,
+                        confidence_level=result.confidence_level,
+                        technical_score=result.technical_score,
+                        sentiment_score=result.sentiment_score,
+                        market_score=result.market_score,
+                        ml_score=result.ml_score,
+                        candlestick_score=result.candlestick_score,
+                        garch_score=result.garch_score,
+                        monte_carlo_score=result.monte_carlo_score,
+                        markov_score=result.markov_score,
+                        volatility_score=result.volatility_score,
+                        created_at=datetime.now(),
+                        updated_at=datetime.now()
+                    )
+                    db.add(new_opportunity)
+                
+                # Ajouter l'opportunité à la liste de réponse
                 opportunities.append({
                     "symbol": symbol,
                     "analysis_date": result.analysis_date,
@@ -661,6 +711,18 @@ async def generate_daily_opportunities(
                     "error": str(e)
                 })
                 continue
+        
+        # Sauvegarder toutes les modifications en base
+        try:
+            db.commit()
+            logger.info(f"Opportunités sauvegardées en base de données")
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Erreur lors de la sauvegarde: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Erreur lors de la sauvegarde des opportunités: {str(e)}"
+            )
         
         # Trier par score composite décroissant
         opportunities.sort(key=lambda x: x["composite_score"], reverse=True)
