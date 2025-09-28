@@ -12,7 +12,7 @@ Ce service orchestre tous les services d'analyse développés dans les phases pr
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Any, Optional, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import logging
 from dataclasses import dataclass
 from sqlalchemy.orm import Session
@@ -70,7 +70,8 @@ class AdvancedTradingAnalysis:
         symbol: str, 
         time_horizon: int = 30,
         include_ml: bool = True,
-        db: Session = None
+        db: Session = None,
+        target_date: date = None
     ) -> AnalysisResult:
         """
         Analyse complète d'une opportunité d'investissement
@@ -88,13 +89,13 @@ class AdvancedTradingAnalysis:
             self.logger.info(f"Starting comprehensive analysis for {symbol}")
             
             # Analyse technique simplifiée
-            technical_score, technical_analysis = await self._analyze_technical(symbol, db)
+            technical_score, technical_analysis = await self._analyze_technical(symbol, db, target_date)
             
             # Analyse de sentiment simplifiée
-            sentiment_score, sentiment_analysis = await self._analyze_sentiment(symbol, db)
+            sentiment_score, sentiment_analysis = await self._analyze_sentiment(symbol, db, target_date)
             
             # Analyse de marché simplifiée
-            market_score, market_indicators = await self._analyze_market(symbol, db)
+            market_score, market_indicators = await self._analyze_market(symbol, db, target_date)
             
             # Analyse des patterns de candlesticks
             candlestick_score, candlestick_analysis = await self._analyze_candlestick_patterns(symbol, db)
@@ -164,38 +165,58 @@ class AdvancedTradingAnalysis:
             self.logger.error(f"Error analyzing {symbol}: {e}")
             raise
     
-    async def _analyze_technical(self, symbol: str, db: Session) -> Tuple[float, Dict[str, Any]]:
+    async def _analyze_technical(self, symbol: str, db: Session, target_date: date = None) -> Tuple[float, Dict[str, Any]]:
         """Analyse technique robuste basée sur l'historique des indicateurs avec scoring multi-dimensionnel"""
         try:
             # Récupérer l'historique des indicateurs techniques (60 jours pour les Z-scores)
-            # Filtrer par la date de dernière mise à jour pour ne garder que les derniers calculs
+            # Pour les opportunités historiques, utiliser les données disponibles à la date cible
             from sqlalchemy import func
             
-            # Récupérer la date de dernière mise à jour pour ce symbole
-            max_updated_at = db.query(func.max(TechnicalIndicators.updated_at))\
-                .filter(TechnicalIndicators.symbol == symbol)\
-                .scalar()
-            
-            if not max_updated_at:
-                return 0.5, {"status": "no_data", "message": "No technical indicators found"}
-            
-            # Récupérer les indicateurs avec la dernière mise à jour
-            indicators_history = db.query(TechnicalIndicators)\
-                .filter(TechnicalIndicators.symbol == symbol)\
-                .filter(TechnicalIndicators.updated_at == max_updated_at)\
-                .order_by(TechnicalIndicators.date.desc())\
-                .limit(60)\
-                .all()
+            if target_date:
+                # Pour les opportunités historiques, récupérer les indicateurs disponibles à cette date
+                indicators_history = db.query(TechnicalIndicators)\
+                    .filter(TechnicalIndicators.symbol == symbol)\
+                    .filter(TechnicalIndicators.date <= target_date)\
+                    .order_by(TechnicalIndicators.date.desc())\
+                    .limit(60)\
+                    .all()
+            else:
+                # Pour les opportunités en temps réel, utiliser la logique existante
+                # Récupérer la date de dernière mise à jour pour ce symbole
+                max_updated_at = db.query(func.max(TechnicalIndicators.updated_at))\
+                    .filter(TechnicalIndicators.symbol == symbol)\
+                    .scalar()
+                
+                if not max_updated_at:
+                    return 0.5, {"status": "no_data", "message": "No technical indicators found"}
+                
+                # Récupérer les indicateurs avec la dernière mise à jour
+                indicators_history = db.query(TechnicalIndicators)\
+                    .filter(TechnicalIndicators.symbol == symbol)\
+                    .filter(TechnicalIndicators.updated_at == max_updated_at)\
+                    .order_by(TechnicalIndicators.date.desc())\
+                    .limit(60)\
+                    .all()
             
             if not indicators_history:
                 return 0.5, {"status": "no_data", "message": "No technical indicators found"}
             
             # Récupérer l'historique des prix (60 jours)
-            price_history = db.query(HistoricalData)\
-                .filter(HistoricalData.symbol == symbol)\
-                .order_by(HistoricalData.date.desc())\
-                .limit(60)\
-                .all()
+            if target_date:
+                # Pour les opportunités historiques, récupérer les prix disponibles à cette date
+                price_history = db.query(HistoricalData)\
+                    .filter(HistoricalData.symbol == symbol)\
+                    .filter(HistoricalData.date <= target_date)\
+                    .order_by(HistoricalData.date.desc())\
+                    .limit(60)\
+                    .all()
+            else:
+                # Pour les opportunités en temps réel, utiliser la logique existante
+                price_history = db.query(HistoricalData)\
+                    .filter(HistoricalData.symbol == symbol)\
+                    .order_by(HistoricalData.date.desc())\
+                    .limit(60)\
+                    .all()
             
             if not price_history:
                 return 0.5, {"status": "no_price_data", "message": "No price history found"}
@@ -291,41 +312,50 @@ class AdvancedTradingAnalysis:
             }
             
             return normalized_score, analysis
-            
+                
         except Exception as e:
             self.logger.error(f"Error in technical analysis for {symbol}: {e}")
             return 0.5, {"error": str(e)}
     
-    async def _analyze_sentiment(self, symbol: str, db: Session) -> Tuple[float, Dict[str, Any]]:
+    async def _analyze_sentiment(self, symbol: str, db: Session, target_date: date = None) -> Tuple[float, Dict[str, Any]]:
         """Analyse de sentiment basée sur les vrais indicateurs"""
         try:
-            # Récupérer la date de dernière mise à jour pour ce symbole
-            from sqlalchemy import func
-            max_updated_at = db.query(func.max(SentimentIndicators.updated_at))\
-                .filter(SentimentIndicators.symbol == symbol)\
-                .scalar()
-            
-            if not max_updated_at:
-                return 0.5, {"status": "no_data", "message": "No sentiment indicators found"}
-            
-            # Récupérer les indicateurs de sentiment depuis la base avec la dernière mise à jour
-            # Chercher les données les plus récentes non-neutres (différentes de 50.0)
-            indicators = db.query(SentimentIndicators)\
-                .filter(SentimentIndicators.symbol == symbol)\
-                .filter(SentimentIndicators.updated_at == max_updated_at)\
-                .filter(SentimentIndicators.sentiment_score_normalized != 50.0)\
-                .order_by(SentimentIndicators.date.desc())\
-                .limit(1)\
-                .first()
-            
-            # Si pas de données non-neutres, prendre les plus récentes avec la dernière mise à jour
-            if not indicators:
+            if target_date:
+                # Pour les opportunités historiques, récupérer les indicateurs disponibles à cette date
                 indicators = db.query(SentimentIndicators)\
                     .filter(SentimentIndicators.symbol == symbol)\
-                    .filter(SentimentIndicators.updated_at == max_updated_at)\
+                    .filter(SentimentIndicators.date <= target_date)\
                     .order_by(SentimentIndicators.date.desc())\
                     .limit(1)\
                     .first()
+            else:
+                # Pour les opportunités en temps réel, utiliser la logique existante
+                from sqlalchemy import func
+                max_updated_at = db.query(func.max(SentimentIndicators.updated_at))\
+                    .filter(SentimentIndicators.symbol == symbol)\
+                    .scalar()
+                
+                if not max_updated_at:
+                    return 0.5, {"status": "no_data", "message": "No sentiment indicators found"}
+                
+                # Récupérer les indicateurs de sentiment depuis la base avec la dernière mise à jour
+                # Chercher les données les plus récentes non-neutres (différentes de 50.0)
+                indicators = db.query(SentimentIndicators)\
+                    .filter(SentimentIndicators.symbol == symbol)\
+                    .filter(SentimentIndicators.updated_at == max_updated_at)\
+                    .filter(SentimentIndicators.sentiment_score_normalized != 50.0)\
+                    .order_by(SentimentIndicators.date.desc())\
+                    .limit(1)\
+                    .first()
+                
+                # Si pas de données non-neutres, prendre les plus récentes avec la dernière mise à jour
+                if not indicators:
+                    indicators = db.query(SentimentIndicators)\
+                        .filter(SentimentIndicators.symbol == symbol)\
+                        .filter(SentimentIndicators.updated_at == max_updated_at)\
+                        .order_by(SentimentIndicators.date.desc())\
+                        .limit(1)\
+                        .first()
             
             if not indicators:
                 return 0.5, {"status": "no_data", "message": "No sentiment indicators found"}
@@ -363,25 +393,34 @@ class AdvancedTradingAnalysis:
             self.logger.error(f"Error in sentiment analysis for {symbol}: {e}")
             return 0.5, {"error": str(e)}
     
-    async def _analyze_market(self, symbol: str, db: Session) -> Tuple[float, Dict[str, Any]]:
+    async def _analyze_market(self, symbol: str, db: Session, target_date: date = None) -> Tuple[float, Dict[str, Any]]:
         """Analyse de marché basée sur les vrais indicateurs"""
         try:
-            # Récupérer la date de dernière création pour ce symbole
-            from sqlalchemy import func
-            max_created_at = db.query(func.max(MarketIndicators.created_at))\
-                .filter(MarketIndicators.symbol == symbol)\
-                .scalar()
-            
-            if not max_created_at:
-                return 0.5, {"status": "no_data", "message": "No market indicators found"}
-            
-            # Récupérer les indicateurs de marché depuis la base avec la dernière création
-            indicators = db.query(MarketIndicators)\
-                .filter(MarketIndicators.symbol == symbol)\
-                .filter(MarketIndicators.created_at == max_created_at)\
-                .order_by(MarketIndicators.analysis_date.desc())\
-                .limit(10)\
-                .all()
+            if target_date:
+                # Pour les opportunités historiques, récupérer les indicateurs disponibles à cette date
+                indicators = db.query(MarketIndicators)\
+                    .filter(MarketIndicators.symbol == symbol)\
+                    .filter(MarketIndicators.analysis_date <= target_date)\
+                    .order_by(MarketIndicators.analysis_date.desc())\
+                    .limit(10)\
+                    .all()
+            else:
+                # Pour les opportunités en temps réel, utiliser la logique existante
+                from sqlalchemy import func
+                max_created_at = db.query(func.max(MarketIndicators.created_at))\
+                    .filter(MarketIndicators.symbol == symbol)\
+                    .scalar()
+                
+                if not max_created_at:
+                    return 0.5, {"status": "no_data", "message": "No market indicators found"}
+                
+                # Récupérer les indicateurs de marché depuis la base avec la dernière création
+                indicators = db.query(MarketIndicators)\
+                    .filter(MarketIndicators.symbol == symbol)\
+                    .filter(MarketIndicators.created_at == max_created_at)\
+                    .order_by(MarketIndicators.analysis_date.desc())\
+                    .limit(10)\
+                    .all()
             
             if not indicators:
                 return 0.5, {"status": "no_data", "message": "No market indicators found"}
@@ -938,7 +977,7 @@ class AdvancedTradingAnalysis:
             if current_price_data.volume and indicators.volume_sma_20:
                 if float(current_price_data.volume) > float(indicators.volume_sma_20):
                     points += 40
-                else:
+            else:
                     points += 20
         
         # Volume momentum (40 points max)
