@@ -26,9 +26,9 @@ class HistoricalOpportunities(Base):
     ml_score = Column(Numeric(5, 4), nullable=True)
     composite_score = Column(Numeric(5, 4), nullable=True)
     
-    recommendation = Column(String(10), nullable=True)  # BUY, SELL, HOLD
-    confidence_level = Column(String(10), nullable=True)  # LOW, MEDIUM, HIGH
-    risk_level = Column(String(10), nullable=True)  # LOW, MEDIUM, HIGH
+    recommendation = Column(String(20), nullable=True)  # BUY_STRONG, BUY_MODERATE, BUY_WEAK, HOLD, SELL_MODERATE, SELL_STRONG
+    confidence_level = Column(String(20), nullable=True)  # LOW, MEDIUM, HIGH, VERY_HIGH
+    risk_level = Column(String(20), nullable=True)  # LOW, MEDIUM, HIGH, VERY_HIGH
     
     # Données contextuelles au moment de la génération
     price_at_generation = Column(Numeric(10, 4), nullable=True)
