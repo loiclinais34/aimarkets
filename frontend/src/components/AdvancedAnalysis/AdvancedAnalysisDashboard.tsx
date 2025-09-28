@@ -154,7 +154,7 @@ const AdvancedAnalysisDashboard: React.FC<AdvancedAnalysisDashboardProps> = ({ c
   });
   
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedSearchFilters>({
-    min_score: 0.5,
+    min_score: 0.2,  // Score plus bas par défaut pour inclure les opportunités SELL
     max_risk: "HIGH",
     limit: 20,
     recommendations: "",
@@ -485,6 +485,25 @@ const AdvancedAnalysisDashboard: React.FC<AdvancedAnalysisDashboardProps> = ({ c
                       <option value="desc">Décroissant</option>
                       <option value="asc">Croissant</option>
                     </select>
+                  </div>
+                  
+                  {/* Score minimum */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Score Min ({advancedFilters.min_score || 0.5})
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={advancedFilters.min_score || 0.5}
+                      onChange={(e) => setAdvancedFilters({
+                        ...advancedFilters,
+                        min_score: parseFloat(e.target.value)
+                      })}
+                      className="w-full"
+                    />
                   </div>
                   
                   {/* Confiance minimum */}

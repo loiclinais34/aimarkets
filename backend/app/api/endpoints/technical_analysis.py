@@ -34,7 +34,7 @@ router = APIRouter()
 @router.get("/signals/{symbol}")
 async def get_technical_signals(
     symbol: str,
-    period: int = 30,
+    period: str = "1m",
     db: Session = Depends(get_db)
 ):
     """
@@ -52,9 +52,19 @@ async def get_technical_signals(
         # Récupérer les données historiques depuis la base de données
         from ...models.database import HistoricalData
         
+        # Convertir la période en jours
+        period_days = {
+            "5d": 5,
+            "10d": 10,
+            "1m": 30,
+            "3m": 90,
+            "6m": 180,
+            "1y": 365
+        }.get(period, 30)
+        
         # Récupérer les données historiques stockées
         end_date = datetime.now().date()
-        start_date = end_date - timedelta(days=period + 50)  # Buffer pour les calculs
+        start_date = end_date - timedelta(days=period_days + 100)  # Buffer pour les calculs Ichimoku (52+26+22)
         
         historical_records = db.query(HistoricalData).filter(
             HistoricalData.symbol == symbol,
@@ -132,77 +142,162 @@ async def get_technical_signals(
             except (ValueError, TypeError):
                 return None
         
-        # Préparer les indicateurs
+        # Préparer les indicateurs avec séries complètes pour les graphiques
         indicators_data = {}
         
-        # RSI
-        if 'rsi' in indicators and not indicators['rsi'].empty:
-            indicators_data['rsi'] = safe_float(indicators['rsi'].iloc[-1])
+        # Fonction pour convertir une série en format JSON
+        def series_to_json(series, max_points=None):
+            if series is None or series.empty:
+                return []
+            # Utiliser period_days comme limite ou la valeur par défaut
+            if max_points is None:
+                max_points = min(period_days, len(series))
+            # Prendre les derniers points selon la période
+            recent_series = series.tail(max_points)
+            return [
+                {
+                    "date": date.strftime('%Y-%m-%d') if hasattr(date, 'strftime') else str(date),
+                    "value": safe_float(value)
+                }
+                for date, value in recent_series.items()
+                if not pd.isna(value)
+            ]
         
-        # MACD
+        # RSI - série complète
+        if 'rsi' in indicators and not indicators['rsi'].empty:
+            indicators_data['rsi'] = {
+                "current": safe_float(indicators['rsi'].iloc[-1]),
+                "series": series_to_json(indicators['rsi'])
+            }
+        
+        # MACD - séries complètes
         if 'macd' in indicators:
             macd_data = indicators['macd']
             indicators_data['macd'] = {
-                "macd": safe_float(macd_data.get('macd', pd.Series()).iloc[-1]) if not macd_data.get('macd', pd.Series()).empty else None,
-                "signal": safe_float(macd_data.get('signal', pd.Series()).iloc[-1]) if not macd_data.get('signal', pd.Series()).empty else None,
-                "histogram": safe_float(macd_data.get('histogram', pd.Series()).iloc[-1]) if not macd_data.get('histogram', pd.Series()).empty else None
+                "current": {
+                    "macd": safe_float(macd_data.get('macd', pd.Series()).iloc[-1]) if not macd_data.get('macd', pd.Series()).empty else None,
+                    "signal": safe_float(macd_data.get('signal', pd.Series()).iloc[-1]) if not macd_data.get('signal', pd.Series()).empty else None,
+                    "histogram": safe_float(macd_data.get('histogram', pd.Series()).iloc[-1]) if not macd_data.get('histogram', pd.Series()).empty else None
+                },
+                "series": {
+                    "macd": series_to_json(macd_data.get('macd', pd.Series())),
+                    "signal": series_to_json(macd_data.get('signal', pd.Series())),
+                    "histogram": series_to_json(macd_data.get('histogram', pd.Series()))
+                }
             }
         
-        # Bollinger Bands
+        # Bollinger Bands - séries complètes
         if 'bollinger_bands' in indicators:
             bb_data = indicators['bollinger_bands']
             indicators_data['bollinger_bands'] = {
-                "upper": safe_float(bb_data.get('upper', pd.Series()).iloc[-1]) if not bb_data.get('upper', pd.Series()).empty else None,
-                "middle": safe_float(bb_data.get('middle', pd.Series()).iloc[-1]) if not bb_data.get('middle', pd.Series()).empty else None,
-                "lower": safe_float(bb_data.get('lower', pd.Series()).iloc[-1]) if not bb_data.get('lower', pd.Series()).empty else None
+                "current": {
+                    "upper": safe_float(bb_data.get('upper', pd.Series()).iloc[-1]) if not bb_data.get('upper', pd.Series()).empty else None,
+                    "middle": safe_float(bb_data.get('middle', pd.Series()).iloc[-1]) if not bb_data.get('middle', pd.Series()).empty else None,
+                    "lower": safe_float(bb_data.get('lower', pd.Series()).iloc[-1]) if not bb_data.get('lower', pd.Series()).empty else None
+                },
+                "series": {
+                    "upper": series_to_json(bb_data.get('upper', pd.Series())),
+                    "middle": series_to_json(bb_data.get('middle', pd.Series())),
+                    "lower": series_to_json(bb_data.get('lower', pd.Series()))
+                }
             }
         
-        # Stochastic
+        # Stochastic - séries complètes
         if 'stochastic' in indicators:
             stoch_data = indicators['stochastic']
             indicators_data['stochastic'] = {
-                "k_percent": safe_float(stoch_data.get('k_percent', pd.Series()).iloc[-1]) if not stoch_data.get('k_percent', pd.Series()).empty else None,
-                "d_percent": safe_float(stoch_data.get('d_percent', pd.Series()).iloc[-1]) if not stoch_data.get('d_percent', pd.Series()).empty else None
+                "current": {
+                    "k_percent": safe_float(stoch_data.get('k_percent', pd.Series()).iloc[-1]) if not stoch_data.get('k_percent', pd.Series()).empty else None,
+                    "d_percent": safe_float(stoch_data.get('d_percent', pd.Series()).iloc[-1]) if not stoch_data.get('d_percent', pd.Series()).empty else None
+                },
+                "series": {
+                    "k_percent": series_to_json(stoch_data.get('k_percent', pd.Series())),
+                    "d_percent": series_to_json(stoch_data.get('d_percent', pd.Series()))
+                }
             }
         
-        # Williams %R
+        # Williams %R - série complète
         if 'williams_r' in indicators and not indicators['williams_r'].empty:
-            indicators_data['williams_r'] = safe_float(indicators['williams_r'].iloc[-1])
+            indicators_data['williams_r'] = {
+                "current": safe_float(indicators['williams_r'].iloc[-1]),
+                "series": series_to_json(indicators['williams_r'])
+            }
         
-        # CCI (Commodity Channel Index)
+        # CCI - série complète
         if 'cci' in indicators and not indicators['cci'].empty:
-            indicators_data['cci'] = safe_float(indicators['cci'].iloc[-1])
+            indicators_data['cci'] = {
+                "current": safe_float(indicators['cci'].iloc[-1]),
+                "series": series_to_json(indicators['cci'])
+            }
         
-        # ADX (Average Directional Index)
+        # ADX - séries complètes
         if 'adx' in indicators:
             adx_data = indicators['adx']
             indicators_data['adx'] = {
-                "adx": safe_float(adx_data.get('adx', pd.Series()).iloc[-1]) if not adx_data.get('adx', pd.Series()).empty else None,
-                "plus_di": safe_float(adx_data.get('plus_di', pd.Series()).iloc[-1]) if not adx_data.get('plus_di', pd.Series()).empty else None,
-                "minus_di": safe_float(adx_data.get('minus_di', pd.Series()).iloc[-1]) if not adx_data.get('minus_di', pd.Series()).empty else None
+                "current": {
+                    "adx": safe_float(adx_data.get('adx', pd.Series()).iloc[-1]) if not adx_data.get('adx', pd.Series()).empty else None,
+                    "plus_di": safe_float(adx_data.get('plus_di', pd.Series()).iloc[-1]) if not adx_data.get('plus_di', pd.Series()).empty else None,
+                    "minus_di": safe_float(adx_data.get('minus_di', pd.Series()).iloc[-1]) if not adx_data.get('minus_di', pd.Series()).empty else None
+                },
+                "series": {
+                    "adx": series_to_json(adx_data.get('adx', pd.Series())),
+                    "plus_di": series_to_json(adx_data.get('plus_di', pd.Series())),
+                    "minus_di": series_to_json(adx_data.get('minus_di', pd.Series()))
+                }
             }
         
-        # Parabolic SAR
+        # Parabolic SAR - série complète
         if 'parabolic_sar' in indicators and not indicators['parabolic_sar'].empty:
-            indicators_data['parabolic_sar'] = safe_float(indicators['parabolic_sar'].iloc[-1])
+            indicators_data['parabolic_sar'] = {
+                "current": safe_float(indicators['parabolic_sar'].iloc[-1]),
+                "series": series_to_json(indicators['parabolic_sar'])
+            }
         
-        # Ichimoku Cloud
+        # Ichimoku Cloud - séries complètes
         if 'ichimoku' in indicators:
             ichimoku_data = indicators['ichimoku']
             indicators_data['ichimoku'] = {
-                "tenkan_sen": safe_float(ichimoku_data.get('tenkan_sen', pd.Series()).iloc[-1]) if not ichimoku_data.get('tenkan_sen', pd.Series()).empty else None,
-                "kijun_sen": safe_float(ichimoku_data.get('kijun_sen', pd.Series()).iloc[-1]) if not ichimoku_data.get('kijun_sen', pd.Series()).empty else None,
-                "senkou_span_a": safe_float(ichimoku_data.get('senkou_span_a', pd.Series()).iloc[-1]) if not ichimoku_data.get('senkou_span_a', pd.Series()).empty else None,
-                "senkou_span_b": safe_float(ichimoku_data.get('senkou_span_b', pd.Series()).iloc[-1]) if not ichimoku_data.get('senkou_span_b', pd.Series()).empty else None,
-                "chikou_span": safe_float(ichimoku_data.get('chikou_span', pd.Series()).iloc[-1]) if not ichimoku_data.get('chikou_span', pd.Series()).empty else None
+                "current": {
+                    "tenkan_sen": safe_float(ichimoku_data.get('tenkan_sen', pd.Series()).iloc[-1]) if not ichimoku_data.get('tenkan_sen', pd.Series()).empty else None,
+                    "kijun_sen": safe_float(ichimoku_data.get('kijun_sen', pd.Series()).iloc[-1]) if not ichimoku_data.get('kijun_sen', pd.Series()).empty else None,
+                    "senkou_span_a": safe_float(ichimoku_data.get('senkou_span_a', pd.Series()).iloc[-1]) if not ichimoku_data.get('senkou_span_a', pd.Series()).empty else None,
+                    "senkou_span_b": safe_float(ichimoku_data.get('senkou_span_b', pd.Series()).iloc[-1]) if not ichimoku_data.get('senkou_span_b', pd.Series()).empty else None,
+                    "chikou_span": safe_float(ichimoku_data.get('chikou_span', pd.Series()).iloc[-1]) if not ichimoku_data.get('chikou_span', pd.Series()).empty else None
+                },
+                "series": {
+                    "tenkan_sen": series_to_json(ichimoku_data.get('tenkan_sen', pd.Series())),
+                    "kijun_sen": series_to_json(ichimoku_data.get('kijun_sen', pd.Series())),
+                    "senkou_span_a": series_to_json(ichimoku_data.get('senkou_span_a', pd.Series())),
+                    "senkou_span_b": series_to_json(ichimoku_data.get('senkou_span_b', pd.Series())),
+                    "chikou_span": series_to_json(ichimoku_data.get('chikou_span', pd.Series()))
+                }
             }
         
-        # SMA 20 et 50
+        # SMA 20 et 50 - séries complètes
         if 'sma_20' in indicators and not indicators['sma_20'].empty:
-            indicators_data['sma_20'] = safe_float(indicators['sma_20'].iloc[-1])
+            indicators_data['sma_20'] = {
+                "current": safe_float(indicators['sma_20'].iloc[-1]),
+                "series": series_to_json(indicators['sma_20'])
+            }
         
         if 'sma_50' in indicators and not indicators['sma_50'].empty:
-            indicators_data['sma_50'] = safe_float(indicators['sma_50'].iloc[-1])
+            indicators_data['sma_50'] = {
+                "current": safe_float(indicators['sma_50'].iloc[-1]),
+                "series": series_to_json(indicators['sma_50'])
+            }
+        
+        # EMA 20 et 50 - séries complètes
+        if 'ema_20' in indicators and not indicators['ema_20'].empty:
+            indicators_data['ema_20'] = {
+                "current": safe_float(indicators['ema_20'].iloc[-1]),
+                "series": series_to_json(indicators['ema_20'])
+            }
+        
+        if 'ema_50' in indicators and not indicators['ema_50'].empty:
+            indicators_data['ema_50'] = {
+                "current": safe_float(indicators['ema_50'].iloc[-1]),
+                "series": series_to_json(indicators['ema_50'])
+            }
         
         # Préparer les patterns
         patterns_data = {}
@@ -245,74 +340,86 @@ async def get_technical_signals(
         signals_to_save = []
         
         # Signal RSI
-        if 'rsi' in indicators_data and indicators_data['rsi'] is not None:
-            rsi_value = indicators_data['rsi']
-            if rsi_value > 70:
-                signal_direction = "SELL"
-                signal_strength = min(1.0, (rsi_value - 70) / 30)
-                confidence = 0.8
-            elif rsi_value < 30:
-                signal_direction = "BUY"
-                signal_strength = min(1.0, (30 - rsi_value) / 30)
-                confidence = 0.8
-            else:
-                signal_direction = "HOLD"
-                signal_strength = 0.0
-                confidence = 0.5
+        if 'rsi' in indicators_data:
+            rsi_data = indicators_data['rsi']
+            rsi_value = rsi_data.get('current')
             
-            signals_to_save.append(TechnicalSignalsModel(
-                symbol=symbol,
-                signal_type="RSI",
-                signal_value=float(rsi_value),
-                signal_strength=float(signal_strength),
-                signal_direction=signal_direction,
-                indicator_value=float(rsi_value),
-                threshold_upper=70.0,
-                threshold_lower=30.0,
-                confidence=float(confidence)
-            ))
+            if rsi_value is not None:
+                if rsi_value > 70:
+                    signal_direction = "SELL"
+                    signal_strength = min(1.0, (rsi_value - 70) / 30)
+                    confidence = 0.8
+                elif rsi_value < 30:
+                    signal_direction = "BUY"
+                    signal_strength = min(1.0, (30 - rsi_value) / 30)
+                    confidence = 0.8
+                else:
+                    signal_direction = "HOLD"
+                    signal_strength = 0.0
+                    confidence = 0.5
+                
+                signals_to_save.append(TechnicalSignalsModel(
+                    symbol=symbol,
+                    signal_type="RSI",
+                    signal_value=float(rsi_value),
+                    signal_strength=float(signal_strength),
+                    signal_direction=signal_direction,
+                    indicator_value=float(rsi_value),
+                    threshold_upper=70.0,
+                    threshold_lower=30.0,
+                    confidence=float(confidence)
+                ))
         
         # Signal MACD
-        if 'macd' in indicators_data and indicators_data['macd']['histogram'] is not None:
-            histogram = indicators_data['macd']['histogram']
-            if histogram > 0:
-                signal_direction = "BUY"
-                signal_strength = min(1.0, abs(histogram) / 0.1)
-                confidence = 0.7
-            elif histogram < 0:
-                signal_direction = "SELL"
-                signal_strength = min(1.0, abs(histogram) / 0.1)
-                confidence = 0.7
-            else:
-                signal_direction = "HOLD"
-                signal_strength = 0.0
-                confidence = 0.5
+        if 'macd' in indicators_data:
+            macd_data = indicators_data['macd']
+            macd_current = macd_data.get('current', {})
+            histogram = macd_current.get('histogram')
             
-            signals_to_save.append(TechnicalSignalsModel(
-                symbol=symbol,
-                signal_type="MACD",
-                signal_value=float(histogram),
-                signal_strength=float(signal_strength),
-                signal_direction=signal_direction,
-                indicator_value=float(histogram),
-                threshold_upper=0.1,
-                threshold_lower=-0.1,
-                confidence=float(confidence)
-            ))
+            if histogram is not None:
+                if histogram > 0:
+                    signal_direction = "BUY"
+                    signal_strength = min(1.0, abs(histogram) / 0.1)
+                    confidence = 0.7
+                elif histogram < 0:
+                    signal_direction = "SELL"
+                    signal_strength = min(1.0, abs(histogram) / 0.1)
+                    confidence = 0.7
+                else:
+                    signal_direction = "HOLD"
+                    signal_strength = 0.0
+                    confidence = 0.5
+                
+                signals_to_save.append(TechnicalSignalsModel(
+                    symbol=symbol,
+                    signal_type="MACD",
+                    signal_value=float(histogram),
+                    signal_strength=float(signal_strength),
+                    signal_direction=signal_direction,
+                    indicator_value=float(histogram),
+                    threshold_upper=0.1,
+                    threshold_lower=-0.1,
+                    confidence=float(confidence)
+                ))
         
         # Signal Bollinger Bands
         if 'bollinger_bands' in indicators_data:
             bb = indicators_data['bollinger_bands']
             current_price = safe_float(df['close'].iloc[-1])
             
-            if bb['upper'] and bb['lower'] and current_price:
-                if current_price > bb['upper']:
+            # Accéder aux valeurs current du nouveau format
+            bb_current = bb.get('current', {})
+            if bb_current.get('upper') and bb_current.get('lower') and current_price:
+                upper = safe_float(bb_current['upper'])
+                lower = safe_float(bb_current['lower'])
+                
+                if current_price > upper:
                     signal_direction = "SELL"
-                    signal_strength = min(1.0, (current_price - bb['upper']) / (bb['upper'] - bb['lower']) * 2)
+                    signal_strength = min(1.0, (current_price - upper) / (upper - lower) * 2)
                     confidence = 0.8
-                elif current_price < bb['lower']:
+                elif current_price < lower:
                     signal_direction = "BUY"
-                    signal_strength = min(1.0, (bb['lower'] - current_price) / (bb['upper'] - bb['lower']) * 2)
+                    signal_strength = min(1.0, (lower - current_price) / (upper - lower) * 2)
                     confidence = 0.8
                 else:
                     signal_direction = "HOLD"
@@ -326,207 +433,228 @@ async def get_technical_signals(
                     signal_strength=float(signal_strength),
                     signal_direction=signal_direction,
                     indicator_value=float(current_price),
-                    threshold_upper=float(bb['upper']),
-                    threshold_lower=float(bb['lower']),
+                    threshold_upper=float(upper),
+                    threshold_lower=float(lower),
                     confidence=float(confidence)
                 ))
         
         # Signal Stochastic
-        if 'stochastic' in indicators_data and indicators_data['stochastic']['k_percent'] is not None:
-            k_percent = indicators_data['stochastic']['k_percent']
-            if k_percent > 80:
-                signal_direction = "SELL"
-                signal_strength = min(1.0, (k_percent - 80) / 20)
-                confidence = 0.7
-            elif k_percent < 20:
-                signal_direction = "BUY"
-                signal_strength = min(1.0, (20 - k_percent) / 20)
-                confidence = 0.7
-            else:
-                signal_direction = "HOLD"
-                signal_strength = 0.0
-                confidence = 0.5
+        if 'stochastic' in indicators_data:
+            stochastic = indicators_data['stochastic']
+            stochastic_current = stochastic.get('current', {})
+            k_percent = stochastic_current.get('k_percent')
             
-            signals_to_save.append(TechnicalSignalsModel(
-                symbol=symbol,
-                signal_type="STOCHASTIC",
-                signal_value=float(k_percent),
-                signal_strength=float(signal_strength),
-                signal_direction=signal_direction,
-                indicator_value=float(k_percent),
-                threshold_upper=80.0,
-                threshold_lower=20.0,
-                confidence=float(confidence)
-            ))
-        
-        # Signal Williams %R
-        if 'williams_r' in indicators_data and indicators_data['williams_r'] is not None:
-            williams_r = indicators_data['williams_r']
-            if williams_r > -20:
-                signal_direction = "SELL"
-                signal_strength = min(1.0, (williams_r + 20) / 20)
-                confidence = 0.6
-            elif williams_r < -80:
-                signal_direction = "BUY"
-                signal_strength = min(1.0, (-80 - williams_r) / 20)
-                confidence = 0.6
-            else:
-                signal_direction = "HOLD"
-                signal_strength = 0.0
-                confidence = 0.5
-            
-            signals_to_save.append(TechnicalSignalsModel(
-                symbol=symbol,
-                signal_type="WILLIAMS_R",
-                signal_value=float(williams_r),
-                signal_strength=float(signal_strength),
-                signal_direction=signal_direction,
-                indicator_value=float(williams_r),
-                threshold_upper=-20.0,
-                threshold_lower=-80.0,
-                confidence=float(confidence)
-            ))
-        
-        # Signal CCI
-        if 'cci' in indicators_data and indicators_data['cci'] is not None:
-            cci = indicators_data['cci']
-            if cci > 100:
-                signal_direction = "BUY"
-                signal_strength = min(1.0, (cci - 100) / 100)
-                confidence = 0.6
-            elif cci < -100:
-                signal_direction = "SELL"
-                signal_strength = min(1.0, (-100 - cci) / 100)
-                confidence = 0.6
-            else:
-                signal_direction = "HOLD"
-                signal_strength = 0.0
-                confidence = 0.5
-            
-            signals_to_save.append(TechnicalSignalsModel(
-                symbol=symbol,
-                signal_type="CCI",
-                signal_value=float(cci),
-                signal_strength=float(signal_strength),
-                signal_direction=signal_direction,
-                indicator_value=float(cci),
-                threshold_upper=100.0,
-                threshold_lower=-100.0,
-                confidence=float(confidence)
-            ))
-        
-        # Signal ADX
-        if 'adx' in indicators_data and indicators_data['adx']['adx'] is not None:
-            adx = indicators_data['adx']['adx']
-            plus_di = indicators_data['adx']['plus_di']
-            minus_di = indicators_data['adx']['minus_di']
-            
-            if adx > 25:  # Tendance forte
-                if plus_di and minus_di:
-                    if plus_di > minus_di:
-                        signal_direction = "BUY"
-                        signal_strength = min(1.0, (plus_di - minus_di) / 50)
-                        confidence = 0.8
-                    else:
-                        signal_direction = "SELL"
-                        signal_strength = min(1.0, (minus_di - plus_di) / 50)
-                        confidence = 0.8
+            if k_percent is not None:
+                if k_percent > 80:
+                    signal_direction = "SELL"
+                    signal_strength = min(1.0, (k_percent - 80) / 20)
+                    confidence = 0.7
+                elif k_percent < 20:
+                    signal_direction = "BUY"
+                    signal_strength = min(1.0, (20 - k_percent) / 20)
+                    confidence = 0.7
                 else:
                     signal_direction = "HOLD"
                     signal_strength = 0.0
                     confidence = 0.5
-            else:
-                signal_direction = "HOLD"
-                signal_strength = 0.0
-                confidence = 0.3
-            
-            signals_to_save.append(TechnicalSignalsModel(
-                symbol=symbol,
-                signal_type="ADX",
-                signal_value=float(adx),
-                signal_strength=float(signal_strength),
-                signal_direction=signal_direction,
-                indicator_value=float(adx),
-                threshold_upper=25.0,
-                threshold_lower=0.0,
-                confidence=float(confidence)
-            ))
-        
-        # Signal Parabolic SAR
-        if 'parabolic_sar' in indicators_data and indicators_data['parabolic_sar'] is not None:
-            sar = indicators_data['parabolic_sar']
-            current_price = safe_float(df['close'].iloc[-1])
-            
-            if current_price and sar:
-                if current_price > sar:
-                    signal_direction = "BUY"
-                    signal_strength = min(1.0, (current_price - sar) / current_price)
-                    confidence = 0.7
-                else:
-                    signal_direction = "SELL"
-                    signal_strength = min(1.0, (sar - current_price) / current_price)
-                    confidence = 0.7
                 
                 signals_to_save.append(TechnicalSignalsModel(
                     symbol=symbol,
-                    signal_type="PARABOLIC_SAR",
-                    signal_value=float(current_price),
+                    signal_type="STOCHASTIC",
+                    signal_value=float(k_percent),
                     signal_strength=float(signal_strength),
                     signal_direction=signal_direction,
-                    indicator_value=float(sar),
-                    threshold_upper=float(current_price),
-                    threshold_lower=float(sar),
+                    indicator_value=float(k_percent),
+                    threshold_upper=80.0,
+                    threshold_lower=20.0,
                     confidence=float(confidence)
                 ))
+        
+        # Signal Williams %R
+        if 'williams_r' in indicators_data:
+            williams_r_data = indicators_data['williams_r']
+            williams_r = williams_r_data.get('current')
+            
+            if williams_r is not None:
+                if williams_r > -20:
+                    signal_direction = "SELL"
+                    signal_strength = min(1.0, (williams_r + 20) / 20)
+                    confidence = 0.6
+                elif williams_r < -80:
+                    signal_direction = "BUY"
+                    signal_strength = min(1.0, (-80 - williams_r) / 20)
+                    confidence = 0.6
+                else:
+                    signal_direction = "HOLD"
+                    signal_strength = 0.0
+                    confidence = 0.5
+                
+                signals_to_save.append(TechnicalSignalsModel(
+                    symbol=symbol,
+                    signal_type="WILLIAMS_R",
+                    signal_value=float(williams_r),
+                    signal_strength=float(signal_strength),
+                    signal_direction=signal_direction,
+                    indicator_value=float(williams_r),
+                    threshold_upper=-20.0,
+                    threshold_lower=-80.0,
+                    confidence=float(confidence)
+                ))
+        
+        # Signal CCI
+        if 'cci' in indicators_data:
+            cci_data = indicators_data['cci']
+            cci = cci_data.get('current')
+            
+            if cci is not None:
+                if cci > 100:
+                    signal_direction = "BUY"
+                    signal_strength = min(1.0, (cci - 100) / 100)
+                    confidence = 0.6
+                elif cci < -100:
+                    signal_direction = "SELL"
+                    signal_strength = min(1.0, (-100 - cci) / 100)
+                    confidence = 0.6
+                else:
+                    signal_direction = "HOLD"
+                    signal_strength = 0.0
+                    confidence = 0.5
+                
+                signals_to_save.append(TechnicalSignalsModel(
+                    symbol=symbol,
+                    signal_type="CCI",
+                    signal_value=float(cci),
+                    signal_strength=float(signal_strength),
+                    signal_direction=signal_direction,
+                    indicator_value=float(cci),
+                    threshold_upper=100.0,
+                    threshold_lower=-100.0,
+                    confidence=float(confidence)
+                ))
+        
+        # Signal ADX
+        if 'adx' in indicators_data:
+            adx_data = indicators_data['adx']
+            adx_current = adx_data.get('current', {})
+            adx = adx_current.get('adx')
+            plus_di = adx_current.get('plus_di')
+            
+            if adx is not None and plus_di is not None:
+                minus_di = adx_current.get('minus_di')
+                
+                if adx > 25:  # Tendance forte
+                    if plus_di and minus_di:
+                        if plus_di > minus_di:
+                            signal_direction = "BUY"
+                            signal_strength = min(1.0, (plus_di - minus_di) / 50)
+                            confidence = 0.8
+                        else:
+                            signal_direction = "SELL"
+                            signal_strength = min(1.0, (minus_di - plus_di) / 50)
+                            confidence = 0.8
+                    else:
+                        signal_direction = "HOLD"
+                        signal_strength = 0.0
+                        confidence = 0.5
+                else:
+                    signal_direction = "HOLD"
+                    signal_strength = 0.0
+                    confidence = 0.3
+                
+                signals_to_save.append(TechnicalSignalsModel(
+                    symbol=symbol,
+                    signal_type="ADX",
+                    signal_value=float(adx),
+                    signal_strength=float(signal_strength),
+                    signal_direction=signal_direction,
+                    indicator_value=float(adx),
+                    threshold_upper=25.0,
+                    threshold_lower=0.0,
+                    confidence=float(confidence)
+                ))
+        
+        # Signal Parabolic SAR
+        if 'parabolic_sar' in indicators_data:
+            sar_data = indicators_data['parabolic_sar']
+            sar = sar_data.get('current')
+            
+            if sar is not None:
+                current_price = safe_float(df['close'].iloc[-1])
+                
+                if current_price and sar:
+                    if current_price > sar:
+                        signal_direction = "BUY"
+                        signal_strength = min(1.0, (current_price - sar) / current_price)
+                        confidence = 0.7
+                    else:
+                        signal_direction = "SELL"
+                        signal_strength = min(1.0, (sar - current_price) / current_price)
+                        confidence = 0.7
+                    
+                    signals_to_save.append(TechnicalSignalsModel(
+                        symbol=symbol,
+                        signal_type="PARABOLIC_SAR",
+                        signal_value=float(current_price),
+                        signal_strength=float(signal_strength),
+                        signal_direction=signal_direction,
+                        indicator_value=float(sar),
+                        threshold_upper=float(current_price),
+                        threshold_lower=float(sar),
+                        confidence=float(confidence)
+                    ))
         
         # Signal Ichimoku
         if 'ichimoku' in indicators_data:
             ichimoku = indicators_data['ichimoku']
             current_price = safe_float(df['close'].iloc[-1])
             
-            if (current_price and ichimoku['tenkan_sen'] and ichimoku['kijun_sen'] and 
-                ichimoku['senkou_span_a'] and ichimoku['senkou_span_b']):
+            # Accéder aux valeurs current du nouveau format
+            ichimoku_current = ichimoku.get('current', {})
+            if (current_price and ichimoku_current.get('tenkan_sen') and ichimoku_current.get('kijun_sen') and 
+                ichimoku_current.get('senkou_span_a') and ichimoku_current.get('senkou_span_b')):
                 
-                tenkan = ichimoku['tenkan_sen']
-                kijun = ichimoku['kijun_sen']
-                senkou_a = ichimoku['senkou_span_a']
-                senkou_b = ichimoku['senkou_span_b']
+                tenkan = safe_float(ichimoku_current['tenkan_sen'])
+                kijun = safe_float(ichimoku_current['kijun_sen'])
+                senkou_a = safe_float(ichimoku_current['senkou_span_a'])
+                senkou_b = safe_float(ichimoku_current['senkou_span_b'])
                 
-                # Logique Ichimoku simplifiée
-                if current_price > tenkan and current_price > kijun:
-                    if current_price > max(senkou_a, senkou_b):
-                        signal_direction = "BUY"
-                        signal_strength = 0.8
-                        confidence = 0.8
+                # Vérifier que toutes les valeurs sont valides
+                if not any(val is None for val in [tenkan, kijun, senkou_a, senkou_b]):
+                    # Logique Ichimoku simplifiée
+                    if current_price > tenkan and current_price > kijun:
+                        if current_price > max(senkou_a, senkou_b):
+                            signal_direction = "BUY"
+                            signal_strength = 0.8
+                            confidence = 0.8
+                        else:
+                            signal_direction = "HOLD"
+                            signal_strength = 0.3
+                            confidence = 0.6
+                    elif current_price < tenkan and current_price < kijun:
+                        if current_price < min(senkou_a, senkou_b):
+                            signal_direction = "SELL"
+                            signal_strength = 0.8
+                            confidence = 0.8
+                        else:
+                            signal_direction = "HOLD"
+                            signal_strength = 0.3
+                            confidence = 0.6
                     else:
                         signal_direction = "HOLD"
-                        signal_strength = 0.3
-                        confidence = 0.6
-                elif current_price < tenkan and current_price < kijun:
-                    if current_price < min(senkou_a, senkou_b):
-                        signal_direction = "SELL"
-                        signal_strength = 0.8
-                        confidence = 0.8
-                    else:
-                        signal_direction = "HOLD"
-                        signal_strength = 0.3
-                        confidence = 0.6
-                else:
-                    signal_direction = "HOLD"
-                    signal_strength = 0.0
-                    confidence = 0.5
-                
-                signals_to_save.append(TechnicalSignalsModel(
-                    symbol=symbol,
-                    signal_type="ICHIMOKU",
-                    signal_value=float(current_price),
-                    signal_strength=float(signal_strength),
-                    signal_direction=signal_direction,
-                    indicator_value=float(tenkan),
-                    threshold_upper=float(max(senkou_a, senkou_b)),
-                    threshold_lower=float(min(senkou_a, senkou_b)),
-                    confidence=float(confidence)
-                ))
+                        signal_strength = 0.0
+                        confidence = 0.5
+                    
+                    signals_to_save.append(TechnicalSignalsModel(
+                        symbol=symbol,
+                        signal_type="ICHIMOKU",
+                        signal_value=float(current_price),
+                        signal_strength=float(signal_strength),
+                        signal_direction=signal_direction,
+                        indicator_value=float(tenkan),
+                        threshold_upper=float(max(senkou_a, senkou_b)),
+                        threshold_lower=float(min(senkou_a, senkou_b)),
+                        confidence=float(confidence)
+                    ))
         
         # Sauvegarder tous les signaux
         for signal in signals_to_save:
@@ -607,7 +735,19 @@ async def get_technical_signals(
             "current_price": safe_float(df['close'].iloc[-1]),
             "previous_price": safe_float(df['close'].iloc[-2]) if len(df) > 1 else None,
             "last_update": df.index[-1].strftime('%Y-%m-%d %H:%M:%S') if hasattr(df.index[-1], 'strftime') else datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            "historical_prices": df[['close']].tail(30).to_dict('records'),  # 30 derniers cours
+            "historical_prices": {
+                "series": [
+                    {
+                        "date": date.strftime('%Y-%m-%d') if hasattr(date, 'strftime') else str(date),
+                        "close": safe_float(close),
+                        "open": safe_float(df.loc[date, 'open']),
+                        "high": safe_float(df.loc[date, 'high']),
+                        "low": safe_float(df.loc[date, 'low']),
+                        "volume": int(df.loc[date, 'volume'])
+                    }
+                    for date, close in df['close'].tail(period_days).items()
+                ]
+            },
             "period": period
         }
         

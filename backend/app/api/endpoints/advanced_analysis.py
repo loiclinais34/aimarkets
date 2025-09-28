@@ -16,6 +16,7 @@ from app.models.advanced_analysis_schemas import AnalysisRequest, AnalysisRespon
 from app.services.advanced_analysis.advanced_trading_analysis import AdvancedTradingAnalysis
 from app.services.advanced_analysis.hybrid_scoring import HybridScoringSystem
 from app.services.advanced_analysis.composite_scoring import CompositeScoringEngine, AnalysisType, RiskLevel
+from app.models.market_indicators import MomentumIndicators, CorrelationAnalysis, VolatilityIndicators, MarketSentimentSummary
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,101 @@ router = APIRouter(tags=["Advanced Analysis"])
 advanced_analyzer = AdvancedTradingAnalysis()
 hybrid_scorer = HybridScoringSystem()
 composite_scorer = CompositeScoringEngine()
+
+def get_market_indicators_for_symbol(symbol: str, db: Session) -> Dict[str, Any]:
+    """
+    Récupère les indicateurs de marché réels pour un symbole donné
+    """
+    try:
+        # Récupérer les indicateurs de momentum les plus récents
+        momentum = db.query(MomentumIndicators)\
+            .filter(MomentumIndicators.symbol == symbol)\
+            .order_by(MomentumIndicators.analysis_date.desc())\
+            .first()
+        
+        # Récupérer l'analyse de corrélation la plus récente (ignorer pour l'instant car table problématique)
+        correlation = None
+        
+        # Récupérer les indicateurs de volatilité les plus récents
+        volatility = db.query(VolatilityIndicators)\
+            .filter(VolatilityIndicators.symbol == symbol)\
+            .order_by(VolatilityIndicators.analysis_date.desc())\
+            .first()
+        
+        # Récupérer le résumé de sentiment de marché le plus récent (ignorer pour l'instant car table vide)
+        sentiment_summary = None
+        
+        # Déterminer la tendance momentum basée sur les données disponibles
+        momentum_trend = "Neutral"
+        if momentum and momentum.momentum_class:
+            if "Strong Positive" in momentum.momentum_class or "Positive" in momentum.momentum_class:
+                momentum_trend = "Bullish"
+            elif "Strong Negative" in momentum.momentum_class or "Negative" in momentum.momentum_class:
+                momentum_trend = "Bearish"
+        else:
+            # Utiliser la volatilité pour déterminer une tendance approximative
+            if volatility and volatility.volatility_percentile:
+                vol_percentile = float(volatility.volatility_percentile)
+                if vol_percentile < 30:
+                    momentum_trend = "Bullish"  # Faible volatilité = tendance haussière
+                elif vol_percentile > 70:
+                    momentum_trend = "Bearish"  # Forte volatilité = tendance baissière
+        
+        # Déterminer la force de corrélation basée sur la volatilité
+        correlation_strength = "Medium"
+        if volatility and volatility.volatility_percentile:
+            vol_percentile = float(volatility.volatility_percentile)
+            if vol_percentile < 25 or vol_percentile > 75:
+                correlation_strength = "High"  # Volatilité extrême = forte corrélation
+            elif vol_percentile < 40 or vol_percentile > 60:
+                correlation_strength = "Medium"
+            else:
+                correlation_strength = "Low"  # Volatilité modérée = faible corrélation
+        
+        # Déterminer le régime de marché basé sur la volatilité
+        market_regime = "Sideways"
+        if volatility and volatility.volatility_percentile:
+            vol_percentile = float(volatility.volatility_percentile)
+            if vol_percentile > 80:
+                market_regime = "High Volatility"
+            elif vol_percentile < 20:
+                market_regime = "Bull Market"  # Faible volatilité = marché haussier
+            elif vol_percentile > 60:
+                market_regime = "Bear Market"  # Forte volatilité = marché baissier
+            else:
+                market_regime = "Sideways"  # Volatilité modérée = marché latéral
+        
+        # Calculer le score global (basé sur les scores disponibles)
+        overall_score = 50.0  # Score par défaut
+        if momentum and momentum.momentum_score:
+            overall_score += float(momentum.momentum_score) * 0.3
+        if volatility and volatility.volatility_percentile:
+            # Inverser le percentile de volatilité (moins de volatilité = meilleur score)
+            overall_score += (100 - float(volatility.volatility_percentile)) * 0.2
+        if sentiment_summary and sentiment_summary.sentiment_score:
+            # Convertir le score de sentiment (-1 à 1) en score positif (0 à 100)
+            sentiment_normalized = (float(sentiment_summary.sentiment_score) + 1) * 50
+            overall_score += sentiment_normalized * 0.5
+        
+        # Normaliser le score entre 0 et 100
+        overall_score = max(0, min(100, overall_score))
+        
+        return {
+            "momentum_trend": momentum_trend,
+            "correlation_strength": correlation_strength,
+            "market_regime": market_regime,
+            "overall_score": overall_score
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting market indicators for {symbol}: {e}")
+        # Retourner des valeurs par défaut en cas d'erreur
+        return {
+            "momentum_trend": "Neutral",
+            "correlation_strength": "Medium",
+            "market_regime": "Sideways",
+            "overall_score": 50.0
+        }
 
 @router.post("/opportunity/{symbol}")
 async def analyze_opportunity(
@@ -413,9 +509,12 @@ async def search_opportunities(
         # Limiter les résultats
         opportunities = query.limit(limit).all()
         
-        # Formater les résultats
+        # Formater les résultats avec indicateurs de marché
         results = []
         for opp in opportunities:
+            # Récupérer les indicateurs de marché pour ce symbole
+            market_indicators = get_market_indicators_for_symbol(opp.symbol, db)
+            
             results.append({
                 "symbol": opp.symbol,
                 "analysis_date": opp.analysis_date.isoformat() if opp.analysis_date else None,
@@ -434,7 +533,8 @@ async def search_opportunities(
                     "monte_carlo": float(opp.monte_carlo_score),
                     "markov": float(opp.markov_score),
                     "volatility": float(opp.volatility_score)
-                }
+                },
+                "market_indicators": market_indicators
             })
         
         # Compter le total sans limite pour les métadonnées

@@ -348,6 +348,13 @@ class TechnicalIndicators:
         try:
             indicators = {}
             
+            # Indicateurs de tendance (moyennes mobiles)
+            indicators['sma_20'] = close.rolling(window=20).mean()
+            indicators['sma_50'] = close.rolling(window=50).mean()
+            indicators['sma_200'] = close.rolling(window=200).mean()
+            indicators['ema_20'] = close.ewm(span=20).mean()
+            indicators['ema_50'] = close.ewm(span=50).mean()
+            
             # Indicateurs de momentum
             indicators['rsi'] = TechnicalIndicators.rsi(close)
             indicators['macd'] = TechnicalIndicators.macd(close)

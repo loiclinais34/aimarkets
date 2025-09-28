@@ -34,7 +34,7 @@ def get_all_symbols(db: Session) -> List[str]:
 
 def recompute_technical_indicators(
     symbols: Optional[List[str]] = None,
-    force_update: bool = False,
+    force_update: bool = True,
     db: Session = None
 ) -> dict:
     """

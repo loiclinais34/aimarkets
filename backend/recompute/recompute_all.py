@@ -107,7 +107,7 @@ def recompute_all(
             
             technical_results = recompute_technical_indicators(
                 symbols=symbols,
-                force_update=force_update,
+                force_update=True,
                 db=db
             )
             overall_results["components"]["technical_indicators"] = technical_results
@@ -127,7 +127,7 @@ def recompute_all(
             
             sentiment_results = recompute_sentiment_indicators(
                 symbols=symbols,
-                force_update=force_update,
+                force_update=True,
                 db=db
             )
             overall_results["components"]["sentiment_indicators"] = sentiment_results
@@ -147,7 +147,7 @@ def recompute_all(
             
             market_results = recompute_market_indicators(
                 symbols=symbols,
-                force_update=force_update,
+                force_update=True,
                 db=db
             )
             overall_results["components"]["market_indicators"] = market_results

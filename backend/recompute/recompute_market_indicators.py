@@ -48,7 +48,7 @@ def calculate_market_indicators_for_symbol(symbol: str, db: Session) -> int:
         # Récupérer les données historiques
         historical_data = db.query(HistoricalData).filter(
             HistoricalData.symbol == symbol
-        ).order_by(HistoricalData.date.desc()).limit(252).all()
+        ).order_by(HistoricalData.created_at.desc()).limit(252).all()
         
         if not historical_data:
             logger.warning(f"No historical data found for {symbol}")

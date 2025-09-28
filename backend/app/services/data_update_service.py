@@ -171,7 +171,7 @@ class DataUpdateService:
         try:
             # Récupérer la date de la dernière mise à jour
             result = self.db.execute(text("""
-                SELECT MAX(date) as last_update_date, COUNT(*) as total_records
+                SELECT MAX(created_at) as last_update_date, COUNT(*) as total_records
                 FROM sentiment_data
             """)).fetchone()
             

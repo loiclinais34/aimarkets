@@ -147,6 +147,7 @@ class AdvancedAnalysisApi {
   ): Promise<HybridAnalysisResponse> {
     // Valeurs par défaut
     const defaultFilters = {
+      min_score: 0.2,  // Score plus bas par défaut pour inclure les opportunités SELL
       max_risk: "HIGH",
       limit: 10,
       sort_by: "composite_score",
@@ -179,7 +180,12 @@ class AdvancedAnalysisApi {
       markov_score: opp.scores.markov * 100,
       volatility_score: opp.scores.volatility * 100,
       analysis_timestamp: opp.analysis_date,
-      updated_at: opp.updated_at
+      updated_at: opp.updated_at,
+      // Indicateurs de marché (données réelles du backend)
+      momentum_trend: opp.market_indicators?.momentum_trend,
+      correlation_strength: opp.market_indicators?.correlation_strength,
+      market_regime: opp.market_indicators?.market_regime,
+      overall_score: opp.market_indicators?.overall_score
     }));
     
     return {

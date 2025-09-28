@@ -124,82 +124,82 @@ def update_historical_data_task(self, force_update: bool = False) -> Dict[str, A
         self.update_state(state='FAILURE', meta={'error': str(e)})
         raise
 
-@celery_app.task(bind=True, name="app.tasks.data_update_tasks.calculate_technical_indicators")
-def calculate_technical_indicators_task(self) -> Dict[str, Any]:
-    """
-    Calculer les indicateurs techniques pour tous les symboles
-    """
-    try:
-        self.update_state(state='PROGRESS', meta={'status': 'Démarrage du calcul des indicateurs techniques'})
+# @celery_app.task(bind=True, name="app.tasks.data_update_tasks.calculate_technical_indicators")
+# def calculate_technical_indicators_task(self) -> Dict[str, Any]:
+#     """
+#     Calculer les indicateurs techniques pour tous les symboles
+#     """
+#     try:
+#         self.update_state(state='PROGRESS', meta={'status': 'Démarrage du calcul des indicateurs techniques'})
         
-        db = next(get_db())
-        indicators_service = TechnicalIndicatorsCalculator(db)
-        data_service = DataUpdateService(db)
+#         db = next(get_db())
+#         indicators_service = TechnicalIndicatorsCalculator(db)
+#         data_service = DataUpdateService(db)
         
-        # Récupérer tous les symboles actifs
-        symbols = data_service.get_active_symbols()
-        total_symbols = len(symbols)
+#         # Récupérer tous les symboles actifs
+#         symbols = data_service.get_active_symbols()
+#         total_symbols = len(symbols)
         
-        logger.info(f"Début du calcul des indicateurs techniques pour {total_symbols} symboles")
+#         logger.info(f"Début du calcul des indicateurs techniques pour {total_symbols} symboles")
         
-        results = []
-        successful_calculations = 0
-        failed_calculations = 0
+#         results = []
+#         successful_calculations = 0
+#         failed_calculations = 0
         
-        for i, symbol in enumerate(symbols):
-            try:
-                self.update_state(
-                    state='PROGRESS', 
-                    meta={
-                        'status': f'Calcul des indicateurs techniques pour {symbol}',
-                        'progress': int((i / total_symbols) * 100),
-                        'current_symbol': symbol,
-                        'total_symbols': total_symbols
-                    }
-                )
+#         for i, symbol in enumerate(symbols):
+#             try:
+#                 self.update_state(
+#                     state='PROGRESS', 
+#                     meta={
+#                         'status': f'Calcul des indicateurs techniques pour {symbol}',
+#                         'progress': int((i / total_symbols) * 100),
+#                         'current_symbol': symbol,
+#                         'total_symbols': total_symbols
+#                     }
+#                 )
                 
-                # Calculer les indicateurs pour ce symbole
-                result = indicators_service.calculate_all_indicators(symbol)
-                result_dict = {
-                    'symbol': symbol,
-                    'status': 'success' if result else 'error',
-                    'message': 'Indicateurs calculés avec succès' if result else 'Erreur lors du calcul des indicateurs'
-                }
-                results.append(result_dict)
+#                 # Calculer les indicateurs pour ce symbole
+#                 result = indicators_service.calculate_all_indicators(symbol)
+#                 result_dict = {
+#                     'symbol': symbol,
+#                     'status': 'success' if result else 'error',
+#                     'message': 'Indicateurs calculés avec succès' if result else 'Erreur lors du calcul des indicateurs'
+#                 }
+#                 results.append(result_dict)
                 
-                if result:
-                    successful_calculations += 1
-                else:
-                    failed_calculations += 1
+#                 if result:
+#                     successful_calculations += 1
+#                 else:
+#                     failed_calculations += 1
                     
-                logger.info(f"Symbole {symbol}: {result_dict['status']} - {result_dict['message']}")
+#                 logger.info(f"Symbole {symbol}: {result_dict['status']} - {result_dict['message']}")
                 
-            except Exception as e:
-                logger.error(f"Erreur lors du calcul des indicateurs pour {symbol}: {e}")
-                results.append({
-                    'symbol': symbol,
-                    'status': 'error',
-                    'message': str(e)
-                })
-                failed_calculations += 1
+#             except Exception as e:
+#                 logger.error(f"Erreur lors du calcul des indicateurs pour {symbol}: {e}")
+#                 results.append({
+#                     'symbol': symbol,
+#                     'status': 'error',
+#                     'message': str(e)
+#                 })
+#                 failed_calculations += 1
         
-        final_result = {
-            'status': 'completed',
-            'total_symbols': total_symbols,
-            'successful_calculations': successful_calculations,
-            'failed_calculations': failed_calculations,
-            'results': results,
-            'completion_time': datetime.now().isoformat()
-        }
+#         final_result = {
+#             'status': 'completed',
+#             'total_symbols': total_symbols,
+#             'successful_calculations': successful_calculations,
+#             'failed_calculations': failed_calculations,
+#             'results': results,
+#             'completion_time': datetime.now().isoformat()
+#         }
         
-        self.update_state(state='SUCCESS', meta=final_result)
-        logger.info(f"Calcul des indicateurs techniques terminé: {successful_calculations}/{total_symbols} réussis")
-        return final_result
+#         self.update_state(state='SUCCESS', meta=final_result)
+#         logger.info(f"Calcul des indicateurs techniques terminé: {successful_calculations}/{total_symbols} réussis")
+#         return final_result
         
-    except Exception as e:
-        logger.error(f"Erreur lors du calcul des indicateurs techniques: {e}", exc_info=True)
-        self.update_state(state='FAILURE', meta={'error': str(e)})
-        raise
+#     except Exception as e:
+#         logger.error(f"Erreur lors du calcul des indicateurs techniques: {e}", exc_info=True)
+#         self.update_state(state='FAILURE', meta={'error': str(e)})
+#         raise
 
 @celery_app.task(bind=True, name="app.tasks.data_update_tasks.update_sentiment_data")
 def update_sentiment_data_task(self, force_update: bool = False) -> Dict[str, Any]:
@@ -371,94 +371,94 @@ def update_sentiment_data_task(self, force_update: bool = False) -> Dict[str, An
         self.update_state(state='FAILURE', meta={'error': str(e)})
         raise
 
-@celery_app.task(bind=True, name="app.tasks.data_update_tasks.calculate_sentiment_indicators")
-def calculate_sentiment_indicators_task(self) -> Dict[str, Any]:
-    """
-    Calculer les indicateurs de sentiment pour tous les symboles
-    """
-    try:
-        self.update_state(state='PROGRESS', meta={'status': 'Démarrage du calcul des indicateurs de sentiment'})
+# @celery_app.task(bind=True, name="app.tasks.data_update_tasks.calculate_sentiment_indicators")
+# def calculate_sentiment_indicators_task(self) -> Dict[str, Any]:
+#     """
+#     Calculer les indicateurs de sentiment pour tous les symboles
+#     """
+#     try:
+#         self.update_state(state='PROGRESS', meta={'status': 'Démarrage du calcul des indicateurs de sentiment'})
         
-        db = next(get_db())
-        indicators_service = SentimentIndicatorService()
-        data_service = DataUpdateService(db)
+#         db = next(get_db())
+#         indicators_service = SentimentIndicatorService()
+#         data_service = DataUpdateService(db)
         
-        # Récupérer tous les symboles actifs
-        symbols = data_service.get_active_symbols()
-        total_symbols = len(symbols)
+#         # Récupérer tous les symboles actifs
+#         symbols = data_service.get_active_symbols()
+#         total_symbols = len(symbols)
         
-        logger.info(f"Début du calcul des indicateurs de sentiment pour {total_symbols} symboles")
+#         logger.info(f"Début du calcul des indicateurs de sentiment pour {total_symbols} symboles")
         
-        results = []
-        successful_calculations = 0
-        failed_calculations = 0
+#         results = []
+#         successful_calculations = 0
+#         failed_calculations = 0
         
-        for i, symbol in enumerate(symbols):
-            try:
-                self.update_state(
-                    state='PROGRESS', 
-                    meta={
-                        'status': f'Calcul des indicateurs de sentiment pour {symbol}',
-                        'progress': int((i / total_symbols) * 100),
-                        'current_symbol': symbol,
-                        'total_symbols': total_symbols
-                    }
-                )
+#         for i, symbol in enumerate(symbols):
+#             try:
+#                 self.update_state(
+#                     state='PROGRESS', 
+#                     meta={
+#                         'status': f'Calcul des indicateurs de sentiment pour {symbol}',
+#                         'progress': int((i / total_symbols) * 100),
+#                         'current_symbol': symbol,
+#                         'total_symbols': total_symbols
+#                     }
+#                 )
                 
-                # Créer une nouvelle session pour chaque symbole
-                symbol_db = next(get_db())
+#                 # Créer une nouvelle session pour chaque symbole
+#                 symbol_db = next(get_db())
                 
-                # Calculer les indicateurs de sentiment pour ce symbole
-                indicators_result = indicators_service.calculate_sentiment_indicators(symbol_db, symbol)
+#                 # Calculer les indicateurs de sentiment pour ce symbole
+#                 indicators_result = indicators_service.calculate_sentiment_indicators(symbol_db, symbol)
                 
-                # Fermer la session
-                symbol_db.close()
+#                 # Fermer la session
+#                 symbol_db.close()
                 
-                result = {
-                    'symbol': symbol,
-                    'status': 'success' if indicators_result else 'error',
-                    'message': 'Indicateurs de sentiment calculés avec succès' if indicators_result else 'Erreur lors du calcul des indicateurs'
-                }
-                results.append(result)
+#                 result = {
+#                     'symbol': symbol,
+#                     'status': 'success' if indicators_result else 'error',
+#                     'message': 'Indicateurs de sentiment calculés avec succès' if indicators_result else 'Erreur lors du calcul des indicateurs'
+#                 }
+#                 results.append(result)
                 
-                if result['status'] == 'success':
-                    successful_calculations += 1
-                else:
-                    failed_calculations += 1
+#                 if result['status'] == 'success':
+#                     successful_calculations += 1
+#                 else:
+#                     failed_calculations += 1
                     
-                logger.info(f"Symbole {symbol}: {result['status']} - {result['message']}")
+#                 logger.info(f"Symbole {symbol}: {result['status']} - {result['message']}")
                 
-            except Exception as e:
-                logger.error(f"Erreur lors du calcul des indicateurs de sentiment pour {symbol}: {e}")
-                # Fermer la session en cas d'erreur
-                try:
-                    symbol_db.close()
-                except:
-                    pass
-                results.append({
-                    'symbol': symbol,
-                    'status': 'error',
-                    'message': str(e)
-                })
-                failed_calculations += 1
+#             except Exception as e:
+#                 logger.error(f"Erreur lors du calcul des indicateurs de sentiment pour {symbol}: {e}")
+#                 # Fermer la session en cas d'erreur
+#                 try:
+#                     symbol_db.close()
+#                 except:
+#                     pass
+#                 results.append({
+#                     'symbol': symbol,
+#                     'status': 'error',
+#                     'message': str(e)
+#                 })
+#                 failed_calculations += 1
         
-        final_result = {
-            'status': 'completed',
-            'total_symbols': total_symbols,
-            'successful_calculations': successful_calculations,
-            'failed_calculations': failed_calculations,
-            'results': results,
-            'completion_time': datetime.now().isoformat()
-        }
+#         final_result = {
+#             'status': 'completed',
+#             'total_symbols': total_symbols,
+#             'successful_calculations': successful_calculations,
+#             'failed_calculations': failed_calculations,
+#             'results': results,
+#             'completion_time': datetime.now().isoformat()
+#         }
         
-        self.update_state(state='SUCCESS', meta=final_result)
-        logger.info(f"Calcul des indicateurs de sentiment terminé: {successful_calculations}/{total_symbols} réussis")
-        return final_result
+#         self.update_state(state='SUCCESS', meta=final_result)
+#         logger.info(f"Calcul des indicateurs de sentiment terminé: {successful_calculations}/{total_symbols} réussis")
+#         return final_result
         
-    except Exception as e:
-        logger.error(f"Erreur lors du calcul des indicateurs de sentiment: {e}", exc_info=True)
-        self.update_state(state='FAILURE', meta={'error': str(e)})
-        raise
+#     except Exception as e:
+#         logger.error(f"Erreur lors du calcul des indicateurs de sentiment: {e}", exc_info=True)
+#         self.update_state(state='FAILURE', meta={'error': str(e)})
+#         raise
 
 @celery_app.task(bind=True, name="app.tasks.data_update_tasks.full_data_update_workflow")
 def full_data_update_workflow_task(self, force_update: bool = False) -> Dict[str, Any]:
@@ -509,19 +509,19 @@ def full_data_update_workflow_task(self, force_update: bool = False) -> Dict[str
             'result': historical_result.result
         })
         
-        # Étape 3: Calcul des indicateurs techniques
-        self.update_state(state='PROGRESS', meta={
-            'status': 'Étape 3/5: Calcul des indicateurs techniques',
-            'steps': workflow_results['steps'],
-            'overall_status': workflow_results['overall_status'],
-            'start_time': workflow_results['start_time']
-        })
-        technical_result = calculate_technical_indicators_task.apply()
-        workflow_results['steps'].append({
-            'step': 3,
-            'name': 'Calcul indicateurs techniques',
-            'result': technical_result.result
-        })
+        # # Étape 3: Calcul des indicateurs techniques
+        # self.update_state(state='PROGRESS', meta={
+        #     'status': 'Étape 3/5: Calcul des indicateurs techniques',
+        #     'steps': workflow_results['steps'],
+        #     'overall_status': workflow_results['overall_status'],
+        #     'start_time': workflow_results['start_time']
+        # })
+        # technical_result = calculate_technical_indicators_task.apply()
+        # workflow_results['steps'].append({
+        #     'step': 3,
+        #     'name': 'Calcul indicateurs techniques',
+        #     'result': technical_result.result
+        # })
         
         # Étape 4: Mise à jour des données de sentiment
         self.update_state(state='PROGRESS', meta={
@@ -537,19 +537,19 @@ def full_data_update_workflow_task(self, force_update: bool = False) -> Dict[str
             'result': sentiment_result.result
         })
         
-        # Étape 5: Calcul des indicateurs de sentiment
-        self.update_state(state='PROGRESS', meta={
-            'status': 'Étape 5/5: Calcul des indicateurs de sentiment',
-            'steps': workflow_results['steps'],
-            'overall_status': workflow_results['overall_status'],
-            'start_time': workflow_results['start_time']
-        })
-        sentiment_indicators_result = calculate_sentiment_indicators_task.apply()
-        workflow_results['steps'].append({
-            'step': 5,
-            'name': 'Calcul indicateurs de sentiment',
-            'result': sentiment_indicators_result.result
-        })
+        # # Étape 5: Calcul des indicateurs de sentiment
+        # self.update_state(state='PROGRESS', meta={
+        #     'status': 'Étape 5/5: Calcul des indicateurs de sentiment',
+        #     'steps': workflow_results['steps'],
+        #     'overall_status': workflow_results['overall_status'],
+        #     'start_time': workflow_results['start_time']
+        # })
+        # sentiment_indicators_result = calculate_sentiment_indicators_task.apply()
+        # workflow_results['steps'].append({
+        #     'step': 5,
+        #     'name': 'Calcul indicateurs de sentiment',
+        #     'result': sentiment_indicators_result.result
+        # })
         
         # Finalisation
         workflow_results['overall_status'] = 'completed'

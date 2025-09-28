@@ -11,9 +11,9 @@ from app.services.data_update_service import DataUpdateService
 from app.tasks.data_update_tasks import (
     check_data_freshness_task,
     update_historical_data_task,
-    calculate_technical_indicators_task,
+    #calculate_technical_indicators_task,
     update_sentiment_data_task,
-    calculate_sentiment_indicators_task,
+    #calculate_sentiment_indicators_task,
     full_data_update_workflow_task
 )
 
@@ -153,45 +153,45 @@ def trigger_sentiment_data_update(
         logger.error(f"Erreur lors du déclenchement de la mise à jour de sentiment: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur interne du serveur: {e}")
 
-@router.post("/trigger-technical-indicators", response_model=Dict[str, Any])
-def trigger_technical_indicators_calculation(db: Session = Depends(get_db)):
-    """
-    Déclencher le calcul des indicateurs techniques
-    """
-    try:
-        task = calculate_technical_indicators_task.delay()
+# @router.post("/trigger-technical-indicators", response_model=Dict[str, Any])
+# def trigger_technical_indicators_calculation(db: Session = Depends(get_db)):
+#     """
+#     Déclencher le calcul des indicateurs techniques
+#     """
+#     try:
+#         task = calculate_technical_indicators_task.delay()
         
-        logger.info(f"Calcul des indicateurs techniques déclenché - Task ID: {task.id}")
+#         logger.info(f"Calcul des indicateurs techniques déclenché - Task ID: {task.id}")
         
-        return {
-            'success': True,
-            'message': 'Calcul des indicateurs techniques déclenché avec succès',
-            'task_id': task.id
-        }
+#         return {
+#             'success': True,
+#             'message': 'Calcul des indicateurs techniques déclenché avec succès',
+#             'task_id': task.id
+#         }
         
-    except Exception as e:
-        logger.error(f"Erreur lors du déclenchement du calcul des indicateurs techniques: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur interne du serveur: {e}")
+#     except Exception as e:
+#         logger.error(f"Erreur lors du déclenchement du calcul des indicateurs techniques: {e}")
+#         raise HTTPException(status_code=500, detail=f"Erreur interne du serveur: {e}")
 
-@router.post("/trigger-sentiment-indicators", response_model=Dict[str, Any])
-def trigger_sentiment_indicators_calculation(db: Session = Depends(get_db)):
-    """
-    Déclencher le calcul des indicateurs de sentiment
-    """
-    try:
-        task = calculate_sentiment_indicators_task.delay()
+# @router.post("/trigger-sentiment-indicators", response_model=Dict[str, Any])
+# def trigger_sentiment_indicators_calculation(db: Session = Depends(get_db)):
+#     """
+#     Déclencher le calcul des indicateurs de sentiment
+#     """
+#     try:
+#         task = calculate_sentiment_indicators_task.delay()
         
-        logger.info(f"Calcul des indicateurs de sentiment déclenché - Task ID: {task.id}")
+#         logger.info(f"Calcul des indicateurs de sentiment déclenché - Task ID: {task.id}")
         
-        return {
-            'success': True,
-            'message': 'Calcul des indicateurs de sentiment déclenché avec succès',
-            'task_id': task.id
-        }
+#         return {
+#             'success': True,
+#             'message': 'Calcul des indicateurs de sentiment déclenché avec succès',
+#             'task_id': task.id
+#         }
         
-    except Exception as e:
-        logger.error(f"Erreur lors du déclenchement du calcul des indicateurs de sentiment: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur interne du serveur: {e}")
+#     except Exception as e:
+#         logger.error(f"Erreur lors du déclenchement du calcul des indicateurs de sentiment: {e}")
+#         raise HTTPException(status_code=500, detail=f"Erreur interne du serveur: {e}")
 
 @router.get("/task-status/{task_id}", response_model=Dict[str, Any])
 def get_task_status(task_id: str):

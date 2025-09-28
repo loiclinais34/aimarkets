@@ -28,6 +28,11 @@ interface HybridOpportunityCardProps {
     markov_score: number;
     volatility_score: number;
     analysis_timestamp?: string;
+    // Indicateurs de marché
+    momentum_trend?: string;
+    correlation_strength?: string;
+    market_regime?: string;
+    overall_score?: number;
   };
   onAnalyze?: (symbol: string) => void;
   onViewDetails?: (symbol: string, tab: 'technical' | 'sentiment' | 'market' | 'hybrid') => void;
@@ -91,6 +96,12 @@ const HybridOpportunityCard: React.FC<HybridOpportunityCardProps> = ({
     return 'text-red-600';
   };
 
+  const getScoreColorHex = (score: number) => {
+    if (score > 70) return '#10b981';
+    if (score > 50) return '#f59e0b';
+    return '#ef4444';
+  };
+
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 0.8) return 'text-green-600';
     if (confidence >= 0.6) return 'text-yellow-600';
@@ -110,6 +121,23 @@ const HybridOpportunityCard: React.FC<HybridOpportunityCardProps> = ({
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const getTrendColor = (trend: string) => {
+    switch (trend.toLowerCase()) {
+      case 'bullish': return '#10b981';
+      case 'bearish': return '#ef4444';
+      default: return '#6b7280';
+    }
+  };
+
+  const getRegimeColor = (regime: string) => {
+    switch (regime.toLowerCase()) {
+      case 'bull market': return '#10b981';
+      case 'bear market': return '#ef4444';
+      case 'high volatility': return '#f59e0b';
+      default: return '#6b7280';
+    }
   };
 
   return (
@@ -177,6 +205,74 @@ const HybridOpportunityCard: React.FC<HybridOpportunityCardProps> = ({
             <div className="text-xs text-gray-600">Analyse</div>
           </div>
         </div>
+
+        {/* Indicateurs de marché */}
+        {(opportunity.momentum_trend || opportunity.correlation_strength || opportunity.market_regime || opportunity.overall_score) && (
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="grid grid-cols-2 gap-4">
+              {/* Tendances Actuelles */}
+              <div>
+                <h5 className="text-sm font-semibold text-gray-900 mb-2">Tendances Actuelles</h5>
+                <div className="space-y-2">
+                  {opportunity.momentum_trend && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-600">Tendance Momentum</span>
+                      <span 
+                        className="px-2 py-1 rounded text-xs font-medium text-white"
+                        style={{ 
+                          backgroundColor: getTrendColor(opportunity.momentum_trend)
+                        }}
+                      >
+                        {opportunity.momentum_trend}
+                      </span>
+                    </div>
+                  )}
+                  {opportunity.correlation_strength && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-600">Force Corrélation</span>
+                      <span className="text-xs font-bold text-gray-900">
+                        {opportunity.correlation_strength}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Régime de Marché */}
+              <div>
+                <h5 className="text-sm font-semibold text-gray-900 mb-2">Régime de Marché</h5>
+                <div className="space-y-2">
+                  {opportunity.market_regime && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-600">Régime Principal</span>
+                      <span 
+                        className="px-2 py-1 rounded text-xs font-medium text-white"
+                        style={{ 
+                          backgroundColor: getRegimeColor(opportunity.market_regime)
+                        }}
+                      >
+                        {opportunity.market_regime}
+                      </span>
+                    </div>
+                  )}
+                  {opportunity.overall_score && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-600">Score Global</span>
+                      <span 
+                        className="text-xs font-bold"
+                        style={{ 
+                          color: getScoreColorHex(opportunity.overall_score)
+                        }}
+                      >
+                        {opportunity.overall_score.toFixed(0)}/100
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Contenu détaillé (expandable) */}

@@ -12,7 +12,10 @@ import {
   Legend, 
   ResponsiveContainer, 
   BarChart, 
-  Bar 
+  Bar,
+  Area,
+  AreaChart,
+  ComposedChart
 } from 'recharts';
 import { advancedAnalysisApi } from '@/services/advancedAnalysisApi';
 
@@ -36,6 +39,9 @@ interface TechnicalData {
   parabolic_sar: number;
   ichimoku_tenkan: number;
   ichimoku_kijun: number;
+  ichimoku_senkou_a: number;
+  ichimoku_senkou_b: number;
+  ichimoku_chikou: number;
   sma_20: number;
   sma_50: number;
 }
@@ -63,15 +69,16 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedIndicator, setSelectedIndicator] = useState<'rsi' | 'macd' | 'bollinger' | 'williams_r' | 'cci' | 'adx' | 'parabolic_sar' | 'ichimoku' | 'sma' | 'support_resistance' | 'signals'>('rsi');
+  const [historicalDepth, setHistoricalDepth] = useState<'5d' | '10d' | '1m' | '3m' | '6m' | '1y'>('1m');
 
   useEffect(() => {
     fetchTechnicalData();
-  }, [symbol]);
+  }, [symbol, historicalDepth]);
 
   const fetchTechnicalData = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:8000/api/v1/technical-analysis/signals/${symbol}`);
+      const response = await fetch(`http://localhost:8000/api/v1/technical-analysis/signals/${symbol}?period=${historicalDepth}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -129,70 +136,130 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
         bollinger_upper: basePrice + 5 + Math.random() * 10,
         bollinger_lower: basePrice - 5 - Math.random() * 10,
         price: basePrice + (Math.random() - 0.5) * 20,
+        price_normalized: 0, // Sera calculé après
         signal_strength: Math.random() * 100,
         williams_r: -80 + Math.random() * 60,
         cci: -200 + Math.random() * 400,
         adx: 10 + Math.random() * 40,
         parabolic_sar: basePrice + (Math.random() - 0.5) * 10,
         ichimoku_tenkan: basePrice + (Math.random() - 0.5) * 8,
-        ichimoku_kijun: basePrice + (Math.random() - 0.5) * 6
+        ichimoku_kijun: basePrice + (Math.random() - 0.5) * 6,
+        ichimoku_senkou_a: basePrice + (Math.random() - 0.5) * 4,
+        ichimoku_senkou_b: basePrice + (Math.random() - 0.5) * 4,
+        ichimoku_chikou: basePrice + (Math.random() - 0.5) * 3,
+        sma_20: basePrice + (Math.random() - 0.5) * 5,
+        sma_50: basePrice + (Math.random() - 0.5) * 7
       });
     }
     return data;
   };
 
   const convertApiDataToChartData = (apiData: any): TechnicalData[] => {
-    // Utiliser les données historiques réelles de l'API
-    const currentPrice = apiData.current_price || 150;
+    // Utiliser les vraies séries de données de l'API
     const indicators = apiData.indicators || {};
-    const historicalPrices = apiData.historical_prices || [];
+    const historicalPrices = apiData.historical_prices?.series || [];
     
     const data = [];
-    const baseDate = new Date();
     
-    // Calculer les valeurs Bollinger pour une meilleure cohérence
-    const bollingerUpper = indicators.bollinger_bands?.upper || currentPrice * 1.05;
-    const bollingerLower = indicators.bollinger_bands?.lower || currentPrice * 0.95;
+    // Fonction helper pour récupérer la valeur d'un indicateur à une date donnée
+    const getIndicatorValue = (series: any[], date: string, fallback: number = 0) => {
+      const point = series.find(p => p.date === date);
+      return point ? point.value : fallback;
+    };
     
-    for (let i = 0; i < 30; i++) {
-      const date = new Date(baseDate);
-      date.setDate(date.getDate() - (29 - i));
-      
-      // Utiliser le prix historique réel si disponible, sinon générer une variation
-      let price;
-      if (historicalPrices[i] && historicalPrices[i].close) {
-        price = historicalPrices[i].close;
-      } else {
-        // Fallback: générer une variation basée sur le prix actuel
-        const variation = (Math.random() - 0.5) * 0.08; // ±4% de variation
-        price = currentPrice * (1 + variation);
-      }
-      
-      // Générer des bandes Bollinger cohérentes avec le prix
-      const bollingerVariation = (Math.random() - 0.5) * 0.02; // ±1% de variation
-      const upperBand = bollingerUpper * (1 + bollingerVariation);
-      const lowerBand = bollingerLower * (1 + bollingerVariation);
+    // Utiliser les prix historiques comme base
+    // Adapter le nombre de points selon la période sélectionnée
+    const maxPoints = {
+      '5d': 5,
+      '10d': 10,
+      '1m': 30,
+      '3m': 90,
+      '6m': 180,
+      '1y': 365
+    }[historicalDepth] || 50;
+    
+    for (const pricePoint of historicalPrices.slice(-maxPoints)) { // Points selon la période
+      const date = pricePoint.date;
+      const price = pricePoint.close;
       
       data.push({
-        timestamp: date.toISOString().split('T')[0],
-        rsi: (indicators.rsi || 50) + (Math.random() - 0.5) * 20,
-        macd: (indicators.macd?.macd || 0) + (Math.random() - 0.5) * 2,
-        bollinger_upper: upperBand,
-        bollinger_lower: lowerBand,
+        timestamp: date,
+        rsi: getIndicatorValue(indicators.rsi?.series || [], date, 50),
+        macd: getIndicatorValue(indicators.macd?.series?.macd || [], date, 0),
+        bollinger_upper: getIndicatorValue(indicators.bollinger_bands?.series?.upper || [], date, price * 1.02),
+        bollinger_lower: getIndicatorValue(indicators.bollinger_bands?.series?.lower || [], date, price * 0.98),
         price: price,
-        price_normalized: ((price - currentPrice) / currentPrice) * 100, // Normaliser le prix en pourcentage
-        signal_strength: Math.random() * 100,
-        williams_r: (indicators.williams_r || -50) + (Math.random() - 0.5) * 30,
-        cci: (indicators.cci || 0) + (Math.random() - 0.5) * 100,
-        adx: (indicators.adx?.adx || 25) + (Math.random() - 0.5) * 10,
-        parabolic_sar: currentPrice * (1 + (Math.random() - 0.5) * 0.04 * 0.5),
-        ichimoku_tenkan: (indicators.ichimoku?.tenkan_sen || currentPrice) + (Math.random() - 0.5) * 5,
-        ichimoku_kijun: (indicators.ichimoku?.kijun_sen || currentPrice) + (Math.random() - 0.5) * 5,
-        sma_20: (indicators.sma_20 || currentPrice) + (Math.random() - 0.5) * 3,
-        sma_50: (indicators.sma_50 || currentPrice) + (Math.random() - 0.5) * 4
+        price_normalized: 0, // Sera calculé après normalisation
+        signal_strength: Math.random() * 100, // Garder simulé pour l'instant
+        williams_r: getIndicatorValue(indicators.williams_r?.series || [], date, -50),
+        cci: getIndicatorValue(indicators.cci?.series || [], date, 0),
+        adx: getIndicatorValue(indicators.adx?.series?.adx || [], date, 25),
+        parabolic_sar: getIndicatorValue(indicators.parabolic_sar?.series || [], date, price),
+        ichimoku_tenkan: getIndicatorValue(indicators.ichimoku?.series?.tenkan_sen || [], date, price),
+        ichimoku_kijun: getIndicatorValue(indicators.ichimoku?.series?.kijun_sen || [], date, price),
+        ichimoku_senkou_a: getIndicatorValue(indicators.ichimoku?.series?.senkou_span_a || [], date, price),
+        ichimoku_senkou_b: getIndicatorValue(indicators.ichimoku?.series?.senkou_span_b || [], date, price),
+        ichimoku_chikou: getIndicatorValue(indicators.ichimoku?.series?.chikou_span || [], date, price),
+        sma_20: getIndicatorValue(indicators.sma_20?.series || [], date, price),
+        sma_50: getIndicatorValue(indicators.sma_50?.series || [], date, price)
       });
     }
+    
+    // Normaliser les prix en pourcentage par rapport au dernier prix
+    if (data.length > 0) {
+      const lastPrice = data[data.length - 1].price;
+      data.forEach(point => {
+        point.price_normalized = ((point.price - lastPrice) / lastPrice) * 100;
+      });
+    }
+    
     return data;
+  };
+
+  // Fonction pour préparer les données du nuage Ichimoku
+  const prepareIchimokuCloudData = (data: TechnicalData[]) => {
+    const cloudBull = [];
+    const cloudBear = [];
+    
+    for (let i = 0; i < data.length; i++) {
+      const d = data[i];
+      const a = d.ichimoku_senkou_a;
+      const b = d.ichimoku_senkou_b;
+      const row = { ...d };
+
+      if (a != null && b != null) {
+        if (a >= b) {
+          // Zone haussière : on peuple bull, on "casse" bear
+          cloudBull.push({
+            ...row,
+            upper: a,
+            lower: b,
+          });
+          cloudBear.push({
+            ...row,
+            upper: undefined,
+            lower: undefined,
+          });
+        } else {
+          // Zone baissière : on peuple bear, on "casse" bull
+          cloudBull.push({
+            ...row,
+            upper: undefined,
+            lower: undefined,
+          });
+          cloudBear.push({
+            ...row,
+            upper: b,
+            lower: a,
+          });
+        }
+      } else {
+        cloudBull.push({ ...row, upper: undefined, lower: undefined });
+        cloudBear.push({ ...row, upper: undefined, lower: undefined });
+      }
+    }
+    
+    return { cloudBull, cloudBear };
   };
 
   const calculateSignalsFromIndicators = (apiData: any): SignalData[] => {
@@ -200,8 +267,8 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
     const signals: SignalData[] = [];
     
     // RSI Signal
-    if (indicators.rsi !== undefined) {
-      const rsi = indicators.rsi;
+    if (indicators.rsi?.current !== undefined && indicators.rsi.current !== null) {
+      const rsi = indicators.rsi.current;
       let direction: 'bullish' | 'bearish' | 'neutral' = 'neutral';
       if (rsi < 30) direction = 'bullish';
       else if (rsi > 70) direction = 'bearish';
@@ -215,8 +282,8 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
     }
     
     // MACD Signal
-    if (indicators.macd?.histogram !== undefined) {
-      const histogram = indicators.macd.histogram;
+    if (indicators.macd?.current?.histogram !== undefined && indicators.macd.current.histogram !== null) {
+      const histogram = indicators.macd.current.histogram;
       let direction: 'bullish' | 'bearish' | 'neutral' = 'neutral';
       if (histogram > 0) direction = 'bullish';
       else if (histogram < 0) direction = 'bearish';
@@ -230,8 +297,8 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
     }
     
     // Williams %R Signal
-    if (indicators.williams_r !== undefined) {
-      const williams_r = indicators.williams_r;
+    if (indicators.williams_r?.current !== undefined && indicators.williams_r.current !== null) {
+      const williams_r = indicators.williams_r.current;
       let direction: 'bullish' | 'bearish' | 'neutral' = 'neutral';
       if (williams_r < -80) direction = 'bullish';
       else if (williams_r > -20) direction = 'bearish';
@@ -245,8 +312,8 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
     }
     
     // CCI Signal
-    if (indicators.cci !== undefined) {
-      const cci = indicators.cci;
+    if (indicators.cci?.current !== undefined && indicators.cci.current !== null) {
+      const cci = indicators.cci.current;
       let direction: 'bullish' | 'bearish' | 'neutral' = 'neutral';
       if (cci > 100) direction = 'bullish';
       else if (cci < -100) direction = 'bearish';
@@ -260,10 +327,10 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
     }
     
     // ADX Signal
-    if (indicators.adx?.adx !== undefined) {
-      const adx = indicators.adx.adx;
-      const plus_di = indicators.adx.plus_di || 0;
-      const minus_di = indicators.adx.minus_di || 0;
+    if (indicators.adx?.current?.adx !== undefined && indicators.adx.current.adx !== null) {
+      const adx = indicators.adx.current.adx;
+      const plus_di = indicators.adx.current.plus_di || 0;
+      const minus_di = indicators.adx.current.minus_di || 0;
       
       let direction: 'bullish' | 'bearish' | 'neutral' = 'neutral';
       if (adx > 25) {
@@ -280,8 +347,8 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
     }
     
     // Parabolic SAR Signal
-    if (indicators.parabolic_sar !== undefined) {
-      const sar = indicators.parabolic_sar;
+    if (indicators.parabolic_sar?.current !== undefined && indicators.parabolic_sar.current !== null) {
+      const sar = indicators.parabolic_sar.current;
       const currentPrice = apiData.current_price || 0;
       
       let direction: 'bullish' | 'bearish' | 'neutral' = 'neutral';
@@ -297,9 +364,9 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
     }
     
     // Ichimoku Signal
-    if (indicators.ichimoku?.tenkan_sen !== undefined && indicators.ichimoku?.kijun_sen !== undefined) {
-      const tenkan = indicators.ichimoku.tenkan_sen;
-      const kijun = indicators.ichimoku.kijun_sen;
+    if (indicators.ichimoku?.current?.tenkan_sen !== undefined && indicators.ichimoku?.current?.kijun_sen !== undefined) {
+      const tenkan = indicators.ichimoku.current.tenkan_sen;
+      const kijun = indicators.ichimoku.current.kijun_sen;
       const currentPrice = apiData.current_price || 0;
       
       let direction: 'bullish' | 'bearish' | 'neutral' = 'neutral';
@@ -428,35 +495,54 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
           Signaux Techniques - {symbol}
         </h3>
         
-        {/* Informations de prix */}
-        {priceInfo && (
-          <div className="text-right">
-            <div className="text-2xl font-bold text-gray-900">
-              ${priceInfo.current_price.toFixed(2)}
-            </div>
-            <div className="text-sm text-gray-600">
-              {new Date(priceInfo.last_update).toLocaleDateString('fr-FR', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
-            </div>
-            {priceInfo.previous_price > 0 ? (
-              <div className={`text-sm font-medium ${
-                priceInfo.price_change >= 0 ? 'text-green-600' : 'text-red-600'
-              }`}>
-                {priceInfo.price_change >= 0 ? '+' : ''}{priceInfo.price_change.toFixed(2)} 
-                ({priceInfo.price_change_percent >= 0 ? '+' : ''}{priceInfo.price_change_percent.toFixed(2)}%)
-              </div>
-            ) : (
-              <div className="text-sm text-gray-500">
-                Données précédentes indisponibles
-              </div>
-            )}
+        <div className="flex items-center space-x-4">
+          {/* Sélecteur de profondeur historique */}
+          <div className="flex items-center space-x-2">
+            <label className="text-sm font-medium text-gray-700">Période:</label>
+            <select
+              value={historicalDepth}
+              onChange={(e) => setHistoricalDepth(e.target.value as '5d' | '10d' | '1m' | '3m' | '6m' | '1y')}
+              className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="5d">5 jours</option>
+              <option value="10d">10 jours</option>
+              <option value="1m">1 mois</option>
+              <option value="3m">3 mois</option>
+              <option value="6m">6 mois</option>
+              <option value="1y">1 an</option>
+            </select>
           </div>
-        )}
+          
+          {/* Informations de prix */}
+          {priceInfo && (
+            <div className="text-right">
+              <div className="text-2xl font-bold text-gray-900">
+                ${priceInfo.current_price.toFixed(2)}
+              </div>
+              <div className="text-sm text-gray-600">
+                {new Date(priceInfo.last_update).toLocaleDateString('fr-FR', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </div>
+              {priceInfo.previous_price > 0 ? (
+                <div className={`text-sm font-medium ${
+                  priceInfo.price_change >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {priceInfo.price_change >= 0 ? '+' : ''}{priceInfo.price_change.toFixed(2)} 
+                  ({priceInfo.price_change_percent >= 0 ? '+' : ''}{priceInfo.price_change_percent.toFixed(2)}%)
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">
+                  Données précédentes indisponibles
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
       
       <div className="flex flex-wrap gap-2 mb-6">
@@ -492,7 +578,10 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
           {selectedIndicator === 'signals' ? (
             <BarChart data={signals}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="signal_type" />
+              <XAxis 
+                dataKey="signal_type" 
+                tick={{ fontSize: 10 }}
+              />
               <YAxis />
               <Tooltip />
               <Legend />
@@ -505,7 +594,13 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
           ) : (
             <LineChart data={technicalData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="timestamp" />
+              <XAxis 
+                dataKey="timestamp" 
+                tick={{ fontSize: 10 }}
+                angle={-45}
+                textAnchor="end"
+                height={60}
+              />
               <YAxis yAxisId="main" />
               <YAxis 
                 yAxisId="price" 
@@ -524,6 +619,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     strokeWidth={2}
                     name="RSI"
                     yAxisId="main"
+                    dot={false}
                   />
                   <Line 
                     type="monotone" 
@@ -533,6 +629,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     strokeDasharray="2 2"
                     name="Prix (normalisé)"
                     yAxisId="price"
+                    dot={false}
                   />
                 </>
               )}
@@ -545,6 +642,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     strokeWidth={2}
                     name="MACD"
                     yAxisId="main"
+                    dot={false}
                   />
                   <Line 
                     type="monotone" 
@@ -554,6 +652,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     strokeDasharray="2 2"
                     name="Prix (normalisé)"
                     yAxisId="price"
+                    dot={false}
                   />
                 </>
               )}
@@ -566,6 +665,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     strokeWidth={2}
                     name="Prix"
                     yAxisId="price"
+                    dot={false}
                   />
                   <Line 
                     type="monotone" 
@@ -575,6 +675,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     strokeDasharray="5 5"
                     name="Bollinger Supérieur"
                     yAxisId="price"
+                    dot={false}
                   />
                   <Line 
                     type="monotone" 
@@ -584,6 +685,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     strokeDasharray="5 5"
                     name="Bollinger Inférieur"
                     yAxisId="price"
+                    dot={false}
                   />
                 </>
               )}
@@ -596,6 +698,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     strokeWidth={2}
                     name="Williams %R"
                     yAxisId="main"
+                    dot={false}
                   />
                   <Line 
                     type="monotone" 
@@ -605,6 +708,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     strokeDasharray="2 2"
                     name="Prix (normalisé)"
                     yAxisId="price"
+                    dot={false}
                   />
                 </>
               )}
@@ -617,6 +721,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     strokeWidth={2}
                     name="CCI"
                     yAxisId="main"
+                    dot={false}
                   />
                   <Line 
                     type="monotone" 
@@ -626,6 +731,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     strokeDasharray="2 2"
                     name="Prix (normalisé)"
                     yAxisId="price"
+                    dot={false}
                   />
                 </>
               )}
@@ -637,6 +743,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                   strokeWidth={2}
                   name="ADX"
                   yAxisId="main"
+                  dot={false}
                 />
               )}
               {selectedIndicator === 'parabolic_sar' && (
@@ -648,6 +755,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     strokeWidth={2}
                     name="Prix"
                     yAxisId="price"
+                    dot={false}
                   />
                   <Line 
                     type="monotone" 
@@ -657,11 +765,13 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     strokeDasharray="3 3"
                     name="Parabolic SAR"
                     yAxisId="price"
+                    dot={false}
                   />
                 </>
               )}
               {selectedIndicator === 'ichimoku' && (
                 <>
+                  {/* Ligne de prix */}
                   <Line 
                     type="monotone" 
                     dataKey="price" 
@@ -669,23 +779,67 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     strokeWidth={2}
                     name="Prix"
                     yAxisId="price"
+                    dot={false}
                   />
+                  
+                  {/* Lignes Ichimoku */}
                   <Line 
                     type="monotone" 
                     dataKey="ichimoku_tenkan" 
-                    stroke={getIndicatorColor('ichimoku')} 
+                    stroke="#ef4444" 
                     strokeWidth={2}
                     name="Tenkan-sen"
                     yAxisId="price"
+                    dot={false}
                   />
                   <Line 
                     type="monotone" 
                     dataKey="ichimoku_kijun" 
-                    stroke="#06b6d4" 
+                    stroke="#3b82f6" 
                     strokeWidth={2}
                     strokeDasharray="5 5"
                     name="Kijun-sen"
                     yAxisId="price"
+                    dot={false}
+                  />
+                  
+                  {/* Senkou Span A avec zone de remplissage */}
+                  <Line 
+                    type="monotone" 
+                    dataKey="ichimoku_senkou_a" 
+                    stroke="#10b981" 
+                    strokeWidth={2}
+                    strokeDasharray="3 3"
+                    name="Senkou Span A"
+                    yAxisId="price"
+                    fill="#10b981"
+                    fillOpacity={0.4}
+                    dot={false}
+                  />
+                  
+                  {/* Senkou Span B avec zone de remplissage */}
+                  <Line 
+                    type="monotone" 
+                    dataKey="ichimoku_senkou_b" 
+                    stroke="#f59e0b" 
+                    strokeWidth={2}
+                    strokeDasharray="3 3"
+                    name="Senkou Span B"
+                    yAxisId="price"
+                    fill="#f59e0b"
+                    fillOpacity={0.4}
+                    dot={false}
+                  />
+                  
+                  <Line 
+                    type="monotone" 
+                    dataKey="ichimoku_chikou" 
+                    stroke="#8b5cf6" 
+                    strokeWidth={1}
+                    strokeDasharray="2 2"
+                    name="Chikou Span"
+                    yAxisId="price"
+                    dot={false}
                   />
                 </>
               )}
@@ -698,6 +852,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     strokeWidth={2}
                     name="Prix"
                     yAxisId="price"
+                    dot={false}
                   />
                   <Line 
                     type="monotone" 
@@ -706,6 +861,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     strokeWidth={2}
                     name="SMA 20"
                     yAxisId="price"
+                    dot={false}
                   />
                   <Line 
                     type="monotone" 
@@ -715,6 +871,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     strokeDasharray="5 5"
                     name="SMA 50"
                     yAxisId="price"
+                    dot={false}
                   />
                 </>
               )}
@@ -727,6 +884,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                     strokeWidth={2}
                     name="Prix"
                     yAxisId="price"
+                    dot={false}
                   />
                   {/* Lignes de support */}
                   {supportResistanceData.support_levels && supportResistanceData.support_levels.map((level: number, index: number) => (
@@ -859,7 +1017,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
             {signals.filter(s => s.direction === 'bullish').map(signal => (
               <div key={signal.signal_type} className="flex justify-between">
                 <span>{signal.signal_type}:</span>
-                <span className="font-medium">{signal.strength.toFixed(1)}</span>
+                <span className="font-medium">{isNaN(signal.strength) ? 'N/A' : signal.strength.toFixed(1)}</span>
               </div>
             ))}
           </div>
@@ -877,7 +1035,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
             {signals.filter(s => s.direction === 'bearish').map(signal => (
               <div key={signal.signal_type} className="flex justify-between">
                 <span>{signal.signal_type}:</span>
-                <span className="font-medium">{signal.strength.toFixed(1)}</span>
+                <span className="font-medium">{isNaN(signal.strength) ? 'N/A' : signal.strength.toFixed(1)}</span>
               </div>
             ))}
           </div>
@@ -895,7 +1053,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
             {signals.filter(s => s.direction === 'neutral').map(signal => (
               <div key={signal.signal_type} className="flex justify-between">
                 <span>{signal.signal_type}:</span>
-                <span className="font-medium">{signal.strength.toFixed(1)}</span>
+                <span className="font-medium">{isNaN(signal.strength) ? 'N/A' : signal.strength.toFixed(1)}</span>
               </div>
             ))}
           </div>
