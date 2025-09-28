@@ -408,6 +408,38 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
     }
   };
 
+  // Fonction pour calculer les niveaux de support/résistance dynamiques
+  const calculateDynamicSupportResistance = (data: TechnicalData[]): { support_levels: number[], resistance_levels: number[] } => {
+    if (!data || data.length === 0) return { support_levels: [], resistance_levels: [] };
+    
+    const prices = data.map(d => d.price).filter(p => p !== null && p !== undefined);
+    if (prices.length === 0) return { support_levels: [], resistance_levels: [] };
+    
+    // Trier les prix
+    const sortedPrices = [...prices].sort((a, b) => a - b);
+    
+    // Calculer les percentiles pour identifier les niveaux
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const priceRange = maxPrice - minPrice;
+    
+    // Niveaux de support (bas)
+    const support_levels = [
+      minPrice + priceRange * 0.1,  // 10% du range
+      minPrice + priceRange * 0.25, // 25% du range
+      minPrice + priceRange * 0.4   // 40% du range
+    ].filter(level => level < maxPrice);
+    
+    // Niveaux de résistance (haut)
+    const resistance_levels = [
+      minPrice + priceRange * 0.6,  // 60% du range
+      minPrice + priceRange * 0.75, // 75% du range
+      minPrice + priceRange * 0.9   // 90% du range
+    ].filter(level => level > minPrice);
+    
+    return { support_levels, resistance_levels };
+  };
+
   const getSignalAnalysis = (): JSX.Element => {
     const bullishSignals = signals.filter(s => s.direction === 'bullish');
     const bearishSignals = signals.filter(s => s.direction === 'bearish');
@@ -906,49 +938,51 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                   />
                 </>
               )}
-              {selectedIndicator === 'support_resistance' && supportResistanceData && (
-                <>
-                  <Line 
-                    type="monotone" 
-                    dataKey="price" 
-                    stroke="#1f2937" 
-                    strokeWidth={2}
-                    name="Prix"
-                    yAxisId="price"
-                    dot={false}
-                  />
-                  {/* Lignes de support */}
-                  {supportResistanceData.support_levels && supportResistanceData.support_levels.map((level: number, index: number) => (
+              {selectedIndicator === 'support_resistance' && (() => {
+                const dynamicLevels = calculateDynamicSupportResistance(technicalData);
+                return (
+                  <>
                     <Line 
-                      key={`support-${index}`}
                       type="monotone" 
-                      dataKey={() => level} 
-                      stroke="#10b981" 
+                      dataKey="price" 
+                      stroke="#1f2937" 
                       strokeWidth={2}
-                      strokeDasharray="5 5"
-                      name={`Support ${index + 1}`}
+                      name="Prix"
                       yAxisId="price"
                       dot={false}
-                      connectNulls={false}
                     />
-                  ))}
-                  {/* Lignes de résistance */}
-                  {supportResistanceData.resistance_levels && supportResistanceData.resistance_levels.map((level: number, index: number) => (
-                    <Line 
-                      key={`resistance-${index}`}
-                      type="monotone" 
-                      dataKey={() => level} 
-                      stroke="#ef4444" 
-                      strokeWidth={2}
-                      strokeDasharray="5 5"
-                      name={`Résistance ${index + 1}`}
-                      yAxisId="price"
-                      dot={false}
-                      connectNulls={false}
-                    />
-                  ))}
-                  {/* Points pivots */}
-                  {supportResistanceData.pivot_points && (
+                    {/* Lignes de support dynamiques */}
+                    {dynamicLevels.support_levels.map((level: number, index: number) => (
+                      <Line 
+                        key={`support-${index}`}
+                        type="monotone" 
+                        dataKey={() => level} 
+                        stroke="#10b981" 
+                        strokeWidth={2}
+                        strokeDasharray="5 5"
+                        name={`Support ${index + 1}`}
+                        yAxisId="price"
+                        dot={false}
+                        connectNulls={false}
+                      />
+                    ))}
+                    {/* Lignes de résistance dynamiques */}
+                    {dynamicLevels.resistance_levels.map((level: number, index: number) => (
+                      <Line 
+                        key={`resistance-${index}`}
+                        type="monotone" 
+                        dataKey={() => level} 
+                        stroke="#ef4444" 
+                        strokeWidth={2}
+                        strokeDasharray="5 5"
+                        name={`Résistance ${index + 1}`}
+                        yAxisId="price"
+                        dot={false}
+                        connectNulls={false}
+                      />
+                    ))}
+                    {/* Points pivots */}
+                    {supportResistanceData.pivot_points && (
                     <>
                       {supportResistanceData.pivot_points.pivot && (
                         <Line 
@@ -1016,9 +1050,10 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
                         />
                       )}
                     </>
-                  )}
-                </>
-              )}
+                    )}
+                  </>
+                );
+              })()}
             </ComposedChart>
           )}
         </ResponsiveContainer>
