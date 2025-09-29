@@ -612,6 +612,286 @@ class AdvancedTradingAnalysis:
         
         return recommendations
 
+
+    def _calculate_adjusted_optimized_composite_score(
+        self, 
+        technical_score: float, 
+        sentiment_score: float, 
+        market_score: float, 
+        ml_score: float = 0.0,
+        candlestick_score: float = 0.0,
+        garch_score: float = 0.0,
+        monte_carlo_score: float = 0.0,
+        markov_score: float = 0.0,
+        volatility_score: float = 0.0
+    ) -> float:
+        """
+        Calcule le score composite avec priorité au score technique (80%)
+        Recommandation 2: Prioriser le score technique dans la formule de scoring
+        """
+        try:
+            # Poids optimisés - priorité forte au score technique
+            priority_weights = {
+                'technical': 0.8,      # 80% - priorité maximale
+                'sentiment': 0.1,  # 10%
+                'market': 0.1         # 10%
+            }
+            
+            # Score composite avec priorité technique
+            composite_score = (
+                priority_weights['technical'] * technical_score +
+                priority_weights['sentiment'] * sentiment_score +
+                priority_weights['market'] * market_score
+            )
+            
+            return round(composite_score, 4)
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating priority optimized composite score: {e}")
+            return 0.5
+    
+    def _determine_adjusted_optimized_recommendation(
+        self, 
+        composite_score: float, 
+        technical_score: float,
+        confidence_level: float
+    ) -> str:
+        """
+        Détermine la recommandation avec les seuils optimisés
+        Recommandation 1: Utiliser les seuils optimisés pour la génération d'opportunités
+        """
+        try:
+            # Seuils optimaux basés sur l'analyse de performance
+            TECH_THRESHOLD = 0.533
+            COMP_THRESHOLD = 0.651
+            CONF_THRESHOLD = 0.6
+            
+            # Validation des seuils optimaux
+            tech_valid = technical_score >= TECH_THRESHOLD
+            comp_valid = composite_score >= COMP_THRESHOLD
+            conf_valid = confidence_level >= CONF_THRESHOLD
+            
+            # Logique de recommandation avec seuils optimisés
+            if comp_valid and tech_valid and conf_valid:
+                return "BUY_STRONG"
+            elif comp_valid and tech_valid:
+                return "BUY_MODERATE"
+            elif comp_valid or tech_valid:
+                return "BUY_WEAK"
+            elif composite_score >= 0.4:
+                return "HOLD"
+            else:
+                return "SELL_MODERATE"
+                
+        except Exception as e:
+            self.logger.error(f"Error determining priority optimized recommendation: {e}")
+            return "HOLD"
+    
+    def _validate_adjusted_optimized_signals(
+        self, 
+        technical_score: float, 
+        composite_score: float,
+        confidence_level: float
+    ) -> Dict[str, bool]:
+        """
+        Valide les signaux avec les seuils optimisés
+        Recommandation 3: Appliquer la validation des signaux optimisés
+        """
+        validation = {
+            "technical_threshold_met": False,
+            "composite_threshold_met": False,
+            "confidence_threshold_met": False,
+            "overall_valid": False
+        }
+        
+        try:
+            # Seuils optimaux
+            TECH_THRESHOLD = 0.533
+            COMP_THRESHOLD = 0.651
+            CONF_THRESHOLD = 0.6
+            
+            # Validation des seuils
+            validation["technical_threshold_met"] = technical_score >= TECH_THRESHOLD
+            validation["composite_threshold_met"] = composite_score >= COMP_THRESHOLD
+            validation["confidence_threshold_met"] = confidence_level >= CONF_THRESHOLD
+            
+            # Validation globale : au moins 2 critères sur 3
+            valid_criteria = sum(1 for k, v in validation.items() if k != "overall_valid" and v)
+            validation["overall_valid"] = valid_criteria >= 2
+            
+        except Exception as e:
+            self.logger.warning(f"Erreur lors de la validation optimisée: {e}")
+        
+        return validation
+    
+    def _apply_adjusted_optimized_filtering(
+        self, 
+        technical_score: float, 
+        composite_score: float,
+        confidence_level: float
+    ) -> bool:
+        """
+        Applique le filtrage optimisé pour ne garder que les opportunités de haute qualité
+        Combine les 3 recommandations prioritaires
+        """
+        try:
+            # Seuils optimaux
+            TECH_THRESHOLD = 0.533
+            COMP_THRESHOLD = 0.651
+            CONF_THRESHOLD = 0.6
+            
+            # Validation des signaux
+            validation = self._validate_adjusted_optimized_signals(
+                technical_score, composite_score, confidence_level
+            )
+            
+            # Filtrage strict : au moins 2 critères sur 3
+            return validation["overall_valid"]
+            
+        except Exception as e:
+            self.logger.warning(f"Erreur lors du filtrage optimisé: {e}")
+            return False
+
+
+    def _calculate_adjusted_optimized_composite_score(
+        self, 
+        technical_score: float, 
+        sentiment_score: float, 
+        market_score: float, 
+        ml_score: float = 0.0,
+        candlestick_score: float = 0.0,
+        garch_score: float = 0.0,
+        monte_carlo_score: float = 0.0,
+        markov_score: float = 0.0,
+        volatility_score: float = 0.0
+    ) -> float:
+        """
+        Calcule le score composite avec priorité au score technique (80%)
+        Seuils ajustés pour être plus réalistes
+        """
+        try:
+            # Poids optimisés - priorité forte au score technique
+            priority_weights = {
+                'technical': 0.8,      # 80% - priorité maximale
+                'sentiment': 0.1,      # 10%
+                'market': 0.1          # 10%
+            }
+            
+            # Score composite avec priorité technique
+            composite_score = (
+                priority_weights['technical'] * technical_score +
+                priority_weights['sentiment'] * sentiment_score +
+                priority_weights['market'] * market_score
+            )
+            
+            return round(composite_score, 4)
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating adjusted optimized composite score: {e}")
+            return 0.5
+    
+    def _determine_adjusted_optimized_recommendation(
+        self, 
+        composite_score: float, 
+        technical_score: float,
+        confidence_level: float
+    ) -> str:
+        """
+        Détermine la recommandation avec les seuils ajustés
+        Seuils plus réalistes basés sur l'analyse des données
+        """
+        try:
+            # Seuils ajustés plus réalistes
+            TECH_THRESHOLD = 0.45
+            COMP_THRESHOLD = 0.5
+            CONF_THRESHOLD = 0.6
+            
+            # Validation des seuils ajustés
+            tech_valid = technical_score >= TECH_THRESHOLD
+            comp_valid = composite_score >= COMP_THRESHOLD
+            conf_valid = confidence_level >= CONF_THRESHOLD
+            
+            # Logique de recommandation avec seuils ajustés
+            if comp_valid and tech_valid and conf_valid:
+                return "BUY_STRONG"
+            elif comp_valid and tech_valid:
+                return "BUY_MODERATE"
+            elif comp_valid or tech_valid:
+                return "BUY_WEAK"
+            elif composite_score >= 0.4:
+                return "HOLD"
+            else:
+                return "SELL_MODERATE"
+                
+        except Exception as e:
+            self.logger.error(f"Error determining adjusted optimized recommendation: {e}")
+            return "HOLD"
+    
+    def _validate_adjusted_optimized_signals(
+        self, 
+        technical_score: float, 
+        composite_score: float,
+        confidence_level: float
+    ) -> Dict[str, bool]:
+        """
+        Valide les signaux avec les seuils ajustés
+        Seuils plus réalistes pour une meilleure sélection
+        """
+        validation = {
+            "technical_threshold_met": False,
+            "composite_threshold_met": False,
+            "confidence_threshold_met": False,
+            "overall_valid": False
+        }
+        
+        try:
+            # Seuils ajustés
+            TECH_THRESHOLD = 0.45
+            COMP_THRESHOLD = 0.5
+            CONF_THRESHOLD = 0.6
+            
+            # Validation des seuils
+            validation["technical_threshold_met"] = technical_score >= TECH_THRESHOLD
+            validation["composite_threshold_met"] = composite_score >= COMP_THRESHOLD
+            validation["confidence_threshold_met"] = confidence_level >= CONF_THRESHOLD
+            
+            # Validation globale : au moins 2 critères sur 3
+            valid_criteria = sum(1 for k, v in validation.items() if k != "overall_valid" and v)
+            validation["overall_valid"] = valid_criteria >= 2
+            
+        except Exception as e:
+            self.logger.warning(f"Erreur lors de la validation ajustée: {e}")
+        
+        return validation
+    
+    def _apply_adjusted_optimized_filtering(
+        self, 
+        technical_score: float, 
+        composite_score: float,
+        confidence_level: float
+    ) -> bool:
+        """
+        Applique le filtrage ajusté pour ne garder que les opportunités de qualité
+        Seuils plus réalistes pour une meilleure sélection
+        """
+        try:
+            # Seuils ajustés
+            TECH_THRESHOLD = 0.45
+            COMP_THRESHOLD = 0.5
+            CONF_THRESHOLD = 0.6
+            
+            # Validation des signaux
+            validation = self._validate_adjusted_optimized_signals(
+                technical_score, composite_score, confidence_level
+            )
+            
+            # Filtrage ajusté : au moins 2 critères sur 3
+            return validation["overall_valid"]
+            
+        except Exception as e:
+            self.logger.warning(f"Erreur lors du filtrage ajusté: {e}")
+            return False
+
     async def analyze_opportunity(
         self, 
         symbol: str, 
@@ -666,7 +946,7 @@ class AdvancedTradingAnalysis:
                 ml_score, ml_analysis = await self._analyze_ml(symbol, db)
             
             # Calcul du score composite
-            composite_score = self._calculate_composite_score(
+            composite_score = self._calculate_adjusted_optimized_composite_score(
                 technical_score, sentiment_score, market_score, ml_score,
                 candlestick_score, garch_score, monte_carlo_score, markov_score, volatility_score
             )
@@ -680,10 +960,33 @@ class AdvancedTradingAnalysis:
                 market_indicators=market_indicators
             )
             
-            # Détermination de la recommandation et du niveau de risque avec validation
-            recommendation, risk_level = self._determine_recommendation(
-                composite_score, technical_score, sentiment_score, market_score, confidence_level
+            # Détermination de la recommandation avec les seuils optimisés
+            recommendation = self._determine_adjusted_optimized_recommendation(
+                composite_score, technical_score, confidence_level
             )
+            
+            # Validation des signaux optimisés (Recommandation 3)
+            signal_validation = self._validate_adjusted_optimized_signals(
+                technical_score, composite_score, confidence_level
+            )
+            
+            # Filtrage optimisé - ne garder que les opportunités de haute qualité
+            if not self._apply_adjusted_optimized_filtering(
+                technical_score, composite_score, confidence_level
+            ):
+                # Si le signal ne passe pas le filtrage, retourner HOLD
+                recommendation = "HOLD"
+            
+            # Détermination du niveau de risque basé sur la validation
+            if signal_validation["overall_valid"]:
+                if confidence_level >= 0.8:
+                    risk_level = "LOW"
+                elif confidence_level >= 0.6:
+                    risk_level = "MEDIUM"
+                else:
+                    risk_level = "HIGH"
+            else:
+                risk_level = "HIGH"
             
             result = AnalysisResult(
                 symbol=symbol,

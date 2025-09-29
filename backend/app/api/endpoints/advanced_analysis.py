@@ -648,6 +648,20 @@ async def generate_daily_opportunities(
                     existing_opportunity.monte_carlo_score = result.monte_carlo_score
                     existing_opportunity.markov_score = result.markov_score
                     existing_opportunity.volatility_score = result.volatility_score
+                    
+                    # Mettre à jour les analyses détaillées
+                    existing_opportunity.technical_analysis = result.technical_analysis
+                    existing_opportunity.sentiment_analysis = result.sentiment_analysis
+                    existing_opportunity.market_analysis = result.market_indicators
+                    existing_opportunity.ml_analysis = result.ml_analysis
+                    existing_opportunity.candlestick_analysis = result.candlestick_analysis
+                    existing_opportunity.garch_analysis = result.garch_analysis
+                    existing_opportunity.monte_carlo_analysis = result.monte_carlo_analysis
+                    existing_opportunity.markov_analysis = result.markov_analysis
+                    existing_opportunity.volatility_analysis = result.volatility_analysis
+                    existing_opportunity.analysis_types = ['technical', 'sentiment', 'market', 'ml', 'candlestick', 'garch', 'monte_carlo', 'markov', 'volatility']
+                    existing_opportunity.time_horizon = time_horizon
+                    
                     existing_opportunity.updated_at = datetime.now()
                 else:
                     # Créer une nouvelle opportunité
@@ -667,6 +681,20 @@ async def generate_daily_opportunities(
                         monte_carlo_score=result.monte_carlo_score,
                         markov_score=result.markov_score,
                         volatility_score=result.volatility_score,
+                        
+                        # Analyses détaillées
+                        technical_analysis=result.technical_analysis,
+                        sentiment_analysis=result.sentiment_analysis,
+                        market_analysis=result.market_indicators,
+                        ml_analysis=result.ml_analysis,
+                        candlestick_analysis=result.candlestick_analysis,
+                        garch_analysis=result.garch_analysis,
+                        monte_carlo_analysis=result.monte_carlo_analysis,
+                        markov_analysis=result.markov_analysis,
+                        volatility_analysis=result.volatility_analysis,
+                        analysis_types=['technical', 'sentiment', 'market', 'ml', 'candlestick', 'garch', 'monte_carlo', 'markov', 'volatility'],
+                        time_horizon=time_horizon,
+                        
                         created_at=datetime.now(),
                         updated_at=datetime.now()
                     )

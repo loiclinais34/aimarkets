@@ -399,15 +399,20 @@ class TradingCategoryAnalyzer:
                 print(f"  • {category}: {data['error']}")
                 continue
             
-            perf = data["performance"]
-            print(f"  • {category}:")
-            print(f"    Nombre d'opportunités: {data['count']} ({data['percentage']:.1f}%)")
-            print(f"    Précision: {perf['accuracy']:.1f}%")
-            print(f"    Retour moyen: {perf['avg_return']:.2f}%")
-            print(f"    Taux de succès: {perf['success_rate']:.1f}%")
-            print(f"    Sharpe ratio: {perf['sharpe_ratio']:.3f}")
-            print(f"    Retours positifs: {perf['positive_returns']['count']} (moy: {perf['positive_returns']['avg']:.2f}%)")
-            print(f"    Retours négatifs: {perf['negative_returns']['count']} (moy: {perf['negative_returns']['avg']:.2f}%)\n")
+            if isinstance(data.get("performance"), dict):
+                perf = data["performance"]
+                print(f"  • {category}:")
+                print(f"    Nombre d'opportunités: {data['count']} ({data.get('percentage', 0):.1f}%)")
+                print(f"    Précision: {perf.get('accuracy', 0):.1f}%")
+                print(f"    Retour moyen: {perf.get('avg_return', 0):.2f}%")
+                print(f"    Taux de succès: {perf.get('success_rate', 0):.1f}%")
+                print(f"    Sharpe ratio: {perf.get('sharpe_ratio', 0):.3f}")
+                if 'positive_returns' in perf and isinstance(perf['positive_returns'], dict):
+                    print(f"    Retours positifs: {perf['positive_returns'].get('count', 0)} (moy: {perf['positive_returns'].get('avg', 0):.2f}%)")
+                if 'negative_returns' in perf and isinstance(perf['negative_returns'], dict):
+                    print(f"    Retours négatifs: {perf['negative_returns'].get('count', 0)} (moy: {perf['negative_returns'].get('avg', 0):.2f}%)\n")
+            else:
+                print(f"  • {category}: Aucune donnée de performance disponible\n")
         
         # Insights stratégiques
         insights = self.results["strategy_insights"]
