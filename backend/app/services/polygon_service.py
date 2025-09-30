@@ -486,37 +486,39 @@ class PolygonService:
                 
                 # 4. Vérifier si nous avons besoin de mettre à jour (logique de fraîcheur basée sur l'heure de clôture NASDAQ)
                 if not force_update and last_date:
-                    # Obtenir l'heure de la dernière mise à jour (created_at) pour ce symbole
-                    last_update_result = db.query(func.max(HistoricalData.created_at)).filter(
-                        HistoricalData.symbol == symbol
-                    ).first()
-                    
-                    if last_update_result[0]:
-                        last_update_datetime = last_update_result[0]
+                    # Vérifier si last_date est égal à end_date (les données sont déjà à jour jusqu'à hier)
+                    if last_date >= end_date:
+                        # Obtenir l'heure de la dernière mise à jour (created_at) pour ce symbole
+                        last_update_result = db.query(func.max(HistoricalData.created_at)).filter(
+                            HistoricalData.symbol == symbol
+                        ).first()
                         
-                        # Calculer l'heure de clôture NASDAQ pour la date de la dernière donnée
-                        from app.services.data_update_service import DataUpdateService
-                        data_update_service = DataUpdateService(db)
-                        
-                        # Convertir last_date en datetime pour la comparaison
-                        last_date_datetime = datetime.combine(last_date, datetime.min.time())
-                        nasdaq_close_time = data_update_service.get_nasdaq_close_time_utc2(last_date_datetime)
-                        
-                        # Convertir last_update_datetime en UTC+2 si nécessaire
-                        if last_update_datetime.tzinfo is None:
-                            last_update_utc2 = last_update_datetime.replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=2)))
-                        else:
-                            last_update_utc2 = last_update_datetime.astimezone(timezone(timedelta(hours=2)))
-                        
-                        # Vérifier si la mise à jour est postérieure à la clôture NASDAQ
-                        if last_update_utc2 >= nasdaq_close_time:
-                            return {
-                                'symbol': symbol,
-                                'status': 'success',
-                                'message': f'Données déjà à jour jusqu\'à {last_date} (mise à jour après clôture NASDAQ)',
-                                'records_updated': 0,
-                                'last_date': last_date
-                            }
+                        if last_update_result[0]:
+                            last_update_datetime = last_update_result[0]
+                            
+                            # Calculer l'heure de clôture NASDAQ pour la date de la dernière donnée
+                            from app.services.data_update_service import DataUpdateService
+                            data_update_service = DataUpdateService(db)
+                            
+                            # Convertir last_date en datetime pour la comparaison
+                            last_date_datetime = datetime.combine(last_date, datetime.min.time())
+                            nasdaq_close_time = data_update_service.get_nasdaq_close_time_utc2(last_date_datetime)
+                            
+                            # Convertir last_update_datetime en UTC+2 si nécessaire
+                            if last_update_datetime.tzinfo is None:
+                                last_update_utc2 = last_update_datetime.replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=2)))
+                            else:
+                                last_update_utc2 = last_update_datetime.astimezone(timezone(timedelta(hours=2)))
+                            
+                            # Vérifier si la mise à jour est postérieure à la clôture NASDAQ
+                            if last_update_utc2 >= nasdaq_close_time:
+                                return {
+                                    'symbol': symbol,
+                                    'status': 'success',
+                                    'message': f'Données déjà à jour jusqu\'à {last_date} (mise à jour après clôture NASDAQ)',
+                                    'records_updated': 0,
+                                    'last_date': last_date
+                                }
                 
                 # 5. Récupérer les nouvelles données depuis Polygon
                 logger.info(f"Récupération des données pour {symbol} du {start_date} au {end_date}")
