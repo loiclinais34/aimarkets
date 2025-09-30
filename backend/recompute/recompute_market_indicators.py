@@ -20,6 +20,7 @@ import numpy as np
 from app.core.database import get_db
 from app.models.database import HistoricalData
 from app.models.market_indicators import MarketIndicators
+from app.models.sentiment_analysis import GARCHModels, MonteCarloSimulations
 
 # Configuration du logging
 logging.basicConfig(
@@ -33,25 +34,31 @@ def get_all_symbols(db: Session) -> List[str]:
     symbols = db.query(HistoricalData.symbol).distinct().all()
     return [symbol[0] for symbol in symbols]
 
-def calculate_market_indicators_for_symbol(symbol: str, db: Session) -> int:
+def calculate_market_indicators_for_symbol(symbol: str, db: Session, target_date: Optional[datetime] = None) -> int:
     """
     Calcule les indicateurs de marché pour un symbole spécifique
     
     Args:
         symbol: Symbole à traiter
         db: Session de base de données
+        target_date: Date pour laquelle calculer les indicateurs (optionnel)
     
     Returns:
         Nombre d'indicateurs créés
     """
     try:
-        # Récupérer les données historiques
+        # Si target_date n'est pas spécifié, utiliser la date actuelle
+        if target_date is None:
+            target_date = datetime.now()
+        
+        # Récupérer les données historiques jusqu'à la target_date
         historical_data = db.query(HistoricalData).filter(
-            HistoricalData.symbol == symbol
-        ).order_by(HistoricalData.created_at.desc()).limit(252).all()
+            HistoricalData.symbol == symbol,
+            HistoricalData.date <= target_date.date()
+        ).order_by(HistoricalData.date.desc()).limit(252).all()
         
         if not historical_data:
-            logger.warning(f"No historical data found for {symbol}")
+            logger.warning(f"No historical data found for {symbol} up to {target_date.date()}")
             return 0
         
         indicators_created = 0
@@ -67,7 +74,7 @@ def calculate_market_indicators_for_symbol(symbol: str, db: Session) -> int:
                 indicator_type="VOLATILITY_20D",
                 indicator_value=float(volatility_20d),
                 indicator_name="Volatilité Historique 20 jours",
-                analysis_date=datetime.now()
+                analysis_date=target_date
             )
             db.add(market_indicator)
             indicators_created += 1
@@ -83,7 +90,7 @@ def calculate_market_indicators_for_symbol(symbol: str, db: Session) -> int:
                 indicator_type="MOMENTUM_5D",
                 indicator_value=float(momentum_5d),
                 indicator_name="Momentum Prix 5 jours",
-                analysis_date=datetime.now()
+                analysis_date=target_date
             )
             db.add(market_indicator)
             indicators_created += 1
@@ -99,7 +106,7 @@ def calculate_market_indicators_for_symbol(symbol: str, db: Session) -> int:
                 indicator_type="MOMENTUM_20D",
                 indicator_value=float(momentum_20d),
                 indicator_name="Momentum Prix 20 jours",
-                analysis_date=datetime.now()
+                analysis_date=target_date
             )
             db.add(market_indicator)
             indicators_created += 1
@@ -119,7 +126,7 @@ def calculate_market_indicators_for_symbol(symbol: str, db: Session) -> int:
                     indicator_type="VOLUME_RATIO",
                     indicator_value=float(volume_ratio),
                     indicator_name="Ratio Volume Moyen",
-                    analysis_date=datetime.now()
+                    analysis_date=target_date
                 )
                 db.add(market_indicator)
                 indicators_created += 1
@@ -152,10 +159,18 @@ def calculate_market_indicators_for_symbol(symbol: str, db: Session) -> int:
                         indicator_type="RSI_14D",
                         indicator_value=float(rsi),
                         indicator_name="RSI 14 jours",
-                        analysis_date=datetime.now()
+                        analysis_date=target_date
                     )
                     db.add(market_indicator)
                     indicators_created += 1
+        
+        # Calculer les indicateurs basés sur les modèles GARCH
+        garch_indicators = calculate_garch_based_indicators(symbol, target_date, db)
+        indicators_created += garch_indicators
+        
+        # Calculer les indicateurs basés sur les simulations Monte Carlo
+        monte_carlo_indicators = calculate_monte_carlo_based_indicators(symbol, target_date, db)
+        indicators_created += monte_carlo_indicators
         
         return indicators_created
         
@@ -166,6 +181,7 @@ def calculate_market_indicators_for_symbol(symbol: str, db: Session) -> int:
 def recompute_market_indicators(
     symbols: Optional[List[str]] = None,
     force_update: bool = False,
+    target_date: Optional[datetime] = None,
     db: Session = None
 ) -> dict:
     """
@@ -174,6 +190,7 @@ def recompute_market_indicators(
     Args:
         symbols: Liste des symboles à traiter (None = tous)
         force_update: Forcer le recalcul même si les indicateurs existent
+        target_date: Date pour laquelle calculer les indicateurs (optionnel)
         db: Session de base de données
     
     Returns:
@@ -221,7 +238,7 @@ def recompute_market_indicators(
                         .delete()
                 
                 # Calculer les nouveaux indicateurs
-                indicators_created = calculate_market_indicators_for_symbol(symbol, db)
+                indicators_created = calculate_market_indicators_for_symbol(symbol, db, target_date)
                 
                 if indicators_created > 0:
                     logger.info(f"Market indicators calculated successfully for {symbol}: {indicators_created} indicators")
@@ -288,6 +305,7 @@ def main():
     results = recompute_market_indicators(
         symbols=args.symbols,
         force_update=args.force,
+        target_date=None,  # Utiliser la date actuelle par défaut
         db=db
     )
     

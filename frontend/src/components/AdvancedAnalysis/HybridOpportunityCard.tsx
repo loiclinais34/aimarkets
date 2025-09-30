@@ -33,9 +33,12 @@ interface HybridOpportunityCardProps {
     correlation_strength?: string;
     market_regime?: string;
     overall_score?: number;
+    // Indicateur de bulle
+    bubble_score?: number;
+    bubble_level?: string;
   };
   onAnalyze?: (symbol: string) => void;
-  onViewDetails?: (symbol: string, tab: 'technical' | 'sentiment' | 'market' | 'hybrid') => void;
+  onViewDetails?: (symbol: string, tab: 'technical' | 'sentiment' | 'market' | 'hybrid' | 'bubble') => void;
   className?: string;
 }
 
@@ -137,6 +140,40 @@ const HybridOpportunityCard: React.FC<HybridOpportunityCardProps> = ({
       case 'bear market': return '#ef4444';
       case 'high volatility': return '#f59e0b';
       default: return '#6b7280';
+    }
+  };
+
+  const getBubbleLevelColor = (level?: string) => {
+    if (!level) return 'bg-gray-100 text-gray-600';
+    switch (level.toUpperCase()) {
+      case 'NORMAL':
+        return 'bg-green-100 text-green-700';
+      case 'WATCH':
+        return 'bg-yellow-100 text-yellow-700';
+      case 'RISK':
+        return 'bg-orange-100 text-orange-700';
+      case 'PROBABLE':
+        return 'bg-red-100 text-red-700';
+      case 'CRITICAL':
+        return 'bg-red-200 text-red-900';
+      default:
+        return 'bg-gray-100 text-gray-600';
+    }
+  };
+
+  const getBubbleLevelIcon = (level?: string) => {
+    if (!level) return null;
+    switch (level.toUpperCase()) {
+      case 'RISK':
+      case 'PROBABLE':
+      case 'CRITICAL':
+        return '🚨';
+      case 'WATCH':
+        return '⚡';
+      case 'NORMAL':
+        return '✅';
+      default:
+        return null;
     }
   };
 
@@ -415,6 +452,32 @@ const HybridOpportunityCard: React.FC<HybridOpportunityCardProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Indicateur de Bulle */}
+          {opportunity.bubble_level && (
+            <div className="mb-6">
+              <h4 className="text-md font-semibold text-gray-900 mb-3">Risque de Bulle Spéculative</h4>
+              <div className={`p-4 rounded-lg ${getBubbleLevelColor(opportunity.bubble_level)}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-lg">{getBubbleLevelIcon(opportunity.bubble_level)}</span>
+                    <span className="font-semibold">{opportunity.bubble_level}</span>
+                  </div>
+                  <span className="text-xl font-bold">
+                    {opportunity.bubble_score?.toFixed(1)}/100
+                  </span>
+                </div>
+                {opportunity.bubble_level !== 'NORMAL' && (
+                  <p className="text-xs mt-2 opacity-90">
+                    {opportunity.bubble_level === 'WATCH' && 'Surveillance recommandée - Valorisation élevée'}
+                    {opportunity.bubble_level === 'RISK' && '⚠️ Risque significatif de correction - Prudence'}
+                    {opportunity.bubble_level === 'PROBABLE' && '🚨 Bulle probable - Éviter toute nouvelle position'}
+                    {opportunity.bubble_level === 'CRITICAL' && '🚨🚨 Bulle critique - Réduction de position recommandée'}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex justify-end space-x-3">

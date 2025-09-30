@@ -6,7 +6,7 @@ import uvicorn
 
 from .core.config import settings
 from .core.database import init_db, close_db
-from .api.endpoints import data, target_parameters, ml_models, lightgbm_models, lightgbm_test, symbol_metadata, backtesting, trading_strategies, model_comparison, async_model_comparison, financial_ratios, technical_analysis, sentiment_analysis, market_indicators
+from .api.endpoints import data, target_parameters, ml_models, lightgbm_models, lightgbm_test, symbol_metadata, backtesting, trading_strategies, model_comparison, async_model_comparison, financial_ratios, technical_analysis, sentiment_analysis, market_indicators, ml_backtesting
 
 
 @asynccontextmanager
@@ -214,6 +214,24 @@ app.include_router(
     advanced_analysis.router,
     prefix="/api/v1/advanced-analysis",
     tags=["Analyse Avancée"]
+)
+
+# Import du router ml_backtesting
+from app.api.endpoints import ml_backtesting
+
+app.include_router(
+    ml_backtesting.router,
+    prefix="/api/v1",
+    tags=["ML Backtesting"]
+)
+
+# Bubble Detection API
+from app.api.endpoints import bubble_detection
+
+app.include_router(
+    bubble_detection.router,
+    prefix="/api/v1/bubble-detection",
+    tags=["Bubble Detection"]
 )
 
 # Endpoints LightGBM temporairement désactivés à cause de problèmes de stabilité

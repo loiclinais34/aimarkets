@@ -13,18 +13,176 @@ import {
 import TechnicalSignalsChart from './TechnicalSignalsChart';
 import SentimentAnalysisPanel from './SentimentAnalysisPanel';
 import MarketIndicatorsWidget from './MarketIndicatorsWidget';
+import BubbleRiskPanel from './BubbleRiskPanel';
 import HybridOpportunityCard from './HybridOpportunityCard';
-import { advancedAnalysisApi, HybridAnalysisRequest, HybridAnalysisResponse, AdvancedSearchFilters } from '@/services/advancedAnalysisApi';
+import { advancedAnalysisApi, HybridAnalysisRequest, HybridAnalysisResponse, AdvancedSearchFilters, GenerateDailyOpportunitiesRequest, GenerateDailyOpportunitiesResponse } from '@/services/advancedAnalysisApi';
 
 interface AdvancedAnalysisDashboardProps {
   className?: string;
 }
 
 const AdvancedAnalysisDashboard: React.FC<AdvancedAnalysisDashboardProps> = ({ className = '' }) => {
-  const [selectedSymbol, setSelectedSymbol] = useState('AAPL');
   const [hybridOpportunities, setHybridOpportunities] = useState<HybridAnalysisResponse['opportunities']>([]);
+  const [filteredOpportunities, setFilteredOpportunities] = useState<HybridAnalysisResponse['opportunities']>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [generatingOpportunities, setGeneratingOpportunities] = useState(false);
+  const [generationMessage, setGenerationMessage] = useState<string | null>(null);
+  const [showGenerationForm, setShowGenerationForm] = useState(false);
+  const [generationParams, setGenerationParams] = useState<GenerateDailyOpportunitiesRequest>({
+    limit_symbols: 50,
+    time_horizon: 30,
+    include_ml: true
+  });
+  
+  // Filtres
+  const [filters, setFilters] = useState({
+    symbol: '',
+    recommendation: '',
+    minScore: '',
+    maxScore: '',
+    startDate: '',
+    endDate: ''
+  });
+  
+  // Tri
+  const [sortBy, setSortBy] = useState('composite_score');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Fonction pour charger les opportunités par défaut
+  const loadDefaultOpportunities = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const searchFilters: AdvancedSearchFilters = {
+        limit: 50,
+        sort_by: 'composite_score',
+        sort_order: 'desc'
+      };
+      
+      const response = await advancedAnalysisApi.searchStoredOpportunities(searchFilters);
+      setHybridOpportunities(response.opportunities);
+      setFilteredOpportunities(response.opportunities);
+    } catch (err) {
+      console.error('Erreur lors du chargement des opportunités:', err);
+      setError('Erreur lors du chargement des opportunités');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fonction pour appliquer les filtres
+  const applyFilters = () => {
+    console.log('Applying filters:', filters);
+    console.log('Original opportunities count:', hybridOpportunities.length);
+    
+    let filtered = [...hybridOpportunities];
+    
+    // Filtre par symbole
+    if (filters.symbol) {
+      filtered = filtered.filter(opp => 
+        opp.symbol.toLowerCase().includes(filters.symbol.toLowerCase())
+      );
+      console.log('After symbol filter:', filtered.length);
+    }
+    
+    // Filtre par recommandation
+    if (filters.recommendation) {
+      filtered = filtered.filter(opp => opp.recommendation === filters.recommendation);
+      console.log('After recommendation filter:', filtered.length);
+    }
+    
+    // Filtre par score minimum
+    if (filters.minScore) {
+      const minScore = parseFloat(filters.minScore);
+      filtered = filtered.filter(opp => opp.hybrid_score >= minScore);
+      console.log('After min score filter:', filtered.length);
+    }
+    
+    // Filtre par score maximum
+    if (filters.maxScore) {
+      const maxScore = parseFloat(filters.maxScore);
+      filtered = filtered.filter(opp => opp.hybrid_score <= maxScore);
+      console.log('After max score filter:', filtered.length);
+    }
+    
+    // Filtre par date
+    if (filters.startDate) {
+      const startDate = new Date(filters.startDate);
+      filtered = filtered.filter(opp => new Date(opp.updated_at || '') >= startDate);
+      console.log('After start date filter:', filtered.length);
+    }
+    
+    if (filters.endDate) {
+      const endDate = new Date(filters.endDate);
+      filtered = filtered.filter(opp => new Date(opp.updated_at || '') <= endDate);
+      console.log('After end date filter:', filtered.length);
+    }
+    
+    console.log('Final filtered count:', filtered.length);
+    setFilteredOpportunities(filtered);
+  };
+
+  // Fonction pour trier les opportunités
+  const sortOpportunities = () => {
+    setFilteredOpportunities(prevFiltered => {
+      const sorted = [...prevFiltered].sort((a, b) => {
+        let aValue: any, bValue: any;
+        
+        switch (sortBy) {
+          case 'composite_score':
+            aValue = a.hybrid_score;
+            bValue = b.hybrid_score;
+            break;
+          case 'technical_score':
+            aValue = a.technical_score;
+            bValue = b.technical_score;
+            break;
+          case 'sentiment_score':
+            aValue = a.sentiment_score;
+            bValue = b.sentiment_score;
+            break;
+          case 'market_score':
+            aValue = a.market_score;
+            bValue = b.market_score;
+            break;
+          case 'confidence_level':
+            aValue = a.confidence;
+            bValue = b.confidence;
+            break;
+          case 'analysis_date':
+            aValue = new Date(a.updated_at || '');
+            bValue = new Date(b.updated_at || '');
+            break;
+          default:
+            aValue = a.hybrid_score;
+            bValue = b.hybrid_score;
+        }
+        
+        if (sortOrder === 'asc') {
+          return aValue > bValue ? 1 : -1;
+        } else {
+          return aValue < bValue ? 1 : -1;
+        }
+      });
+      
+      return sorted;
+    });
+  };
+
+  // Fonction pour réinitialiser les filtres
+  const resetFilters = () => {
+    setFilters({
+      symbol: '',
+      recommendation: '',
+      minScore: '',
+      maxScore: '',
+      startDate: '',
+      endDate: ''
+    });
+    setFilteredOpportunities(hybridOpportunities);
+  };
 
   // Fonction pour obtenir le nom de l'entreprise à partir du symbole
   const getCompanyName = (symbol: string): string => {
@@ -166,16 +324,21 @@ const AdvancedAnalysisDashboard: React.FC<AdvancedAnalysisDashboardProps> = ({ c
     date_from: undefined,
     date_to: undefined
   });
-  const [showFilters, setShowFilters] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
+  const [showFiltersAndSort, setShowFiltersAndSort] = useState(false);
   const [selectedOpportunity, setSelectedOpportunity] = useState<{
     symbol: string;
-    tab: 'technical' | 'sentiment' | 'market' | 'hybrid';
+    tab: 'technical' | 'sentiment' | 'market' | 'bubble' | 'hybrid';
   } | null>(null);
-  const [activeTab, setActiveTab] = useState<'technical' | 'sentiment' | 'market' | 'hybrid'>('technical');
+  const [activeTab, setActiveTab] = useState<'technical' | 'sentiment' | 'market' | 'bubble' | 'hybrid'>('technical');
 
   useEffect(() => {
-    performHybridSearch();
+    loadDefaultOpportunities();
   }, []);
+
+  useEffect(() => {
+    sortOpportunities();
+  }, [sortBy, sortOrder]);
 
   const performHybridSearch = async () => {
     try {
@@ -207,15 +370,43 @@ const AdvancedAnalysisDashboard: React.FC<AdvancedAnalysisDashboardProps> = ({ c
     }
   };
 
+  const generateDailyOpportunities = async () => {
+    setGeneratingOpportunities(true);
+    setGenerationMessage(null);
+    setError(null);
+
+    try {
+      const response = await advancedAnalysisApi.generateDailyOpportunities(generationParams);
+      
+      if (response.status === 'success') {
+        setGenerationMessage(
+          `✅ ${response.summary.total_opportunities_generated} opportunités générées pour ${response.summary.total_symbols_requested} symboles`
+        );
+        
+        // Recharger les opportunités après génération
+        setTimeout(() => {
+          loadDefaultOpportunities();
+        }, 1000);
+      } else {
+        setError('Erreur lors de la génération des opportunités');
+      }
+    } catch (err) {
+      console.error('Erreur lors de la génération des opportunités:', err);
+      setError('Erreur lors de la génération des opportunités du jour');
+    } finally {
+      setGeneratingOpportunities(false);
+    }
+  };
+
   const handleSymbolChange = (symbol: string) => {
-    setSelectedSymbol(symbol);
+    // No longer needed
   };
 
   const handleAnalyzeSymbol = (symbol: string) => {
-    setSelectedSymbol(symbol);
+    // No longer needed
   };
 
-  const handleViewDetails = (symbol: string, tab: 'technical' | 'sentiment' | 'market' | 'hybrid') => {
+  const handleViewDetails = (symbol: string, tab: 'technical' | 'sentiment' | 'market' | 'bubble' | 'hybrid') => {
     setSelectedOpportunity({ symbol, tab });
     setActiveTab(tab);
   };
@@ -229,6 +420,7 @@ const AdvancedAnalysisDashboard: React.FC<AdvancedAnalysisDashboardProps> = ({ c
     { id: 'technical', name: 'Technique', icon: ArrowTrendingUpIcon },
     { id: 'sentiment', name: 'Sentiment', icon: ExclamationTriangleIcon },
     { id: 'market', name: 'Marché', icon: ChartBarIcon },
+    { id: 'bubble', name: 'Bulle', icon: ExclamationTriangleIcon },
     { id: 'hybrid', name: 'Composite', icon: Cog6ToothIcon }
   ];
 
@@ -304,6 +496,10 @@ const AdvancedAnalysisDashboard: React.FC<AdvancedAnalysisDashboardProps> = ({ c
             <MarketIndicatorsWidget symbol={selectedOpportunity.symbol} />
           )}
           
+          {activeTab === 'bubble' && (
+            <BubbleRiskPanel symbol={selectedOpportunity.symbol} />
+          )}
+          
           {activeTab === 'hybrid' && (
             <div className="space-y-8">
               <div className="bg-white rounded-lg shadow-md p-6">
@@ -337,267 +533,288 @@ const AdvancedAnalysisDashboard: React.FC<AdvancedAnalysisDashboardProps> = ({ c
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="py-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">
-                  Analyse Avancée de Trading
-                </h1>
-                <p className="mt-2 text-gray-600">
-                  Système d'analyse combinée ML + conventionnelle pour des décisions éclairées
-                </p>
-              </div>
-              
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
-                  <MagnifyingGlassIcon className="w-5 h-5 text-gray-400" />
-                  <input
-                    type="text"
-                    value={selectedSymbol}
-                    onChange={(e) => setSelectedSymbol(e.target.value.toUpperCase())}
-                    placeholder="Symbole (ex: AAPL)"
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                
-                <button
-                  onClick={performHybridSearch}
-                  disabled={loading}
-                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <MagnifyingGlassIcon className="w-4 h-4" />
-                  )}
-                  <span>Rechercher</span>
-                </button>
-              </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Analyse Avancée de Trading
+              </h1>
+              <p className="mt-2 text-gray-600">
+                Système d'analyse combinée ML + conventionnelle pour des décisions éclairées
+              </p>
             </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Page de recherche */}
-        <div className="space-y-8">
-          {/* Filtres avancés - affichés seulement si showFilters est true */}
-          {showFilters && (
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Filtres Avancés
-              </h3>
-                
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {/* Symboles spécifiques */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Symboles Spécifiques (optionnel)
-                    </label>
-                    <input
-                      type="text"
-                      value={advancedFilters.symbols || ""}
-                      onChange={(e) => setAdvancedFilters({
-                        ...advancedFilters,
-                        symbols: e.target.value
-                      })}
-                      placeholder="AAPL, MSFT, GOOGL (vide = tous les titres)"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  
-                  {/* Recommandations */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Recommandations
-                    </label>
-                    <select
-                      value={advancedFilters.recommendations || ""}
-                      onChange={(e) => setAdvancedFilters({
-                        ...advancedFilters,
-                        recommendations: e.target.value
-                      })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Toutes</option>
-                      <option value="BUY">BUY</option>
-                      <option value="SELL">SELL</option>
-                      <option value="HOLD">HOLD</option>
-                      <option value="STRONG_BUY">STRONG_BUY</option>
-                      <option value="STRONG_SELL">STRONG_SELL</option>
-                    </select>
-                  </div>
-                  
-                  {/* Niveau de risque */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Niveau de Risque Max
-                    </label>
-                    <select
-                      value={advancedFilters.max_risk || "HIGH"}
-                      onChange={(e) => setAdvancedFilters({
-                        ...advancedFilters,
-                        max_risk: e.target.value
-                      })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="LOW">LOW</option>
-                      <option value="MEDIUM">MEDIUM</option>
-                      <option value="HIGH">HIGH</option>
-                    </select>
-                  </div>
-                  
-                  {/* Tri */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Trier par
-                    </label>
-                    <select
-                      value={advancedFilters.sort_by || "composite_score"}
-                      onChange={(e) => setAdvancedFilters({
-                        ...advancedFilters,
-                        sort_by: e.target.value
-                      })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="composite_score">Score Composite</option>
-                      <option value="confidence_level">Niveau de Confiance</option>
-                      <option value="analysis_date">Date d'Analyse</option>
-                      <option value="updated_at">Date de Mise à Jour</option>
-                      <option value="technical_score">Score Technique</option>
-                      <option value="sentiment_score">Score Sentiment</option>
-                      <option value="market_score">Score Marché</option>
-                    </select>
-                  </div>
-                  
-                  {/* Ordre de tri */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Ordre
-                    </label>
-                    <select
-                      value={advancedFilters.sort_order || "desc"}
-                      onChange={(e) => setAdvancedFilters({
-                        ...advancedFilters,
-                        sort_order: e.target.value
-                      })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="desc">Décroissant</option>
-                      <option value="asc">Croissant</option>
-                    </select>
-                  </div>
-                  
-                  {/* Score minimum */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Score Min ({advancedFilters.min_score || 0.5})
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={advancedFilters.min_score || 0.5}
-                      onChange={(e) => setAdvancedFilters({
-                        ...advancedFilters,
-                        min_score: parseFloat(e.target.value)
-                      })}
-                      className="w-full"
-                    />
-                  </div>
-                  
-                  {/* Confiance minimum */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Confiance Min ({advancedFilters.min_confidence || 0})
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={advancedFilters.min_confidence || 0}
-                      onChange={(e) => setAdvancedFilters({
-                        ...advancedFilters,
-                        min_confidence: parseFloat(e.target.value)
-                      })}
-                      className="w-full"
-                    />
-                  </div>
-                  
-                  {/* Limite de résultats */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Nombre de Résultats
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="100"
-                      value={advancedFilters.limit || 20}
-                      onChange={(e) => setAdvancedFilters({
-                        ...advancedFilters,
-                        limit: parseInt(e.target.value)
-                      })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
+        {/* Zone de génération d'opportunités */}
+        <div className="mb-8 p-6 bg-white border border-gray-200 rounded-lg shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Génération d'Opportunités
+            </h2>
+            <button
+              onClick={() => setShowGenerationForm(!showGenerationForm)}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              <Cog6ToothIcon className="w-4 h-4" />
+              <span>Configurer la génération</span>
+            </button>
+          </div>
+          
+          {showGenerationForm && (
+            <div className="mb-6 p-6 bg-gray-50 border border-gray-200 rounded-lg">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Configuration de la génération d'opportunités</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nombre de symboles à analyser
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="200"
+                    value={generationParams.limit_symbols}
+                    onChange={(e) => setGenerationParams({
+                      ...generationParams,
+                      limit_symbols: parseInt(e.target.value) || 50
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Entre 1 et 200 symboles</p>
                 </div>
                 
-                {/* Filtres de dates */}
-                <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Date de Début
-                    </label>
-                    <input
-                      type="date"
-                      value={advancedFilters.date_from || ""}
-                      onChange={(e) => setAdvancedFilters({
-                        ...advancedFilters,
-                        date_from: e.target.value
-                      })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Date de Fin
-                    </label>
-                    <input
-                      type="date"
-                      value={advancedFilters.date_to || ""}
-                      onChange={(e) => setAdvancedFilters({
-                        ...advancedFilters,
-                        date_to: e.target.value
-                      })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Horizon temporel (jours)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={generationParams.time_horizon}
+                    onChange={(e) => setGenerationParams({
+                      ...generationParams,
+                      time_horizon: parseInt(e.target.value) || 30
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Entre 1 et 365 jours</p>
                 </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Inclure l'analyse ML
+                  </label>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={generationParams.include_ml}
+                      onChange={(e) => setGenerationParams({
+                        ...generationParams,
+                        include_ml: e.target.checked
+                      })}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">
+                      {generationParams.include_ml ? 'Activé' : 'Désactivé'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Analyse par machine learning</p>
+                </div>
+              </div>
+              
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <p className="text-sm text-blue-800">
+                  <strong>Résumé de la configuration :</strong> Analyse de {generationParams.limit_symbols} symboles 
+                  sur un horizon de {generationParams.time_horizon} jours 
+                  {generationParams.include_ml ? ' avec analyse ML' : ' sans analyse ML'}.
+                </p>
+              </div>
             </div>
           )}
+          
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-600">
+              Générez de nouvelles opportunités d'investissement basées sur l'analyse avancée
+            </div>
+            <button
+              onClick={generateDailyOpportunities}
+              disabled={generatingOpportunities}
+              className="flex items-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {generatingOpportunities ? (
+                <ArrowPathIcon className="w-5 h-5 animate-spin" />
+              ) : (
+                <ArrowTrendingUpIcon className="w-5 h-5" />
+              )}
+              <span>
+                {generatingOpportunities ? 'Génération...' : 'Générer les opportunités du jour'}
+              </span>
+            </button>
+          </div>
+          
+          {generationMessage && (
+            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center">
+                <ArrowTrendingUpIcon className="w-5 h-5 text-green-400 mr-2" />
+                <span className="text-green-800">{generationMessage}</span>
+              </div>
+            </div>
+          )}
+        </div>
 
-          {/* Opportunités composite */}
-          <div>
+        {/* Filtres et tri des opportunités */}
+        <div className="mb-8 p-6 bg-white border border-gray-200 rounded-lg shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">Filtres et Tri</h2>
+            <button
+              onClick={() => setShowFiltersAndSort(!showFiltersAndSort)}
+              className="flex items-center space-x-2 px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200"
+            >
+              <Cog6ToothIcon className="w-4 h-4" />
+              <span>{showFiltersAndSort ? 'Masquer' : 'Afficher'} les filtres</span>
+            </button>
+          </div>
+          
+          {showFiltersAndSort && (
+            <div>
+          
+          {/* Filtres */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Symbole</label>
+              <input
+                type="text"
+                value={filters.symbol}
+                onChange={(e) => setFilters({...filters, symbol: e.target.value})}
+                placeholder="Ex: AAPL, MSFT"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Recommandation</label>
+              <select
+                value={filters.recommendation}
+                onChange={(e) => setFilters({...filters, recommendation: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Toutes</option>
+                <option value="BUY_STRONG">BUY_STRONG</option>
+                <option value="BUY_MODERATE">BUY_MODERATE</option>
+                <option value="BUY_WEAK">BUY_WEAK</option>
+                <option value="HOLD">HOLD</option>
+                <option value="SELL_WEAK">SELL_WEAK</option>
+                <option value="SELL_MODERATE">SELL_MODERATE</option>
+                <option value="SELL_STRONG">SELL_STRONG</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Score minimum</label>
+              <input
+                type="number"
+                min="0"
+                max="1"
+                step="0.01"
+                value={filters.minScore}
+                onChange={(e) => setFilters({...filters, minScore: e.target.value})}
+                placeholder="0.0"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Score maximum</label>
+              <input
+                type="number"
+                min="0"
+                max="1"
+                step="0.01"
+                value={filters.maxScore}
+                onChange={(e) => setFilters({...filters, maxScore: e.target.value})}
+                placeholder="1.0"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Date de début</label>
+              <input
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => setFilters({...filters, startDate: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Date de fin</label>
+              <input
+                type="date"
+                value={filters.endDate}
+                onChange={(e) => setFilters({...filters, endDate: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          
+          {/* Tri */}
+          <div className="flex items-center space-x-4 mb-4">
+            <div className="flex items-center space-x-2">
+              <label className="text-sm font-medium text-gray-700">Trier par:</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="composite_score">Score composite</option>
+                <option value="technical_score">Score technique</option>
+                <option value="sentiment_score">Score sentiment</option>
+                <option value="market_score">Score marché</option>
+                <option value="confidence_level">Niveau de confiance</option>
+                <option value="analysis_date">Date d'analyse</option>
+              </select>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <label className="text-sm font-medium text-gray-700">Ordre:</label>
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="desc">Décroissant</option>
+                <option value="asc">Croissant</option>
+              </select>
+            </div>
+            
+            <button
+              onClick={resetFilters}
+              className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+            >
+              Réinitialiser
+            </button>
+            
+            <button
+              onClick={applyFilters}
+              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Appliquer les filtres
+            </button>
+          </div>
+            </div>
+          )}
+        </div>
+
+        {/* Liste des opportunités */}
+        <div>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-900">
-                Opportunités Composite Détectées
+                Opportunités ({filteredOpportunities.length})
               </h2>
-              <div className="flex items-center space-x-4">
-                <div className="text-sm text-gray-600">
-                  {hybridOpportunities.length} opportunité{hybridOpportunities.length > 1 ? 's' : ''} trouvée{hybridOpportunities.length > 1 ? 's' : ''}
-                </div>
-                {!showFilters && (
-                  <button
-                    onClick={() => setShowFilters(true)}
-                    className="flex items-center space-x-2 px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200"
-                  >
-                    <Cog6ToothIcon className="w-4 h-4" />
-                    <span>Modifier les filtres</span>
-                  </button>
-                )}
+              <div className="text-sm text-gray-600">
+                {filteredOpportunities.length} opportunité{filteredOpportunities.length > 1 ? 's' : ''} affichée{filteredOpportunities.length > 1 ? 's' : ''}
               </div>
             </div>
             
@@ -609,11 +826,12 @@ const AdvancedAnalysisDashboard: React.FC<AdvancedAnalysisDashboardProps> = ({ c
                 </div>
               </div>
             )}
+
             
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              {hybridOpportunities.map((opportunity) => (
+              {filteredOpportunities.map((opportunity, index) => (
                 <HybridOpportunityCard
-                  key={opportunity.symbol}
+                  key={`${opportunity.symbol}-${opportunity.updated_at || index}`}
                   opportunity={opportunity}
                   onAnalyze={handleAnalyzeSymbol}
                   onViewDetails={handleViewDetails}
@@ -621,7 +839,7 @@ const AdvancedAnalysisDashboard: React.FC<AdvancedAnalysisDashboardProps> = ({ c
               ))}
             </div>
           </div>
-        </div>
+        
       </div>
     </div>
   );

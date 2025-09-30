@@ -12,7 +12,7 @@ Ce service orchestre tous les services d'analyse développés dans les phases pr
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Any, Optional, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import logging
 from dataclasses import dataclass
 from sqlalchemy.orm import Session
@@ -65,12 +65,840 @@ class AdvancedTradingAnalysis:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
     
+
+    def _calculate_position_size(self, opportunity_data: Dict[str, Any], portfolio_value: float = 100000) -> Dict[str, Any]:
+        """
+        Calcule la taille de position optimale basée sur le risque
+        Phase 3: Gestion du risque
+        """
+        try:
+            symbol = opportunity_data.get('symbol')
+            current_price = opportunity_data.get('price_at_generation', 0)
+            composite_score = opportunity_data.get('composite_score', 0.5)
+            confidence_level = opportunity_data.get('confidence_level', 0.5)
+            risk_level = opportunity_data.get('risk_level', 'MEDIUM')
+            
+            if not symbol or current_price <= 0:
+                return {"error": "Données d'opportunité incomplètes"}
+            
+            # Utiliser le risk manager
+            risk_manager = Phase3RiskManager(self.db)
+            return risk_manager.calculate_position_size(opportunity_data, portfolio_value)
+            
+        except Exception as e:
+            self.logger.error(f"Erreur calcul taille position: {e}")
+            return {"error": str(e)}
+    
+    def _calculate_portfolio_risk(self, positions: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Calcule les métriques de risque du portefeuille
+        Phase 3: Gestion du risque
+        """
+        try:
+            risk_manager = Phase3RiskManager(self.db)
+            return risk_manager.calculate_portfolio_risk_metrics(positions)
+            
+        except Exception as e:
+            self.logger.error(f"Erreur calcul risque portefeuille: {e}")
+            return {"error": str(e)}
+    
+    def _calculate_stop_loss_levels(self, opportunity_data: Dict[str, Any]) -> Dict[str, float]:
+        """
+        Calcule les niveaux de stop-loss dynamiques
+        Phase 3: Gestion du risque
+        """
+        try:
+            symbol = opportunity_data.get('symbol')
+            current_price = opportunity_data.get('price_at_generation', 0)
+            
+            # Récupérer l'ATR
+            technical_data = self._get_technical_indicators(symbol)
+            atr = technical_data.get('atr', 0.02 * current_price)  # 2% par défaut
+            
+            # Calculer les niveaux
+            stop_loss = current_price * (1 - 2.0 * atr / current_price)  # 2x ATR
+            trailing_stop = current_price * (1 - 1.5 * atr / current_price)  # 1.5x ATR
+            
+            return {
+                "stop_loss": stop_loss,
+                "trailing_stop": trailing_stop,
+                "atr": atr
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Erreur calcul stop-loss: {e}")
+            return {"error": str(e)}
+    
+    def _calculate_take_profit_levels(self, opportunity_data: Dict[str, Any]) -> Dict[str, float]:
+        """
+        Calcule les niveaux de take-profit dynamiques
+        Phase 3: Gestion du risque
+        """
+        try:
+            symbol = opportunity_data.get('symbol')
+            current_price = opportunity_data.get('price_at_generation', 0)
+            composite_score = opportunity_data.get('composite_score', 0.5)
+            
+            # Récupérer l'ATR
+            technical_data = self._get_technical_indicators(symbol)
+            atr = technical_data.get('atr', 0.02 * current_price)
+            
+            # Ajuster selon la qualité du signal
+            multiplier = 2.0 + (composite_score - 0.5) * 2.0  # 1x à 3x ATR
+            
+            take_profit = current_price * (1 + multiplier * atr / current_price)
+            
+            return {
+                "take_profit": take_profit,
+                "multiplier": multiplier,
+                "atr": atr
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Erreur calcul take-profit: {e}")
+            return {"error": str(e)}
+    
+    def _validate_risk_parameters(self, opportunity_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Valide les paramètres de risque d'une opportunité
+        Phase 3: Gestion du risque
+        """
+        try:
+            symbol = opportunity_data.get('symbol')
+            risk_level = opportunity_data.get('risk_level', 'MEDIUM')
+            confidence_level = opportunity_data.get('confidence_level', 0.5)
+            
+            # Récupérer les données de volatilité
+            volatility_data = self._get_volatility_indicators(symbol)
+            current_volatility = volatility_data.get('current_volatility', 0.02)
+            
+            # Validation des paramètres
+            validations = {
+                "volatility_acceptable": current_volatility < 0.05,  # < 5%
+                "confidence_sufficient": confidence_level > 0.6,
+                "risk_level_appropriate": risk_level in ['LOW', 'MEDIUM'],
+                "symbol_liquid": True  # À implémenter avec les données de volume
+            }
+            
+            overall_valid = all(validations.values())
+            
+            return {
+                "valid": overall_valid,
+                "validations": validations,
+                "current_volatility": current_volatility,
+                "recommendations": self._generate_risk_recommendations(validations)
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Erreur validation paramètres risque: {e}")
+            return {"error": str(e)}
+    
+    def _generate_risk_recommendations(self, validations: Dict[str, bool]) -> List[str]:
+        """Génère des recommandations basées sur les validations de risque"""
+        recommendations = []
+        
+        if not validations.get("volatility_acceptable", True):
+            recommendations.append("Volatilité élevée - Réduire la taille de position")
+        
+        if not validations.get("confidence_sufficient", True):
+            recommendations.append("Confiance faible - Attendre un signal plus fort")
+        
+        if not validations.get("risk_level_appropriate", True):
+            recommendations.append("Niveau de risque élevé - Surveiller attentivement")
+        
+        return recommendations
+
+
+    def _calculate_position_size(self, opportunity_data: Dict[str, Any], portfolio_value: float = 100000) -> Dict[str, Any]:
+        """
+        Calcule la taille de position optimale basée sur le risque
+        Phase 3: Gestion du risque
+        """
+        try:
+            symbol = opportunity_data.get('symbol')
+            current_price = opportunity_data.get('price_at_generation', 0)
+            composite_score = opportunity_data.get('composite_score', 0.5)
+            confidence_level = opportunity_data.get('confidence_level', 0.5)
+            risk_level = opportunity_data.get('risk_level', 'MEDIUM')
+            
+            if not symbol or current_price <= 0:
+                return {"error": "Données d'opportunité incomplètes"}
+            
+            # Utiliser le risk manager
+            risk_manager = Phase3RiskManager(self.db)
+            return risk_manager.calculate_position_size(opportunity_data, portfolio_value)
+            
+        except Exception as e:
+            self.logger.error(f"Erreur calcul taille position: {e}")
+            return {"error": str(e)}
+    
+    def _calculate_portfolio_risk(self, positions: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Calcule les métriques de risque du portefeuille
+        Phase 3: Gestion du risque
+        """
+        try:
+            risk_manager = Phase3RiskManager(self.db)
+            return risk_manager.calculate_portfolio_risk_metrics(positions)
+            
+        except Exception as e:
+            self.logger.error(f"Erreur calcul risque portefeuille: {e}")
+            return {"error": str(e)}
+    
+    def _calculate_stop_loss_levels(self, opportunity_data: Dict[str, Any]) -> Dict[str, float]:
+        """
+        Calcule les niveaux de stop-loss dynamiques
+        Phase 3: Gestion du risque
+        """
+        try:
+            symbol = opportunity_data.get('symbol')
+            current_price = opportunity_data.get('price_at_generation', 0)
+            
+            # Récupérer l'ATR
+            technical_data = self._get_technical_indicators(symbol)
+            atr = technical_data.get('atr', 0.02 * current_price)  # 2% par défaut
+            
+            # Calculer les niveaux
+            stop_loss = current_price * (1 - 2.0 * atr / current_price)  # 2x ATR
+            trailing_stop = current_price * (1 - 1.5 * atr / current_price)  # 1.5x ATR
+            
+            return {
+                "stop_loss": stop_loss,
+                "trailing_stop": trailing_stop,
+                "atr": atr
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Erreur calcul stop-loss: {e}")
+            return {"error": str(e)}
+    
+    def _calculate_take_profit_levels(self, opportunity_data: Dict[str, Any]) -> Dict[str, float]:
+        """
+        Calcule les niveaux de take-profit dynamiques
+        Phase 3: Gestion du risque
+        """
+        try:
+            symbol = opportunity_data.get('symbol')
+            current_price = opportunity_data.get('price_at_generation', 0)
+            composite_score = opportunity_data.get('composite_score', 0.5)
+            
+            # Récupérer l'ATR
+            technical_data = self._get_technical_indicators(symbol)
+            atr = technical_data.get('atr', 0.02 * current_price)
+            
+            # Ajuster selon la qualité du signal
+            multiplier = 2.0 + (composite_score - 0.5) * 2.0  # 1x à 3x ATR
+            
+            take_profit = current_price * (1 + multiplier * atr / current_price)
+            
+            return {
+                "take_profit": take_profit,
+                "multiplier": multiplier,
+                "atr": atr
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Erreur calcul take-profit: {e}")
+            return {"error": str(e)}
+    
+    def _validate_risk_parameters(self, opportunity_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Valide les paramètres de risque d'une opportunité
+        Phase 3: Gestion du risque
+        """
+        try:
+            symbol = opportunity_data.get('symbol')
+            risk_level = opportunity_data.get('risk_level', 'MEDIUM')
+            confidence_level = opportunity_data.get('confidence_level', 0.5)
+            
+            # Récupérer les données de volatilité
+            volatility_data = self._get_volatility_indicators(symbol)
+            current_volatility = volatility_data.get('current_volatility', 0.02)
+            
+            # Validation des paramètres
+            validations = {
+                "volatility_acceptable": current_volatility < 0.05,  # < 5%
+                "confidence_sufficient": confidence_level > 0.6,
+                "risk_level_appropriate": risk_level in ['LOW', 'MEDIUM'],
+                "symbol_liquid": True  # À implémenter avec les données de volume
+            }
+            
+            overall_valid = all(validations.values())
+            
+            return {
+                "valid": overall_valid,
+                "validations": validations,
+                "current_volatility": current_volatility,
+                "recommendations": self._generate_risk_recommendations(validations)
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Erreur validation paramètres risque: {e}")
+            return {"error": str(e)}
+    
+    def _generate_risk_recommendations(self, validations: Dict[str, bool]) -> List[str]:
+        """Génère des recommandations basées sur les validations de risque"""
+        recommendations = []
+        
+        if not validations.get("volatility_acceptable", True):
+            recommendations.append("Volatilité élevée - Réduire la taille de position")
+        
+        if not validations.get("confidence_sufficient", True):
+            recommendations.append("Confiance faible - Attendre un signal plus fort")
+        
+        if not validations.get("risk_level_appropriate", True):
+            recommendations.append("Niveau de risque élevé - Surveiller attentivement")
+        
+        return recommendations
+
+
+    def _calculate_optimized_composite_score(self, scores: Dict[str, float]) -> float:
+        """
+        Calcule le score composite optimisé basé sur les corrélations observées
+        Optimisations: Augmentation des poids technique et sentiment, réduction du poids marché
+        """
+        try:
+            # Poids optimisés basés sur les corrélations
+            optimized_weights = {
+                'technical': 0.40,    # Augmenté (corrélation positive 0.256)
+                'sentiment': 0.45,    # Augmenté (meilleure corrélation 0.359)
+                'market': 0.15,       # Réduit (corrélation négative -0.438)
+            }
+            
+            # Score de base
+            base_score = (
+                optimized_weights['technical'] * scores.get('technical', 0.5) +
+                optimized_weights['sentiment'] * scores.get('sentiment', 0.5) +
+                optimized_weights['market'] * scores.get('market', 0.5)
+            )
+            
+            # Pénalité pour la sur-confiance (corrélation négative -0.439)
+            confidence = scores.get('confidence', 0.5)
+            if confidence > 0.85:
+                confidence_penalty = (confidence - 0.85) * 0.2
+                base_score -= confidence_penalty
+            
+            return max(0.0, min(1.0, base_score))
+            
+        except Exception as e:
+            self.logger.error(f"Erreur calcul score composite optimisé: {e}")
+            return 0.5
+    
+    def _determine_optimized_recommendation(self, composite_score: float, scores: Dict[str, float]) -> str:
+        """
+        Détermine la recommandation optimisée avec des seuils plus stricts
+        """
+        try:
+            technical_score = scores.get('technical', 0.5)
+            sentiment_score = scores.get('sentiment', 0.5)
+            market_score = scores.get('market', 0.5)
+            confidence = scores.get('confidence', 0.5)
+            
+            # Seuils optimisés plus stricts
+            if (composite_score >= 0.65 and 
+                technical_score >= 0.60 and 
+                sentiment_score >= 0.55 and 
+                market_score <= 0.40 and  # Éviter les marchés baissiers
+                0.70 <= confidence <= 0.85):  # Éviter la sur-confiance
+                return "BUY_STRONG"
+            
+            elif (composite_score >= 0.55 and 
+                  technical_score >= 0.50 and 
+                  sentiment_score >= 0.45 and 
+                  market_score <= 0.45 and 
+                  0.65 <= confidence <= 0.90):
+                return "BUY_MODERATE"
+            
+            elif (composite_score >= 0.45 and 
+                  technical_score >= 0.40 and 
+                  sentiment_score >= 0.35 and 
+                  market_score <= 0.50 and 
+                  0.60 <= confidence <= 0.95):
+                return "BUY_WEAK"
+            
+            else:
+                return "HOLD"
+                
+        except Exception as e:
+            self.logger.error(f"Erreur détermination recommandation optimisée: {e}")
+            return "HOLD"
+    
+    def _calculate_optimized_position_size(
+        self, 
+        opportunity_data: Dict[str, Any], 
+        portfolio_value: float = 100000
+    ) -> Dict[str, Any]:
+        """
+        Calcule la taille de position optimisée basée sur l'analyse des performances
+        """
+        try:
+            symbol = opportunity_data.get('symbol')
+            current_price = opportunity_data.get('price_at_generation', 0)
+            composite_score = opportunity_data.get('composite_score', 0.5)
+            confidence_level = opportunity_data.get('confidence_level', 0.5)
+            technical_score = opportunity_data.get('technical_score', 0.5)
+            sentiment_score = opportunity_data.get('sentiment_score', 0.5)
+            market_score = opportunity_data.get('market_score', 0.5)
+            
+            if not symbol or current_price <= 0:
+                return {"error": "Données d'opportunité incomplètes"}
+            
+            # Paramètres optimisés
+            base_portfolio_risk = 0.015  # Réduit de 2% à 1.5%
+            max_position_risk = 0.025    # Maximum 2.5%
+            
+            # Taille de base
+            base_size = int(portfolio_value * base_portfolio_risk / current_price)
+            
+            # Ajustements optimisés
+            # 1. Ajustement volatilité (simulé)
+            volatility_factor = 1.0  # À calculer avec les données réelles
+            
+            # 2. Ajustement confiance (éviter la sur-confiance)
+            if confidence_level < 0.6:
+                confidence_factor = 0.5
+            elif confidence_level > 0.85:
+                confidence_factor = 0.8  # Réduction pour sur-confiance
+            else:
+                confidence_factor = 1.0 + (confidence_level - 0.5) * 0.6
+            
+            # 3. Ajustement score (poids optimisés)
+            score_factor = (
+                0.4 * technical_score + 
+                0.4 * sentiment_score + 
+                0.2 * market_score
+            )
+            
+            # Taille finale
+            final_size = int(base_size * volatility_factor * confidence_factor * score_factor)
+            
+            # Limites de protection
+            max_size = int(portfolio_value * 0.10 / current_price)  # Max 10% du portefeuille
+            final_size = min(final_size, max_size)
+            final_size = max(1, final_size)  # Minimum 1 action
+            
+            return {
+                "position_size": final_size,
+                "position_value": final_size * current_price,
+                "position_risk": final_size * current_price * base_portfolio_risk / portfolio_value,
+                "volatility_factor": volatility_factor,
+                "confidence_factor": confidence_factor,
+                "score_factor": score_factor
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Erreur calcul position optimisée: {e}")
+            return {"error": str(e)}
+    
+    def _calculate_optimized_take_profit(self, opportunity_data: Dict[str, Any]) -> Dict[str, float]:
+        """
+        Calcule les seuils de take-profit optimisés
+        """
+        try:
+            symbol = opportunity_data.get('symbol')
+            current_price = opportunity_data.get('price_at_generation', 0)
+            composite_score = opportunity_data.get('composite_score', 0.5)
+            confidence_level = opportunity_data.get('confidence_level', 0.5)
+            recommendation = opportunity_data.get('recommendation', 'HOLD')
+            
+            if not symbol or current_price <= 0:
+                return {"error": "Données d'opportunité incomplètes"}
+            
+            # ATR simulé (2% du prix)
+            atr = current_price * 0.02
+            
+            # Multiplicateurs optimisés par type de recommandation
+            if recommendation == "BUY_STRONG":
+                base_multiplier = 2.5 + (composite_score - 0.5) * 1.0  # 2.0 à 3.0
+            elif recommendation == "BUY_MODERATE":
+                base_multiplier = 2.0 + (composite_score - 0.5) * 0.8  # 1.6 à 2.4
+            elif recommendation == "BUY_WEAK":
+                base_multiplier = 1.5 + (composite_score - 0.5) * 0.6  # 1.2 à 1.8
+            else:
+                base_multiplier = 2.0
+            
+            # Ajustement confiance (éviter la sur-confiance)
+            if confidence_level > 0.85:
+                confidence_adjustment = 0.8  # Réduction pour sur-confiance
+            else:
+                confidence_adjustment = 1.0 + (confidence_level - 0.5) * 0.2
+            
+            # Multiplicateur final
+            final_multiplier = base_multiplier * confidence_adjustment
+            
+            # Take-profit
+            take_profit = current_price * (1 + final_multiplier * atr / current_price)
+            
+            # Trailing stop
+            trailing_stop = current_price * (1 - 0.01)  # 1% de trailing
+            
+            return {
+                "take_profit": take_profit,
+                "trailing_stop": trailing_stop,
+                "multiplier": final_multiplier,
+                "atr": atr
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Erreur calcul take-profit optimisé: {e}")
+            return {"error": str(e)}
+    
+    def _validate_optimized_buy_signals(self, opportunity_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Valide les signaux d'achat avec des règles optimisées
+        """
+        try:
+            symbol = opportunity_data.get('symbol')
+            technical_score = opportunity_data.get('technical_score', 0.5)
+            sentiment_score = opportunity_data.get('sentiment_score', 0.5)
+            market_score = opportunity_data.get('market_score', 0.5)
+            confidence_level = opportunity_data.get('confidence_level', 0.5)
+            
+            validations = {
+                "technical_valid": False,
+                "sentiment_valid": False,
+                "market_valid": False,
+                "confidence_valid": False,
+                "overall_valid": False
+            }
+            
+            # Validation technique renforcée
+            if (0.4 <= technical_score <= 0.8 and  # Éviter les extrêmes
+                technical_score > 0.5):  # Score positif
+                validations["technical_valid"] = True
+            
+            # Validation sentiment renforcée
+            if (0.35 <= sentiment_score <= 0.75 and  # Éviter les extrêmes
+                sentiment_score > 0.5):  # Score positif
+                validations["sentiment_valid"] = True
+            
+            # Validation marché (éviter les marchés baissiers)
+            if market_score <= 0.5:  # Marché neutre ou haussier
+                validations["market_valid"] = True
+            
+            # Validation confiance (éviter la sur-confiance)
+            if 0.6 <= confidence_level <= 0.85:  # Confiance modérée
+                validations["confidence_valid"] = True
+            
+            # Validation globale
+            valid_count = sum(1 for v in validations.values() if v and v != "overall_valid")
+            validations["overall_valid"] = valid_count >= 3
+            
+            return {
+                "valid": validations["overall_valid"],
+                "validations": validations,
+                "recommendations": self._generate_validation_recommendations(validations)
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Erreur validation optimisée: {e}")
+            return {"error": str(e)}
+    
+    def _generate_validation_recommendations(self, validations: Dict[str, bool]) -> List[str]:
+        """Génère des recommandations basées sur les validations"""
+        recommendations = []
+        
+        if not validations.get("technical_valid", False):
+            recommendations.append("Score technique insuffisant ou extrême")
+        
+        if not validations.get("sentiment_valid", False):
+            recommendations.append("Score sentiment insuffisant ou extrême")
+        
+        if not validations.get("market_valid", False):
+            recommendations.append("Conditions de marché défavorables")
+        
+        if not validations.get("confidence_valid", False):
+            recommendations.append("Niveau de confiance inadapté (trop faible ou sur-confiance)")
+        
+        return recommendations
+
+
+    def _calculate_adjusted_optimized_composite_score(
+        self, 
+        technical_score: float, 
+        sentiment_score: float, 
+        market_score: float, 
+        ml_score: float = 0.0,
+        candlestick_score: float = 0.0,
+        garch_score: float = 0.0,
+        monte_carlo_score: float = 0.0,
+        markov_score: float = 0.0,
+        volatility_score: float = 0.0
+    ) -> float:
+        """
+        Calcule le score composite avec priorité au score technique (80%)
+        Recommandation 2: Prioriser le score technique dans la formule de scoring
+        """
+        try:
+            # Poids optimisés - priorité forte au score technique
+            priority_weights = {
+                'technical': 0.8,      # 80% - priorité maximale
+                'sentiment': 0.1,  # 10%
+                'market': 0.1         # 10%
+            }
+            
+            # Score composite avec priorité technique
+            composite_score = (
+                priority_weights['technical'] * technical_score +
+                priority_weights['sentiment'] * sentiment_score +
+                priority_weights['market'] * market_score
+            )
+            
+            return round(composite_score, 4)
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating priority optimized composite score: {e}")
+            return 0.5
+    
+    def _determine_adjusted_optimized_recommendation(
+        self, 
+        composite_score: float, 
+        technical_score: float,
+        confidence_level: float
+    ) -> str:
+        """
+        Détermine la recommandation avec les seuils optimisés
+        Recommandation 1: Utiliser les seuils optimisés pour la génération d'opportunités
+        """
+        try:
+            # Seuils optimaux basés sur l'analyse de performance
+            TECH_THRESHOLD = 0.533
+            COMP_THRESHOLD = 0.651
+            CONF_THRESHOLD = 0.6
+            
+            # Validation des seuils optimaux
+            tech_valid = technical_score >= TECH_THRESHOLD
+            comp_valid = composite_score >= COMP_THRESHOLD
+            conf_valid = confidence_level >= CONF_THRESHOLD
+            
+            # Logique de recommandation avec seuils optimisés
+            if comp_valid and tech_valid and conf_valid:
+                return "BUY_STRONG"
+            elif comp_valid and tech_valid:
+                return "BUY_MODERATE"
+            elif comp_valid or tech_valid:
+                return "BUY_WEAK"
+            elif composite_score >= 0.4:
+                return "HOLD"
+            else:
+                return "SELL_MODERATE"
+                
+        except Exception as e:
+            self.logger.error(f"Error determining priority optimized recommendation: {e}")
+            return "HOLD"
+    
+    def _validate_adjusted_optimized_signals(
+        self, 
+        technical_score: float, 
+        composite_score: float,
+        confidence_level: float
+    ) -> Dict[str, bool]:
+        """
+        Valide les signaux avec les seuils optimisés
+        Recommandation 3: Appliquer la validation des signaux optimisés
+        """
+        validation = {
+            "technical_threshold_met": False,
+            "composite_threshold_met": False,
+            "confidence_threshold_met": False,
+            "overall_valid": False
+        }
+        
+        try:
+            # Seuils optimaux
+            TECH_THRESHOLD = 0.533
+            COMP_THRESHOLD = 0.651
+            CONF_THRESHOLD = 0.6
+            
+            # Validation des seuils
+            validation["technical_threshold_met"] = technical_score >= TECH_THRESHOLD
+            validation["composite_threshold_met"] = composite_score >= COMP_THRESHOLD
+            validation["confidence_threshold_met"] = confidence_level >= CONF_THRESHOLD
+            
+            # Validation globale : au moins 2 critères sur 3
+            valid_criteria = sum(1 for k, v in validation.items() if k != "overall_valid" and v)
+            validation["overall_valid"] = valid_criteria >= 2
+            
+        except Exception as e:
+            self.logger.warning(f"Erreur lors de la validation optimisée: {e}")
+        
+        return validation
+    
+    def _apply_adjusted_optimized_filtering(
+        self, 
+        technical_score: float, 
+        composite_score: float,
+        confidence_level: float
+    ) -> bool:
+        """
+        Applique le filtrage optimisé pour ne garder que les opportunités de haute qualité
+        Combine les 3 recommandations prioritaires
+        """
+        try:
+            # Seuils optimaux
+            TECH_THRESHOLD = 0.533
+            COMP_THRESHOLD = 0.651
+            CONF_THRESHOLD = 0.6
+            
+            # Validation des signaux
+            validation = self._validate_adjusted_optimized_signals(
+                technical_score, composite_score, confidence_level
+            )
+            
+            # Filtrage strict : au moins 2 critères sur 3
+            return validation["overall_valid"]
+            
+        except Exception as e:
+            self.logger.warning(f"Erreur lors du filtrage optimisé: {e}")
+            return False
+
+
+    def _calculate_adjusted_optimized_composite_score(
+        self, 
+        technical_score: float, 
+        sentiment_score: float, 
+        market_score: float, 
+        ml_score: float = 0.0,
+        candlestick_score: float = 0.0,
+        garch_score: float = 0.0,
+        monte_carlo_score: float = 0.0,
+        markov_score: float = 0.0,
+        volatility_score: float = 0.0
+    ) -> float:
+        """
+        Calcule le score composite avec priorité au score technique (80%)
+        Seuils ajustés pour être plus réalistes
+        """
+        try:
+            # Poids optimisés - priorité forte au score technique
+            priority_weights = {
+                'technical': 0.8,      # 80% - priorité maximale
+                'sentiment': 0.1,      # 10%
+                'market': 0.1          # 10%
+            }
+            
+            # Score composite avec priorité technique
+            composite_score = (
+                priority_weights['technical'] * technical_score +
+                priority_weights['sentiment'] * sentiment_score +
+                priority_weights['market'] * market_score
+            )
+            
+            return round(composite_score, 4)
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating adjusted optimized composite score: {e}")
+            return 0.5
+    
+    def _determine_adjusted_optimized_recommendation(
+        self, 
+        composite_score: float, 
+        technical_score: float,
+        confidence_level: float
+    ) -> str:
+        """
+        Détermine la recommandation avec les seuils ajustés
+        Seuils plus réalistes basés sur l'analyse des données
+        """
+        try:
+            # Seuils ajustés plus réalistes
+            TECH_THRESHOLD = 0.45
+            COMP_THRESHOLD = 0.5
+            CONF_THRESHOLD = 0.6
+            
+            # Validation des seuils ajustés
+            tech_valid = technical_score >= TECH_THRESHOLD
+            comp_valid = composite_score >= COMP_THRESHOLD
+            conf_valid = confidence_level >= CONF_THRESHOLD
+            
+            # Logique de recommandation avec seuils ajustés
+            if comp_valid and tech_valid and conf_valid:
+                return "BUY_STRONG"
+            elif comp_valid and tech_valid:
+                return "BUY_MODERATE"
+            elif comp_valid or tech_valid:
+                return "BUY_WEAK"
+            elif composite_score >= 0.4:
+                return "HOLD"
+            else:
+                return "SELL_MODERATE"
+                
+        except Exception as e:
+            self.logger.error(f"Error determining adjusted optimized recommendation: {e}")
+            return "HOLD"
+    
+    def _validate_adjusted_optimized_signals(
+        self, 
+        technical_score: float, 
+        composite_score: float,
+        confidence_level: float
+    ) -> Dict[str, bool]:
+        """
+        Valide les signaux avec les seuils ajustés
+        Seuils plus réalistes pour une meilleure sélection
+        """
+        validation = {
+            "technical_threshold_met": False,
+            "composite_threshold_met": False,
+            "confidence_threshold_met": False,
+            "overall_valid": False
+        }
+        
+        try:
+            # Seuils ajustés
+            TECH_THRESHOLD = 0.45
+            COMP_THRESHOLD = 0.5
+            CONF_THRESHOLD = 0.6
+            
+            # Validation des seuils
+            validation["technical_threshold_met"] = technical_score >= TECH_THRESHOLD
+            validation["composite_threshold_met"] = composite_score >= COMP_THRESHOLD
+            validation["confidence_threshold_met"] = confidence_level >= CONF_THRESHOLD
+            
+            # Validation globale : au moins 2 critères sur 3
+            valid_criteria = sum(1 for k, v in validation.items() if k != "overall_valid" and v)
+            validation["overall_valid"] = valid_criteria >= 2
+            
+        except Exception as e:
+            self.logger.warning(f"Erreur lors de la validation ajustée: {e}")
+        
+        return validation
+    
+    def _apply_adjusted_optimized_filtering(
+        self, 
+        technical_score: float, 
+        composite_score: float,
+        confidence_level: float
+    ) -> bool:
+        """
+        Applique le filtrage ajusté pour ne garder que les opportunités de qualité
+        Seuils plus réalistes pour une meilleure sélection
+        """
+        try:
+            # Seuils ajustés
+            TECH_THRESHOLD = 0.45
+            COMP_THRESHOLD = 0.5
+            CONF_THRESHOLD = 0.6
+            
+            # Validation des signaux
+            validation = self._validate_adjusted_optimized_signals(
+                technical_score, composite_score, confidence_level
+            )
+            
+            # Filtrage ajusté : au moins 2 critères sur 3
+            return validation["overall_valid"]
+            
+        except Exception as e:
+            self.logger.warning(f"Erreur lors du filtrage ajusté: {e}")
+            return False
+
     async def analyze_opportunity(
         self, 
         symbol: str, 
         time_horizon: int = 30,
         include_ml: bool = True,
-        db: Session = None
+        db: Session = None,
+        target_date: date = None
     ) -> AnalysisResult:
         """
         Analyse complète d'une opportunité d'investissement
@@ -88,13 +916,13 @@ class AdvancedTradingAnalysis:
             self.logger.info(f"Starting comprehensive analysis for {symbol}")
             
             # Analyse technique simplifiée
-            technical_score, technical_analysis = await self._analyze_technical(symbol, db)
+            technical_score, technical_analysis = await self._analyze_technical(symbol, db, target_date)
             
             # Analyse de sentiment simplifiée
-            sentiment_score, sentiment_analysis = await self._analyze_sentiment(symbol, db)
+            sentiment_score, sentiment_analysis = await self._analyze_sentiment(symbol, db, target_date)
             
             # Analyse de marché simplifiée
-            market_score, market_indicators = await self._analyze_market(symbol, db)
+            market_score, market_indicators = await self._analyze_market(symbol, db, target_date)
             
             # Analyse des patterns de candlesticks
             candlestick_score, candlestick_analysis = await self._analyze_candlestick_patterns(symbol, db)
@@ -118,17 +946,47 @@ class AdvancedTradingAnalysis:
                 ml_score, ml_analysis = await self._analyze_ml(symbol, db)
             
             # Calcul du score composite
-            composite_score = self._calculate_composite_score(
+            composite_score = self._calculate_adjusted_optimized_composite_score(
                 technical_score, sentiment_score, market_score, ml_score,
                 candlestick_score, garch_score, monte_carlo_score, markov_score, volatility_score
             )
             
-            # Détermination de la recommandation et du niveau de risque
-            recommendation, risk_level = self._determine_recommendation(composite_score)
+            # Calcul du niveau de confiance avec validation des indicateurs (Phase 2)
             confidence_level = self._calculate_confidence_level(
                 technical_score, sentiment_score, market_score, ml_score,
-                candlestick_score, garch_score, monte_carlo_score, markov_score, volatility_score
+                candlestick_score, garch_score, monte_carlo_score, markov_score, volatility_score,
+                technical_indicators=technical_analysis,
+                sentiment_indicators=sentiment_analysis,
+                market_indicators=market_indicators
             )
+            
+            # Détermination de la recommandation avec les seuils optimisés
+            recommendation = self._determine_adjusted_optimized_recommendation(
+                composite_score, technical_score, confidence_level
+            )
+            
+            # Validation des signaux optimisés (Recommandation 3)
+            signal_validation = self._validate_adjusted_optimized_signals(
+                technical_score, composite_score, confidence_level
+            )
+            
+            # Filtrage optimisé - ne garder que les opportunités de haute qualité
+            if not self._apply_adjusted_optimized_filtering(
+                technical_score, composite_score, confidence_level
+            ):
+                # Si le signal ne passe pas le filtrage, retourner HOLD
+                recommendation = "HOLD"
+            
+            # Détermination du niveau de risque basé sur la validation
+            if signal_validation["overall_valid"]:
+                if confidence_level >= 0.8:
+                    risk_level = "LOW"
+                elif confidence_level >= 0.6:
+                    risk_level = "MEDIUM"
+                else:
+                    risk_level = "HIGH"
+            else:
+                risk_level = "HIGH"
             
             result = AnalysisResult(
                 symbol=symbol,
@@ -164,38 +1022,58 @@ class AdvancedTradingAnalysis:
             self.logger.error(f"Error analyzing {symbol}: {e}")
             raise
     
-    async def _analyze_technical(self, symbol: str, db: Session) -> Tuple[float, Dict[str, Any]]:
+    async def _analyze_technical(self, symbol: str, db: Session, target_date: date = None) -> Tuple[float, Dict[str, Any]]:
         """Analyse technique robuste basée sur l'historique des indicateurs avec scoring multi-dimensionnel"""
         try:
             # Récupérer l'historique des indicateurs techniques (60 jours pour les Z-scores)
-            # Filtrer par la date de dernière mise à jour pour ne garder que les derniers calculs
+            # Pour les opportunités historiques, utiliser les données disponibles à la date cible
             from sqlalchemy import func
             
-            # Récupérer la date de dernière mise à jour pour ce symbole
-            max_updated_at = db.query(func.max(TechnicalIndicators.updated_at))\
-                .filter(TechnicalIndicators.symbol == symbol)\
-                .scalar()
-            
-            if not max_updated_at:
-                return 0.5, {"status": "no_data", "message": "No technical indicators found"}
-            
-            # Récupérer les indicateurs avec la dernière mise à jour
-            indicators_history = db.query(TechnicalIndicators)\
-                .filter(TechnicalIndicators.symbol == symbol)\
-                .filter(TechnicalIndicators.updated_at == max_updated_at)\
-                .order_by(TechnicalIndicators.date.desc())\
-                .limit(60)\
-                .all()
+            if target_date:
+                # Pour les opportunités historiques, récupérer les indicateurs disponibles à cette date
+                indicators_history = db.query(TechnicalIndicators)\
+                    .filter(TechnicalIndicators.symbol == symbol)\
+                    .filter(TechnicalIndicators.date <= target_date)\
+                    .order_by(TechnicalIndicators.date.desc())\
+                    .limit(60)\
+                    .all()
+            else:
+                # Pour les opportunités en temps réel, utiliser la logique existante
+                # Récupérer la date de dernière mise à jour pour ce symbole
+                max_updated_at = db.query(func.max(TechnicalIndicators.updated_at))\
+                    .filter(TechnicalIndicators.symbol == symbol)\
+                    .scalar()
+                
+                if not max_updated_at:
+                    return 0.5, {"status": "no_data", "message": "No technical indicators found"}
+                
+                # Récupérer les indicateurs avec la dernière mise à jour
+                indicators_history = db.query(TechnicalIndicators)\
+                    .filter(TechnicalIndicators.symbol == symbol)\
+                    .filter(TechnicalIndicators.updated_at == max_updated_at)\
+                    .order_by(TechnicalIndicators.date.desc())\
+                    .limit(60)\
+                    .all()
             
             if not indicators_history:
                 return 0.5, {"status": "no_data", "message": "No technical indicators found"}
             
             # Récupérer l'historique des prix (60 jours)
-            price_history = db.query(HistoricalData)\
-                .filter(HistoricalData.symbol == symbol)\
-                .order_by(HistoricalData.date.desc())\
-                .limit(60)\
-                .all()
+            if target_date:
+                # Pour les opportunités historiques, récupérer les prix disponibles à cette date
+                price_history = db.query(HistoricalData)\
+                    .filter(HistoricalData.symbol == symbol)\
+                    .filter(HistoricalData.date <= target_date)\
+                    .order_by(HistoricalData.date.desc())\
+                    .limit(60)\
+                    .all()
+            else:
+                # Pour les opportunités en temps réel, utiliser la logique existante
+                price_history = db.query(HistoricalData)\
+                    .filter(HistoricalData.symbol == symbol)\
+                    .order_by(HistoricalData.date.desc())\
+                    .limit(60)\
+                    .all()
             
             if not price_history:
                 return 0.5, {"status": "no_price_data", "message": "No price history found"}
@@ -291,41 +1169,50 @@ class AdvancedTradingAnalysis:
             }
             
             return normalized_score, analysis
-            
+                
         except Exception as e:
             self.logger.error(f"Error in technical analysis for {symbol}: {e}")
             return 0.5, {"error": str(e)}
     
-    async def _analyze_sentiment(self, symbol: str, db: Session) -> Tuple[float, Dict[str, Any]]:
+    async def _analyze_sentiment(self, symbol: str, db: Session, target_date: date = None) -> Tuple[float, Dict[str, Any]]:
         """Analyse de sentiment basée sur les vrais indicateurs"""
         try:
-            # Récupérer la date de dernière mise à jour pour ce symbole
-            from sqlalchemy import func
-            max_updated_at = db.query(func.max(SentimentIndicators.updated_at))\
-                .filter(SentimentIndicators.symbol == symbol)\
-                .scalar()
-            
-            if not max_updated_at:
-                return 0.5, {"status": "no_data", "message": "No sentiment indicators found"}
-            
-            # Récupérer les indicateurs de sentiment depuis la base avec la dernière mise à jour
-            # Chercher les données les plus récentes non-neutres (différentes de 50.0)
-            indicators = db.query(SentimentIndicators)\
-                .filter(SentimentIndicators.symbol == symbol)\
-                .filter(SentimentIndicators.updated_at == max_updated_at)\
-                .filter(SentimentIndicators.sentiment_score_normalized != 50.0)\
-                .order_by(SentimentIndicators.date.desc())\
-                .limit(1)\
-                .first()
-            
-            # Si pas de données non-neutres, prendre les plus récentes avec la dernière mise à jour
-            if not indicators:
+            if target_date:
+                # Pour les opportunités historiques, récupérer les indicateurs disponibles à cette date
                 indicators = db.query(SentimentIndicators)\
                     .filter(SentimentIndicators.symbol == symbol)\
-                    .filter(SentimentIndicators.updated_at == max_updated_at)\
+                    .filter(SentimentIndicators.date <= target_date)\
                     .order_by(SentimentIndicators.date.desc())\
                     .limit(1)\
                     .first()
+            else:
+                # Pour les opportunités en temps réel, utiliser la logique existante
+                from sqlalchemy import func
+                max_updated_at = db.query(func.max(SentimentIndicators.updated_at))\
+                    .filter(SentimentIndicators.symbol == symbol)\
+                    .scalar()
+                
+                if not max_updated_at:
+                    return 0.5, {"status": "no_data", "message": "No sentiment indicators found"}
+                
+                # Récupérer les indicateurs de sentiment depuis la base avec la dernière mise à jour
+                # Chercher les données les plus récentes non-neutres (différentes de 50.0)
+                indicators = db.query(SentimentIndicators)\
+                    .filter(SentimentIndicators.symbol == symbol)\
+                    .filter(SentimentIndicators.updated_at == max_updated_at)\
+                    .filter(SentimentIndicators.sentiment_score_normalized != 50.0)\
+                    .order_by(SentimentIndicators.date.desc())\
+                    .limit(1)\
+                    .first()
+                
+                # Si pas de données non-neutres, prendre les plus récentes avec la dernière mise à jour
+                if not indicators:
+                    indicators = db.query(SentimentIndicators)\
+                        .filter(SentimentIndicators.symbol == symbol)\
+                        .filter(SentimentIndicators.updated_at == max_updated_at)\
+                        .order_by(SentimentIndicators.date.desc())\
+                        .limit(1)\
+                        .first()
             
             if not indicators:
                 return 0.5, {"status": "no_data", "message": "No sentiment indicators found"}
@@ -363,25 +1250,34 @@ class AdvancedTradingAnalysis:
             self.logger.error(f"Error in sentiment analysis for {symbol}: {e}")
             return 0.5, {"error": str(e)}
     
-    async def _analyze_market(self, symbol: str, db: Session) -> Tuple[float, Dict[str, Any]]:
+    async def _analyze_market(self, symbol: str, db: Session, target_date: date = None) -> Tuple[float, Dict[str, Any]]:
         """Analyse de marché basée sur les vrais indicateurs"""
         try:
-            # Récupérer la date de dernière création pour ce symbole
-            from sqlalchemy import func
-            max_created_at = db.query(func.max(MarketIndicators.created_at))\
-                .filter(MarketIndicators.symbol == symbol)\
-                .scalar()
-            
-            if not max_created_at:
-                return 0.5, {"status": "no_data", "message": "No market indicators found"}
-            
-            # Récupérer les indicateurs de marché depuis la base avec la dernière création
-            indicators = db.query(MarketIndicators)\
-                .filter(MarketIndicators.symbol == symbol)\
-                .filter(MarketIndicators.created_at == max_created_at)\
-                .order_by(MarketIndicators.analysis_date.desc())\
-                .limit(10)\
-                .all()
+            if target_date:
+                # Pour les opportunités historiques, récupérer les indicateurs disponibles à cette date
+                indicators = db.query(MarketIndicators)\
+                    .filter(MarketIndicators.symbol == symbol)\
+                    .filter(MarketIndicators.analysis_date <= target_date)\
+                    .order_by(MarketIndicators.analysis_date.desc())\
+                    .limit(10)\
+                    .all()
+            else:
+                # Pour les opportunités en temps réel, utiliser la logique existante
+                from sqlalchemy import func
+                max_created_at = db.query(func.max(MarketIndicators.created_at))\
+                    .filter(MarketIndicators.symbol == symbol)\
+                    .scalar()
+                
+                if not max_created_at:
+                    return 0.5, {"status": "no_data", "message": "No market indicators found"}
+                
+                # Récupérer les indicateurs de marché depuis la base avec la dernière création
+                indicators = db.query(MarketIndicators)\
+                    .filter(MarketIndicators.symbol == symbol)\
+                    .filter(MarketIndicators.created_at == max_created_at)\
+                    .order_by(MarketIndicators.analysis_date.desc())\
+                    .limit(10)\
+                    .all()
             
             if not indicators:
                 return 0.5, {"status": "no_data", "message": "No market indicators found"}
@@ -752,41 +1648,28 @@ class AdvancedTradingAnalysis:
             'volatility': volatility_score * 100
         }
         
-        # Poids adaptatifs basés sur la cohérence des signaux
+        # Nouveaux poids optimisés basés sur l'analyse des corrélations avec le succès
+        # Phase 1: Amélioration des seuils de décision
         base_weights = {
-            'technical': 0.30,      # Poids principal pour l'analyse technique
-            'sentiment': 0.15,      # Sentiment important mais variable
-            'market': 0.15,         # Contexte de marché
-            'ml': 0.02,             # ML pour la prédiction
-            'candlestick': 0.10,    # Patterns de prix
-            'garch': 0.08,          # Volatilité prévue
-            'monte_carlo': 0.08,    # Simulations de risque
-            'markov': 0.07,         # Régimes de marché
-            'volatility': 0.05      # Volatilité actuelle
+            'technical': 0.40,      # Corrélation la plus forte avec le succès
+            'sentiment': 0.35,      # Deuxième meilleure corrélation
+            'market': 0.25,         # Corrélation modérée mais importante
+            'ml': 0.0,              # Désactivé temporairement pour la phase 1
+            'candlestick': 0.0,     # Intégré dans l'analyse technique
+            'garch': 0.0,           # Intégré dans l'analyse de marché
+            'monte_carlo': 0.0,     # Intégré dans l'analyse de marché
+            'markov': 0.0,          # Intégré dans l'analyse de marché
+            'volatility': 0.0       # Intégré dans l'analyse de marché
         }
         
-        # Calcul de la cohérence des signaux (écart-type des scores)
-        score_values = list(scores.values())
-        signal_consistency = 1.0 - (np.std(score_values) / 100.0)  # Plus cohérent = plus de confiance
-        
-        # Ajustement des poids basé sur la cohérence
-        adjusted_weights = {}
-        for key, base_weight in base_weights.items():
-            # Si le signal est cohérent avec les autres, augmenter son poids
-            if scores[key] > 50:  # Signal positif
-                consistency_bonus = signal_consistency * 0.1
-            else:  # Signal négatif
-                consistency_bonus = signal_consistency * 0.05
-            
-            adjusted_weights[key] = base_weight + consistency_bonus
-        
-        # Normaliser les poids
-        total_weight = sum(adjusted_weights.values())
-        for key in adjusted_weights:
-            adjusted_weights[key] /= total_weight
-        
-        # Score composite pondéré
-        composite_score = sum(scores[key] * adjusted_weights[key] for key in scores)
+        # Phase 2: Amélioration du scoring - Formule simplifiée et optimisée
+        # Utilisation directe des poids de base sans ajustements complexes
+        # Seuls les scores principaux sont utilisés (les autres sont à 0)
+        composite_score = (
+            base_weights['technical'] * scores['technical'] +
+            base_weights['sentiment'] * scores['sentiment'] +
+            base_weights['market'] * scores['market']
+        )
         
         # Application de règles de prudence (overrides)
         composite_score = self._apply_safety_overrides(composite_score, scores)
@@ -938,7 +1821,7 @@ class AdvancedTradingAnalysis:
             if current_price_data.volume and indicators.volume_sma_20:
                 if float(current_price_data.volume) > float(indicators.volume_sma_20):
                     points += 40
-                else:
+            else:
                     points += 20
         
         # Volume momentum (40 points max)
@@ -1189,18 +2072,193 @@ class AdvancedTradingAnalysis:
         
         return max(0, min(100, points))
     
-    def _determine_recommendation(self, composite_score: float) -> Tuple[str, str]:
-        """Détermine la recommandation et le niveau de risque"""
-        if composite_score >= 0.8:
-            return "STRONG_BUY", "LOW"
-        elif composite_score >= 0.6:
-            return "BUY", "MEDIUM"
-        elif composite_score >= 0.4:
-            return "HOLD", "MEDIUM"
-        elif composite_score >= 0.2:
-            return "SELL", "HIGH"
+    def _validate_buy_signals(self, composite_score: float, technical_score: float, 
+                            sentiment_score: float, market_score: float, 
+                            confidence_level: float) -> Dict[str, bool]:
+        """
+        Valide les signaux d'achat selon les règles définies dans buy_signals_optimization.json
+        Phase 1: Implémentation des règles de validation
+        """
+        validation_results = {
+            "BUY_STRONG": False,
+            "BUY_MODERATE": False,
+            "BUY_WEAK": False
+        }
+        
+        # Règles de validation pour BUY_STRONG
+        if (composite_score >= 0.65 and 
+            technical_score >= 0.6 and 
+            sentiment_score >= 0.5 and 
+            market_score >= 0.4 and 
+            confidence_level >= 0.8):
+            validation_results["BUY_STRONG"] = True
+        
+        # Règles de validation pour BUY_MODERATE
+        if (composite_score >= 0.55 and 
+            technical_score >= 0.5 and 
+            sentiment_score >= 0.4 and 
+            market_score >= 0.3 and 
+            confidence_level >= 0.6):
+            validation_results["BUY_MODERATE"] = True
+        
+        # Règles de validation pour BUY_WEAK
+        if (composite_score >= 0.45 and 
+            technical_score >= 0.4 and 
+            sentiment_score >= 0.3 and 
+            market_score >= 0.2 and 
+            confidence_level >= 0.4):
+            validation_results["BUY_WEAK"] = True
+        
+        return validation_results
+    
+    def _validate_technical_indicators(self, technical_indicators: Dict[str, Any]) -> Dict[str, bool]:
+        """
+        Valide les indicateurs techniques selon les règles définies
+        Phase 2: Règles de validation technique détaillées
+        """
+        validation = {
+            "rsi_valid": False,
+            "macd_valid": False,
+            "price_above_sma": False,
+            "volume_above_average": False,
+            "overall_valid": False
+        }
+        
+        try:
+            # RSI entre 30 et 70 (éviter les extrêmes)
+            if 'rsi_14' in technical_indicators and technical_indicators['rsi_14'] is not None:
+                rsi = float(technical_indicators['rsi_14'])
+                validation["rsi_valid"] = 30 <= rsi <= 70
+            
+            # MACD au-dessus de la ligne de signal
+            if 'macd' in technical_indicators and technical_indicators['macd'] is not None:
+                macd = float(technical_indicators['macd'])
+                if 'macd_signal' in technical_indicators and technical_indicators['macd_signal'] is not None:
+                    macd_signal = float(technical_indicators['macd_signal'])
+                    validation["macd_valid"] = macd > macd_signal
+            
+            # Prix au-dessus de la moyenne mobile 20
+            if 'sma_20' in technical_indicators and technical_indicators['sma_20'] is not None:
+                sma_20 = float(technical_indicators['sma_20'])
+                if 'close' in technical_indicators and technical_indicators['close'] is not None:
+                    close = float(technical_indicators['close'])
+                    validation["price_above_sma"] = close > sma_20
+            
+            # Volume supérieur à la moyenne sur 20 jours
+            if 'volume' in technical_indicators and technical_indicators['volume'] is not None:
+                volume = float(technical_indicators['volume'])
+                if 'volume_sma_20' in technical_indicators and technical_indicators['volume_sma_20'] is not None:
+                    volume_sma_20 = float(technical_indicators['volume_sma_20'])
+                    validation["volume_above_average"] = volume > volume_sma_20
+            
+            # Validation globale : au moins 3 critères sur 4
+            valid_criteria = sum(1 for k, v in validation.items() if k != "overall_valid" and v)
+            validation["overall_valid"] = valid_criteria >= 3
+            
+        except (ValueError, TypeError) as e:
+            self.logger.warning(f"Erreur lors de la validation technique: {e}")
+        
+        return validation
+    
+    def _validate_sentiment_indicators(self, sentiment_indicators: Dict[str, Any]) -> Dict[str, bool]:
+        """
+        Valide les indicateurs de sentiment selon les règles définies
+        Phase 2: Règles de validation sentiment détaillées
+        """
+        validation = {
+            "score_positive": False,
+            "confidence_high": False,
+            "trend_positive": False,
+            "overall_valid": False
+        }
+        
+        try:
+            # Score de sentiment > 0.5
+            if 'sentiment_score_normalized' in sentiment_indicators and sentiment_indicators['sentiment_score_normalized'] is not None:
+                score = float(sentiment_indicators['sentiment_score_normalized'])
+                validation["score_positive"] = score > 0.5
+            
+            # Confiance du sentiment > 0.6
+            if 'confidence' in sentiment_indicators and sentiment_indicators['confidence'] is not None:
+                confidence = float(sentiment_indicators['confidence'])
+                validation["confidence_high"] = confidence > 0.6
+            
+            # Tendance du sentiment positive sur 5 jours (simplifié)
+            if 'sentiment_score_normalized' in sentiment_indicators and sentiment_indicators['sentiment_score_normalized'] is not None:
+                score = float(sentiment_indicators['sentiment_score_normalized'])
+                validation["trend_positive"] = score > 0.5  # Simplification pour la Phase 2
+            
+            # Validation globale : au moins 2 critères sur 3
+            valid_criteria = sum(1 for k, v in validation.items() if k != "overall_valid" and v)
+            validation["overall_valid"] = valid_criteria >= 2
+            
+        except (ValueError, TypeError) as e:
+            self.logger.warning(f"Erreur lors de la validation sentiment: {e}")
+        
+        return validation
+    
+    def _validate_market_indicators(self, market_indicators: Dict[str, Any]) -> Dict[str, bool]:
+        """
+        Valide les indicateurs de marché selon les règles définies
+        Phase 2: Règles de validation marché détaillées
+        """
+        validation = {
+            "regime_favorable": False,
+            "volatility_acceptable": False,
+            "correlations_positive": False,
+            "overall_valid": False
+        }
+        
+        try:
+            # Régime de marché favorable (simplifié)
+            if 'market_regime' in market_indicators and market_indicators['market_regime'] is not None:
+                regime = str(market_indicators['market_regime']).lower()
+                validation["regime_favorable"] = regime in ['bullish', 'sideways']
+            
+            # Volatilité dans une fourchette acceptable
+            if 'volatility_percentile' in market_indicators and market_indicators['volatility_percentile'] is not None:
+                volatility = float(market_indicators['volatility_percentile'])
+                validation["volatility_acceptable"] = 20 <= volatility <= 80
+            
+            # Corrélations sectorielles positives (simplifié)
+            if 'correlation_strength' in market_indicators and market_indicators['correlation_strength'] is not None:
+                correlation = str(market_indicators['correlation_strength']).lower()
+                validation["correlations_positive"] = correlation in ['strong', 'medium']
+            
+            # Validation globale : au moins 2 critères sur 3
+            valid_criteria = sum(1 for k, v in validation.items() if k != "overall_valid" and v)
+            validation["overall_valid"] = valid_criteria >= 2
+            
+        except (ValueError, TypeError) as e:
+            self.logger.warning(f"Erreur lors de la validation marché: {e}")
+        
+        return validation
+    
+    def _determine_recommendation(self, composite_score: float, technical_score: float = 0.0, 
+                                sentiment_score: float = 0.0, market_score: float = 0.0, 
+                                confidence_level: float = 0.0) -> Tuple[str, str]:
+        """
+        Détermine la recommandation et le niveau de risque avec les nouveaux seuils optimisés
+        Phase 1: Amélioration des seuils de décision avec règles de validation
+        """
+        # Appliquer les règles de validation améliorées (Phase 2)
+        validation_passed = self._validate_buy_signals(
+            composite_score, technical_score, sentiment_score, market_score, confidence_level
+        )
+        
+        # Nouveaux seuils basés sur l'analyse des performances
+        if composite_score >= 0.65 and validation_passed["BUY_STRONG"]:
+            return "BUY_STRONG", "LOW"
+        elif composite_score >= 0.55 and validation_passed["BUY_MODERATE"]:
+            return "BUY_MODERATE", "MEDIUM"
+        elif composite_score >= 0.45 and validation_passed["BUY_WEAK"]:
+            return "BUY_WEAK", "MEDIUM"
+        elif composite_score >= 0.35:
+            return "HOLD", "LOW"
+        elif composite_score >= 0.25:
+            return "SELL_MODERATE", "HIGH"
         else:
-            return "STRONG_SELL", "VERY_HIGH"
+            return "SELL_STRONG", "VERY_HIGH"
     
     def _calculate_confidence_level(
         self, 
@@ -1212,30 +2270,48 @@ class AdvancedTradingAnalysis:
         garch_score: float,
         monte_carlo_score: float,
         markov_score: float,
-        volatility_score: float
+        volatility_score: float,
+        technical_indicators: Dict[str, Any] = None,
+        sentiment_indicators: Dict[str, Any] = None,
+        market_indicators: Dict[str, Any] = None
     ) -> float:
-        """Calcule le niveau de confiance basé sur la qualité des données"""
+        """
+        Calcule le niveau de confiance basé sur la qualité des données et les validations
+        Phase 2: Intégration des niveaux de confiance améliorés
+        """
         try:
-            # Calculer la confiance basée sur la cohérence des scores
-            scores = [technical_score, sentiment_score, market_score, ml_score,
-                     candlestick_score, garch_score, monte_carlo_score, markov_score, volatility_score]
-            
-            # Écart-type des scores (plus faible = plus cohérent = plus de confiance)
-            score_std = np.std(scores)
-            
-            # Confiance de base basée sur la cohérence
+            # Confiance de base basée sur la cohérence des scores principaux
+            main_scores = [technical_score, sentiment_score, market_score]
+            score_std = np.std(main_scores)
             base_confidence = max(0.1, 1.0 - score_std)
             
             # Bonus pour les scores élevés (indique une forte conviction)
-            high_scores = sum(1 for score in scores if score > 0.7)
+            high_scores = sum(1 for score in main_scores if score > 0.7)
             conviction_bonus = high_scores * 0.05
             
             # Bonus pour les scores faibles (indique une forte conviction négative)
-            low_scores = sum(1 for score in scores if score < 0.3)
+            low_scores = sum(1 for score in main_scores if score < 0.3)
             conviction_bonus += low_scores * 0.05
             
+            # Bonus pour la validation des indicateurs (Phase 2)
+            validation_bonus = 0.0
+            if technical_indicators:
+                tech_validation = self._validate_technical_indicators(technical_indicators)
+                if tech_validation["overall_valid"]:
+                    validation_bonus += 0.05  # Réduit pour éviter la sur-confiance
+            
+            if sentiment_indicators:
+                sent_validation = self._validate_sentiment_indicators(sentiment_indicators)
+                if sent_validation["overall_valid"]:
+                    validation_bonus += 0.05  # Réduit pour éviter la sur-confiance
+            
+            if market_indicators:
+                market_validation = self._validate_market_indicators(market_indicators)
+                if market_validation["overall_valid"]:
+                    validation_bonus += 0.05  # Réduit pour éviter la sur-confiance
+            
             # Confiance finale
-            confidence = min(1.0, base_confidence + conviction_bonus)
+            confidence = min(1.0, base_confidence + conviction_bonus + validation_bonus)
             
             return round(confidence, 3)
             

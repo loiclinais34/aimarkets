@@ -105,6 +105,13 @@ export interface HybridAnalysisResponse {
     volatility_score: number;
     analysis_timestamp?: string;
     updated_at?: string;
+    // Indicateurs de marché
+    momentum_trend?: string;
+    correlation_strength?: string;
+    market_regime?: string;
+    // Indicateur de bulle
+    bubble_score?: number;
+    bubble_level?: string;
   }>;
   analysis_timestamp: string;
   metadata?: {
@@ -244,6 +251,61 @@ class AdvancedAnalysisApi {
     const response = await apiClient.get(`/api/v1/market-indicators/volatility/${symbol}`);
     return response.data;
   }
+
+  /**
+   * Génération des opportunités du jour
+   */
+  async generateDailyOpportunities(request: GenerateDailyOpportunitiesRequest = {}): Promise<GenerateDailyOpportunitiesResponse> {
+    try {
+      const response = await apiClient.post('/api/v1/advanced-analysis/generate-daily-opportunities', null, {
+        params: request
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Erreur lors de la génération des opportunités:', error);
+      
+      // Gérer les erreurs de réponse
+      if (error.response) {
+        throw new Error(`Erreur serveur: ${error.response.status} - ${error.response.data?.detail || error.response.statusText}`);
+      } else if (error.request) {
+        throw new Error('Erreur de connexion au serveur');
+      } else {
+        throw new Error(`Erreur: ${error.message}`);
+      }
+    }
+  }
+}
+
+export interface GenerateDailyOpportunitiesRequest {
+  limit_symbols?: number;
+  time_horizon?: number;
+  include_ml?: boolean;
+}
+
+export interface GenerateDailyOpportunitiesResponse {
+  status: string;
+  generation_date: string;
+  summary: {
+    total_symbols_requested: number;
+    total_opportunities_generated: number;
+    total_errors: number;
+    success_rate: number;
+  };
+  statistics: {
+    recommendations: Record<string, number>;
+    risk_levels: Record<string, number>;
+    average_composite_score: number;
+    average_confidence: number;
+  };
+  top_opportunities: Array<{
+    symbol: string;
+    recommendation: string;
+    composite_score: number;
+    technical_score: number;
+    confidence_level: number;
+  }>;
+  all_opportunities: Array<any>;
+  errors: Array<any>;
 }
 
 export const advancedAnalysisApi = new AdvancedAnalysisApi();

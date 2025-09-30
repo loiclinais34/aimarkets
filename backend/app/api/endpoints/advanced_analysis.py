@@ -509,13 +509,31 @@ async def search_opportunities(
         # Limiter les résultats
         opportunities = query.limit(limit).all()
         
-        # Formater les résultats avec indicateurs de marché
+        # Formater les résultats avec indicateurs de marché et bulle
         results = []
         for opp in opportunities:
             # Récupérer les indicateurs de marché pour ce symbole
             market_indicators = get_market_indicators_for_symbol(opp.symbol, db)
             
-            results.append({
+            # Récupérer les indicateurs de bulle pour ce symbole
+            from app.models.bubble_indicators import BubbleIndicators
+            from datetime import date
+            
+            bubble_indicator = db.query(BubbleIndicators).filter(
+                BubbleIndicators.symbol == opp.symbol,
+                BubbleIndicators.analysis_date == date.today()
+            ).first()
+            
+            bubble_data = None
+            if bubble_indicator:
+                bubble_data = {
+                    "bubble_score": float(bubble_indicator.bubble_score),
+                    "bubble_level": bubble_indicator.bubble_level,
+                    "valuation_score": float(bubble_indicator.valuation_score),
+                    "momentum_score": float(bubble_indicator.momentum_score)
+                }
+            
+            result_item = {
                 "symbol": opp.symbol,
                 "analysis_date": opp.analysis_date.isoformat() if opp.analysis_date else None,
                 "updated_at": opp.updated_at.isoformat() if opp.updated_at else None,
@@ -535,7 +553,20 @@ async def search_opportunities(
                     "volatility": float(opp.volatility_score)
                 },
                 "market_indicators": market_indicators
-            })
+            }
+            
+            # Ajouter les indicateurs de bulle si disponibles
+            if bubble_data:
+                result_item["bubble_score"] = bubble_data["bubble_score"]
+                result_item["bubble_level"] = bubble_data["bubble_level"]
+            
+            # Ajouter les indicateurs de marché individuels
+            if market_indicators:
+                result_item["momentum_trend"] = market_indicators.get("momentum_trend")
+                result_item["correlation_strength"] = market_indicators.get("correlation_strength")
+                result_item["market_regime"] = market_indicators.get("market_regime")
+            
+            results.append(result_item)
         
         # Compter le total sans limite pour les métadonnées
         total_count = db.query(AdvancedOpportunity).count()
@@ -561,6 +592,252 @@ async def search_opportunities(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erreur lors de la recherche d'opportunités: {str(e)}"
+        )
+
+@router.post("/generate-daily-opportunities")
+async def generate_daily_opportunities(
+    symbols: Optional[List[str]] = Query(None, description="Liste des symboles à analyser (optionnel)"),
+    limit_symbols: int = Query(50, ge=1, le=200, description="Nombre maximum de symboles à analyser"),
+    time_horizon: int = Query(30, ge=1, le=365, description="Horizon temporel en jours"),
+    include_ml: bool = Query(True, description="Inclure l'analyse ML"),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Génère les opportunités du jour pour tous les symboles disponibles
+    
+    Args:
+        symbols: Liste des symboles à analyser (si None, utilise tous les symboles disponibles)
+        limit_symbols: Nombre maximum de symboles à analyser
+        time_horizon: Horizon temporel en jours
+        include_ml: Inclure l'analyse ML
+        
+    Returns:
+        Dict contenant les opportunités générées avec statistiques
+    """
+    try:
+        from app.models.database import HistoricalData
+        from datetime import date, datetime
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        logger.info("Démarrage de la génération des opportunités du jour")
+        
+        # Récupérer les symboles disponibles
+        if symbols:
+            # Utiliser les symboles fournis
+            available_symbols = [sym.upper() for sym in symbols]
+        else:
+            # Récupérer tous les symboles disponibles depuis la base de données
+            symbol_query = db.query(HistoricalData.symbol).distinct().limit(limit_symbols)
+            available_symbols = [row.symbol for row in symbol_query.all()]
+        
+        if not available_symbols:
+            raise HTTPException(
+                status_code=404,
+                detail="Aucun symbole disponible pour l'analyse"
+            )
+        
+        logger.info(f"Analyse de {len(available_symbols)} symboles: {available_symbols[:10]}...")
+        
+        # Générer les opportunités pour chaque symbole
+        opportunities = []
+        errors = []
+        
+        for symbol in available_symbols:
+            try:
+                # Effectuer l'analyse complète avec les optimisations récentes
+                result = await advanced_analyzer.analyze_opportunity(
+                    symbol=symbol,
+                    time_horizon=time_horizon,
+                    include_ml=include_ml,
+                    db=db
+                )
+                
+                # Sauvegarder l'opportunité en base de données
+                from app.models.advanced_opportunities import AdvancedOpportunity
+                from sqlalchemy import func
+                
+                # Vérifier si une opportunité existe déjà pour ce symbole aujourd'hui
+                existing_opportunity = db.query(AdvancedOpportunity).filter(
+                    AdvancedOpportunity.symbol == symbol,
+                    func.date(AdvancedOpportunity.updated_at) == date.today()
+                ).first()
+                
+                if existing_opportunity:
+                    # Mettre à jour l'opportunité existante
+                    existing_opportunity.analysis_date = result.analysis_date
+                    existing_opportunity.recommendation = result.recommendation
+                    existing_opportunity.risk_level = result.risk_level
+                    existing_opportunity.composite_score = result.composite_score
+                    existing_opportunity.confidence_level = result.confidence_level
+                    existing_opportunity.technical_score = result.technical_score
+                    existing_opportunity.sentiment_score = result.sentiment_score
+                    existing_opportunity.market_score = result.market_score
+                    existing_opportunity.ml_score = result.ml_score
+                    existing_opportunity.candlestick_score = result.candlestick_score
+                    existing_opportunity.garch_score = result.garch_score
+                    existing_opportunity.monte_carlo_score = result.monte_carlo_score
+                    existing_opportunity.markov_score = result.markov_score
+                    existing_opportunity.volatility_score = result.volatility_score
+                    
+                    # Mettre à jour les analyses détaillées
+                    existing_opportunity.technical_analysis = result.technical_analysis
+                    existing_opportunity.sentiment_analysis = result.sentiment_analysis
+                    existing_opportunity.market_analysis = result.market_indicators
+                    existing_opportunity.ml_analysis = result.ml_analysis
+                    existing_opportunity.candlestick_analysis = result.candlestick_analysis
+                    existing_opportunity.garch_analysis = result.garch_analysis
+                    existing_opportunity.monte_carlo_analysis = result.monte_carlo_analysis
+                    existing_opportunity.markov_analysis = result.markov_analysis
+                    existing_opportunity.volatility_analysis = result.volatility_analysis
+                    existing_opportunity.analysis_types = ['technical', 'sentiment', 'market', 'ml', 'candlestick', 'garch', 'monte_carlo', 'markov', 'volatility']
+                    existing_opportunity.time_horizon = time_horizon
+                    
+                    existing_opportunity.updated_at = datetime.now()
+                else:
+                    # Créer une nouvelle opportunité
+                    new_opportunity = AdvancedOpportunity(
+                        symbol=symbol,
+                        analysis_date=result.analysis_date,
+                        recommendation=result.recommendation,
+                        risk_level=result.risk_level,
+                        composite_score=result.composite_score,
+                        confidence_level=result.confidence_level,
+                        technical_score=result.technical_score,
+                        sentiment_score=result.sentiment_score,
+                        market_score=result.market_score,
+                        ml_score=result.ml_score,
+                        candlestick_score=result.candlestick_score,
+                        garch_score=result.garch_score,
+                        monte_carlo_score=result.monte_carlo_score,
+                        markov_score=result.markov_score,
+                        volatility_score=result.volatility_score,
+                        
+                        # Analyses détaillées
+                        technical_analysis=result.technical_analysis,
+                        sentiment_analysis=result.sentiment_analysis,
+                        market_analysis=result.market_indicators,
+                        ml_analysis=result.ml_analysis,
+                        candlestick_analysis=result.candlestick_analysis,
+                        garch_analysis=result.garch_analysis,
+                        monte_carlo_analysis=result.monte_carlo_analysis,
+                        markov_analysis=result.markov_analysis,
+                        volatility_analysis=result.volatility_analysis,
+                        analysis_types=['technical', 'sentiment', 'market', 'ml', 'candlestick', 'garch', 'monte_carlo', 'markov', 'volatility'],
+                        time_horizon=time_horizon,
+                        
+                        created_at=datetime.now(),
+                        updated_at=datetime.now()
+                    )
+                    db.add(new_opportunity)
+                
+                # Ajouter l'opportunité à la liste de réponse
+                opportunities.append({
+                    "symbol": symbol,
+                    "analysis_date": result.analysis_date,
+                    "recommendation": result.recommendation,
+                    "risk_level": result.risk_level,
+                    "composite_score": result.composite_score,
+                    "confidence_level": result.confidence_level,
+                    "scores": {
+                        "technical": result.technical_score,
+                        "sentiment": result.sentiment_score,
+                        "market": result.market_score,
+                        "ml": result.ml_score,
+                        "candlestick": result.candlestick_score,
+                        "garch": result.garch_score,
+                        "monte_carlo": result.monte_carlo_score,
+                        "markov": result.markov_score,
+                        "volatility": result.volatility_score
+                    },
+                    "analysis_details": {
+                        "technical": result.technical_analysis,
+                        "sentiment": result.sentiment_analysis,
+                        "market": result.market_indicators,
+                        "ml": result.ml_analysis,
+                        "candlestick": result.candlestick_analysis,
+                        "garch": result.garch_analysis,
+                        "monte_carlo": result.monte_carlo_analysis,
+                        "markov": result.markov_analysis,
+                        "volatility": result.volatility_analysis
+                    }
+                })
+                
+            except Exception as e:
+                logger.warning(f"Erreur lors de l'analyse de {symbol}: {e}")
+                errors.append({
+                    "symbol": symbol,
+                    "error": str(e)
+                })
+                continue
+        
+        # Sauvegarder toutes les modifications en base
+        try:
+            db.commit()
+            logger.info(f"Opportunités sauvegardées en base de données")
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Erreur lors de la sauvegarde: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Erreur lors de la sauvegarde des opportunités: {str(e)}"
+            )
+        
+        # Trier par score composite décroissant
+        opportunities.sort(key=lambda x: x["composite_score"], reverse=True)
+        
+        # Calculer les statistiques
+        total_analyzed = len(opportunities)
+        total_errors = len(errors)
+        
+        # Statistiques par recommandation
+        recommendation_stats = {}
+        for opp in opportunities:
+            rec = opp["recommendation"]
+            if rec not in recommendation_stats:
+                recommendation_stats[rec] = 0
+            recommendation_stats[rec] += 1
+        
+        # Statistiques par niveau de risque
+        risk_stats = {}
+        for opp in opportunities:
+            risk = opp["risk_level"]
+            if risk not in risk_stats:
+                risk_stats[risk] = 0
+            risk_stats[risk] += 1
+        
+        # Top 10 des meilleures opportunités
+        top_opportunities = opportunities[:10]
+        
+        logger.info(f"Génération terminée: {total_analyzed} opportunités, {total_errors} erreurs")
+        
+        return {
+            "status": "success",
+            "generation_date": date.today().isoformat(),
+            "summary": {
+                "total_symbols_requested": len(available_symbols),
+                "total_opportunities_generated": total_analyzed,
+                "total_errors": total_errors,
+                "success_rate": round((total_analyzed / len(available_symbols)) * 100, 2) if available_symbols else 0
+            },
+            "statistics": {
+                "recommendations": recommendation_stats,
+                "risk_levels": risk_stats,
+                "average_composite_score": round(sum(opp["composite_score"] for opp in opportunities) / total_analyzed, 3) if total_analyzed > 0 else 0,
+                "average_confidence": round(sum(opp["confidence_level"] for opp in opportunities) / total_analyzed, 3) if total_analyzed > 0 else 0
+            },
+            "top_opportunities": top_opportunities,
+            "all_opportunities": opportunities,
+            "errors": errors
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur lors de la génération des opportunités du jour: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la génération des opportunités du jour: {str(e)}"
         )
 
 @router.get("/health")
