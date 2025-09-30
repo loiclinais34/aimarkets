@@ -1,362 +1,351 @@
 """
-Service pour récupérer les ratios financiers depuis Alpha Vantage
+Service pour récupérer les ratios financiers via yfinance
 """
-import requests
-import logging
-from datetime import datetime, date
-from typing import Dict, Any, List, Optional
-from decimal import Decimal
-import time
-from sqlalchemy.orm import Session
-from sqlalchemy import func, desc
 
-from ..models.database import FinancialRatios
-from ..core.config import settings
+import logging
+from typing import Dict, Any, Optional
+from datetime import datetime, date
+import yfinance as yf
+from sqlalchemy.orm import Session
+
+from app.models.financial_ratios import FinancialRatios
 
 logger = logging.getLogger(__name__)
 
+
 class FinancialRatiosService:
-    """Service pour interagir avec l'API Alpha Vantage pour les ratios financiers"""
+    """
+    Service pour récupérer et gérer les ratios financiers des entreprises
+    Source: Yahoo Finance via yfinance
+    """
     
     def __init__(self):
-        self.api_key = settings.alpha_vantage_api_key
-        self.base_url = settings.alpha_vantage_base_url
-        self.rate_limit_delay = settings.alpha_vantage_rate_limit_delay
+        self.logger = logging.getLogger(__name__)
+    
+    def get_financial_ratios(self, symbol: str) -> Dict[str, Any]:
+        """
+        Récupère les ratios financiers pour un symbole donné
         
-    def _make_request(self, function: str, symbol: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Effectue une requête vers l'API Alpha Vantage avec gestion des erreurs"""
-        if params is None:
-            params = {}
+        Args:
+            symbol: Symbole du titre (ex: AAPL)
             
-        # Paramètres de base
-        base_params = {
-            'function': function,
-            'symbol': symbol,
-            'apikey': self.api_key
-        }
-        
-        # Fusionner avec les paramètres spécifiques
-        params.update(base_params)
-        
+        Returns:
+            Dict contenant les ratios financiers
+        """
         try:
-            logger.info(f"Requête Alpha Vantage: {function} pour {symbol}")
+            self.logger.info(f"Récupération des ratios financiers pour {symbol}")
             
-            # Respecter les limites de taux
-            time.sleep(self.rate_limit_delay)
+            ticker = yf.Ticker(symbol)
+            info = ticker.info
             
-            response = requests.get(self.base_url, params=params, timeout=30)
-            response.raise_for_status()
-            
-            data = response.json()
-            
-            # Vérifier les erreurs de l'API
-            if 'Error Message' in data:
-                logger.error(f"Erreur Alpha Vantage: {data['Error Message']}")
-                return {}
+            # Extraire les ratios pertinents
+            ratios = {
+                # Ratios de valorisation
+                'pe_ratio': self._safe_float(info.get('trailingPE')),
+                'forward_pe': self._safe_float(info.get('forwardPE')),
+                'ps_ratio': self._safe_float(info.get('priceToSalesTrailing12Months')),
+                'pb_ratio': self._safe_float(info.get('priceToBook')),
+                'peg_ratio': self._safe_float(info.get('pegRatio')),
                 
-            if 'Note' in data:
-                logger.warning(f"Note Alpha Vantage: {data['Note']}")
-                return {}
+                # Ratios de rentabilité
+                'profit_margin': self._safe_float(info.get('profitMargins')),
+                'operating_margin': self._safe_float(info.get('operatingMargins')),
+                'roe': self._safe_float(info.get('returnOnEquity')),
+                'roa': self._safe_float(info.get('returnOnAssets')),
                 
-            if 'Information' in data:
-                logger.warning(f"Information Alpha Vantage: {data['Information']}")
-                return {}
+                # Ratios de liquidité
+                'current_ratio': self._safe_float(info.get('currentRatio')),
+                'quick_ratio': self._safe_float(info.get('quickRatio')),
+                
+                # Ratios d'endettement
+                'debt_to_equity': self._safe_float(info.get('debtToEquity')),
+                
+                # Autres métriques
+                'market_cap': self._safe_float(info.get('marketCap')),
+                'enterprise_value': self._safe_float(info.get('enterpriseValue')),
+                'eps': self._safe_float(info.get('trailingEps')),
+                'dividend_yield': self._safe_float(info.get('dividendYield')),
+                
+                # Informations contextuelles
+                'sector': info.get('sector'),
+                'industry': info.get('industry'),
+                'company_name': info.get('longName') or info.get('shortName'),
+                
+                # Métadonnées
+                'retrieved_at': datetime.now().isoformat(),
+                'symbol': symbol
+            }
             
-            return data
+            self.logger.info(f"Ratios récupérés pour {symbol}: P/E={ratios['pe_ratio']}, P/S={ratios['ps_ratio']}, P/B={ratios['pb_ratio']}")
+            return ratios
             
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Erreur de requête Alpha Vantage: {e}")
-            return {}
         except Exception as e:
-            logger.error(f"Erreur inattendue Alpha Vantage: {e}")
-            return {}
+            self.logger.error(f"Erreur lors de la récupération des ratios pour {symbol}: {e}")
+            return {
+                'symbol': symbol,
+                'error': str(e),
+                'retrieved_at': datetime.now().isoformat()
+            }
     
-    def get_company_overview(self, symbol: str) -> Dict[str, Any]:
+    def get_sector_averages(self, symbols: list, sector: str = None) -> Dict[str, float]:
         """
-        Récupère les informations générales de l'entreprise et les ratios de base
+        Calcule les moyennes des ratios pour un secteur
         
         Args:
-            symbol: Symbole du titre (ex: AAPL)
+            symbols: Liste de symboles du secteur
+            sector: Nom du secteur (optionnel)
             
         Returns:
-            Dictionnaire avec les informations de l'entreprise
-        """
-        data = self._make_request('OVERVIEW', symbol)
-        
-        if not data:
-            return {}
-            
-        # Extraire les ratios financiers principaux
-        overview = {
-            'symbol': symbol,
-            'name': data.get('Name', ''),
-            'description': data.get('Description', ''),
-            'sector': data.get('Sector', ''),
-            'industry': data.get('Industry', ''),
-            'market_capitalization': self._safe_decimal(data.get('MarketCapitalization')),
-            'ebitda': self._safe_decimal(data.get('EBITDA')),
-            'pe_ratio': self._safe_decimal(data.get('PERatio')),
-            'peg_ratio': self._safe_decimal(data.get('PEGRatio')),
-            'book_value': self._safe_decimal(data.get('BookValue')),
-            'dividend_per_share': self._safe_decimal(data.get('DividendPerShare')),
-            'dividend_yield': self._safe_decimal(data.get('DividendYield')),
-            'eps': self._safe_decimal(data.get('EPS')),
-            'revenue_per_share_ttm': self._safe_decimal(data.get('RevenuePerShareTTM')),
-            'profit_margin': self._safe_decimal(data.get('ProfitMargin')),
-            'operating_margin_ttm': self._safe_decimal(data.get('OperatingMarginTTM')),
-            'return_on_assets_ttm': self._safe_decimal(data.get('ReturnOnAssetsTTM')),
-            'return_on_equity_ttm': self._safe_decimal(data.get('ReturnOnEquityTTM')),
-            'revenue_ttm': self._safe_decimal(data.get('RevenueTTM')),
-            'gross_profit_ttm': self._safe_decimal(data.get('GrossProfitTTM')),
-            'diluted_eps_ttm': self._safe_decimal(data.get('DilutedEPSTTM')),
-            'quarterly_earnings_growth_yoy': self._safe_decimal(data.get('QuarterlyEarningsGrowthYOY')),
-            'quarterly_revenue_growth_yoy': self._safe_decimal(data.get('QuarterlyRevenueGrowthYOY')),
-            'analyst_target_price': self._safe_decimal(data.get('AnalystTargetPrice')),
-            'trailing_pe': self._safe_decimal(data.get('TrailingPE')),
-            'forward_pe': self._safe_decimal(data.get('ForwardPE')),
-            'price_to_sales_ratio_ttm': self._safe_decimal(data.get('PriceToSalesRatioTTM')),
-            'price_to_book_ratio': self._safe_decimal(data.get('PriceToBookRatio')),
-            'ev_to_revenue': self._safe_decimal(data.get('EVToRevenue')),
-            'ev_to_ebitda': self._safe_decimal(data.get('EVToEBITDA')),
-            'beta': self._safe_decimal(data.get('Beta')),
-            'fifty_two_week_high': self._safe_decimal(data.get('52WeekHigh')),
-            'fifty_two_week_low': self._safe_decimal(data.get('52WeekLow')),
-            'fifty_day_moving_average': self._safe_decimal(data.get('50DayMovingAverage')),
-            'two_hundred_day_moving_average': self._safe_decimal(data.get('200DayMovingAverage')),
-            'shares_outstanding': self._safe_decimal(data.get('SharesOutstanding')),
-            'dividend_date': self._safe_date(data.get('DividendDate')),
-            'ex_dividend_date': self._safe_date(data.get('ExDividendDate')),
-            'last_updated': datetime.now()
-        }
-        
-        return overview
-    
-    def get_income_statement(self, symbol: str) -> Dict[str, Any]:
-        """
-        Récupère le compte de résultat
-        
-        Args:
-            symbol: Symbole du titre (ex: AAPL)
-            
-        Returns:
-            Dictionnaire avec les données du compte de résultat
-        """
-        data = self._make_request('INCOME_STATEMENT', symbol)
-        
-        if not data or 'annualReports' not in data:
-            return {}
-            
-        # Prendre le rapport annuel le plus récent
-        latest_report = data['annualReports'][0] if data['annualReports'] else {}
-        
-        income_statement = {
-            'symbol': symbol,
-            'fiscal_date_ending': self._safe_date(latest_report.get('fiscalDateEnding')),
-            'total_revenue': self._safe_decimal(latest_report.get('totalRevenue')),
-            'cost_of_revenue': self._safe_decimal(latest_report.get('costOfRevenue')),
-            'gross_profit': self._safe_decimal(latest_report.get('grossProfit')),
-            'operating_income': self._safe_decimal(latest_report.get('operatingIncome')),
-            'ebit': self._safe_decimal(latest_report.get('ebit')),
-            'ebitda': self._safe_decimal(latest_report.get('ebitda')),
-            'net_income': self._safe_decimal(latest_report.get('netIncome')),
-            'research_and_development': self._safe_decimal(latest_report.get('researchAndDevelopment')),
-            'selling_general_administrative': self._safe_decimal(latest_report.get('sellingGeneralAdministrative')),
-            'interest_expense': self._safe_decimal(latest_report.get('interestExpense')),
-            'income_before_tax': self._safe_decimal(latest_report.get('incomeBeforeTax')),
-            'income_tax_expense': self._safe_decimal(latest_report.get('incomeTaxExpense')),
-            'last_updated': datetime.now()
-        }
-        
-        return income_statement
-    
-    def get_balance_sheet(self, symbol: str) -> Dict[str, Any]:
-        """
-        Récupère le bilan
-        
-        Args:
-            symbol: Symbole du titre (ex: AAPL)
-            
-        Returns:
-            Dictionnaire avec les données du bilan
-        """
-        data = self._make_request('BALANCE_SHEET', symbol)
-        
-        if not data or 'annualReports' not in data:
-            return {}
-            
-        # Prendre le rapport annuel le plus récent
-        latest_report = data['annualReports'][0] if data['annualReports'] else {}
-        
-        balance_sheet = {
-            'symbol': symbol,
-            'fiscal_date_ending': self._safe_date(latest_report.get('fiscalDateEnding')),
-            'total_assets': self._safe_decimal(latest_report.get('totalAssets')),
-            'total_current_assets': self._safe_decimal(latest_report.get('totalCurrentAssets')),
-            'cash_and_cash_equivalents': self._safe_decimal(latest_report.get('cashAndCashEquivalentsAtCarryingValue')),
-            'cash_and_short_term_investments': self._safe_decimal(latest_report.get('cashAndShortTermInvestments')),
-            'inventory': self._safe_decimal(latest_report.get('inventory')),
-            'current_net_receivables': self._safe_decimal(latest_report.get('currentNetReceivables')),
-            'total_liabilities': self._safe_decimal(latest_report.get('totalLiabilities')),
-            'total_current_liabilities': self._safe_decimal(latest_report.get('totalCurrentLiabilities')),
-            'current_accounts_payable': self._safe_decimal(latest_report.get('currentAccountsPayable')),
-            'deferred_revenue': self._safe_decimal(latest_report.get('deferredRevenue')),
-            'current_debt': self._safe_decimal(latest_report.get('currentDebt')),
-            'short_term_debt': self._safe_decimal(latest_report.get('shortTermDebt')),
-            'total_shareholder_equity': self._safe_decimal(latest_report.get('totalShareholderEquity')),
-            'treasury_stock': self._safe_decimal(latest_report.get('treasuryStock')),
-            'retained_earnings': self._safe_decimal(latest_report.get('retainedEarnings')),
-            'common_stock': self._safe_decimal(latest_report.get('commonStock')),
-            'last_updated': datetime.now()
-        }
-        
-        return balance_sheet
-    
-    def get_cash_flow(self, symbol: str) -> Dict[str, Any]:
-        """
-        Récupère le tableau des flux de trésorerie
-        
-        Args:
-            symbol: Symbole du titre (ex: AAPL)
-            
-        Returns:
-            Dictionnaire avec les données des flux de trésorerie
-        """
-        data = self._make_request('CASH_FLOW', symbol)
-        
-        if not data or 'annualReports' not in data:
-            return {}
-            
-        # Prendre le rapport annuel le plus récent
-        latest_report = data['annualReports'][0] if data['annualReports'] else {}
-        
-        cash_flow = {
-            'symbol': symbol,
-            'fiscal_date_ending': self._safe_date(latest_report.get('fiscalDateEnding')),
-            'operating_cashflow': self._safe_decimal(latest_report.get('operatingCashflow')),
-            'payments_for_operating_activities': self._safe_decimal(latest_report.get('paymentsForOperatingActivities')),
-            'proceeds_from_operating_activities': self._safe_decimal(latest_report.get('proceedsFromOperatingActivities')),
-            'change_in_operating_liabilities': self._safe_decimal(latest_report.get('changeInOperatingLiabilities')),
-            'change_in_operating_assets': self._safe_decimal(latest_report.get('changeInOperatingAssets')),
-            'depreciation_depletion_and_amortization': self._safe_decimal(latest_report.get('depreciationDepletionAndAmortization')),
-            'capital_expenditures': self._safe_decimal(latest_report.get('capitalExpenditures')),
-            'change_in_receivables': self._safe_decimal(latest_report.get('changeInReceivables')),
-            'change_in_inventory': self._safe_decimal(latest_report.get('changeInInventory')),
-            'profit_loss': self._safe_decimal(latest_report.get('profitLoss')),
-            'cashflow_from_investment': self._safe_decimal(latest_report.get('cashflowFromInvestment')),
-            'cashflow_from_financing': self._safe_decimal(latest_report.get('cashflowFromFinancing')),
-            'proceeds_from_repayments_of_short_term_debt': self._safe_decimal(latest_report.get('proceedsFromRepaymentsOfShortTermDebt')),
-            'payments_for_repurchase_of_common_stock': self._safe_decimal(latest_report.get('paymentsForRepurchaseOfCommonStock')),
-            'payments_for_repurchase_of_equity': self._safe_decimal(latest_report.get('paymentsForRepurchaseOfEquity')),
-            'payments_for_repurchase_of_preferred_stock': self._safe_decimal(latest_report.get('paymentsForRepurchaseOfPreferredStock')),
-            'dividend_payout': self._safe_decimal(latest_report.get('dividendPayout')),
-            'dividend_payout_common_stock': self._safe_decimal(latest_report.get('dividendPayoutCommonStock')),
-            'dividend_payout_preferred_stock': self._safe_decimal(latest_report.get('dividendPayoutPreferredStock')),
-            'proceeds_from_issuance_of_common_stock': self._safe_decimal(latest_report.get('proceedsFromIssuanceOfCommonStock')),
-            'proceeds_from_issuance_of_long_term_debt_and_capital_securities_net': self._safe_decimal(latest_report.get('proceedsFromIssuanceOfLongTermDebtAndCapitalSecuritiesNet')),
-            'proceeds_from_issuance_of_preferred_stock': self._safe_decimal(latest_report.get('proceedsFromIssuanceOfPreferredStock')),
-            'proceeds_from_repurchase_of_equity': self._safe_decimal(latest_report.get('proceedsFromRepurchaseOfEquity')),
-            'proceeds_from_sale_of_treasury_stock': self._safe_decimal(latest_report.get('proceedsFromSaleOfTreasuryStock')),
-            'change_in_cash_and_cash_equivalents': self._safe_decimal(latest_report.get('changeInCashAndCashEquivalents')),
-            'change_in_exchange_rate': self._safe_decimal(latest_report.get('changeInExchangeRate')),
-            'net_income': self._safe_decimal(latest_report.get('netIncome')),
-            'last_updated': datetime.now()
-        }
-        
-        return cash_flow
-    
-    def save_financial_ratios(self, db: Session, symbol: str) -> bool:
-        """
-        Récupère et sauvegarde tous les ratios financiers pour un symbole
-        
-        Args:
-            db: Session de base de données
-            symbol: Symbole du titre
-            
-        Returns:
-            True si succès, False sinon
+            Dict avec les moyennes des ratios
         """
         try:
-            logger.info(f"Récupération des ratios financiers pour {symbol}")
+            all_ratios = []
             
-            # Récupérer les données
-            overview = self.get_company_overview(symbol)
-            income_statement = self.get_income_statement(symbol)
-            balance_sheet = self.get_balance_sheet(symbol)
-            cash_flow = self.get_cash_flow(symbol)
+            for symbol in symbols:
+                ratios = self.get_financial_ratios(symbol)
+                if 'error' not in ratios:
+                    all_ratios.append(ratios)
             
-            if not overview:
-                logger.warning(f"Aucune donnée trouvée pour {symbol}")
-                return False
+            if not all_ratios:
+                return {}
             
-            # Vérifier si l'enregistrement existe déjà
-            existing_record = db.query(FinancialRatios).filter(
-                FinancialRatios.symbol == symbol
+            # Calculer les moyennes
+            averages = {}
+            ratio_keys = ['pe_ratio', 'ps_ratio', 'pb_ratio', 'peg_ratio', 'roe', 'roa', 'debt_to_equity']
+            
+            for key in ratio_keys:
+                values = [r[key] for r in all_ratios if r.get(key) is not None]
+                if values:
+                    averages[f'avg_{key}'] = sum(values) / len(values)
+                    averages[f'median_{key}'] = sorted(values)[len(values) // 2]
+            
+            averages['sample_size'] = len(all_ratios)
+            averages['sector'] = sector
+            
+            return averages
+            
+        except Exception as e:
+            self.logger.error(f"Erreur lors du calcul des moyennes sectorielles: {e}")
+            return {}
+    
+    def compare_to_sector(self, symbol: str, sector_symbols: list) -> Dict[str, Any]:
+        """
+        Compare les ratios d'un symbole à la moyenne de son secteur
+        
+        Args:
+            symbol: Symbole à comparer
+            sector_symbols: Liste des symboles du secteur
+            
+        Returns:
+            Dict avec les comparaisons
+        """
+        try:
+            # Récupérer les ratios du symbole
+            symbol_ratios = self.get_financial_ratios(symbol)
+            if 'error' in symbol_ratios:
+                return symbol_ratios
+            
+            # Récupérer les moyennes du secteur
+            sector_averages = self.get_sector_averages(sector_symbols, symbol_ratios.get('sector'))
+            
+            # Calculer les écarts
+            comparisons = {
+                'symbol': symbol,
+                'sector': symbol_ratios.get('sector'),
+                'ratios': symbol_ratios,
+                'sector_averages': sector_averages,
+                'deviations': {}
+            }
+            
+            for key in ['pe_ratio', 'ps_ratio', 'pb_ratio']:
+                symbol_value = symbol_ratios.get(key)
+                sector_avg = sector_averages.get(f'avg_{key}')
+                
+                if symbol_value is not None and sector_avg is not None and sector_avg > 0:
+                    deviation_pct = ((symbol_value - sector_avg) / sector_avg) * 100
+                    comparisons['deviations'][key] = {
+                        'symbol_value': symbol_value,
+                        'sector_average': sector_avg,
+                        'deviation_pct': round(deviation_pct, 2)
+                    }
+            
+            return comparisons
+            
+        except Exception as e:
+            self.logger.error(f"Erreur lors de la comparaison sectorielle pour {symbol}: {e}")
+            return {'symbol': symbol, 'error': str(e)}
+    
+    def _safe_float(self, value) -> Optional[float]:
+        """Convertit une valeur en float de manière sécurisée"""
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return None
+    
+    def batch_get_ratios(self, symbols: list) -> Dict[str, Dict[str, Any]]:
+        """
+        Récupère les ratios pour plusieurs symboles en batch
+        
+        Args:
+            symbols: Liste de symboles
+            
+        Returns:
+            Dict {symbol: ratios}
+        """
+        results = {}
+        
+        for symbol in symbols:
+            self.logger.info(f"Récupération des ratios pour {symbol} ({symbols.index(symbol)+1}/{len(symbols)})")
+            results[symbol] = self.get_financial_ratios(symbol)
+        
+        return results
+    
+    def save_financial_ratios(self, ratios_data: Dict[str, Any], db: Session) -> Optional[FinancialRatios]:
+        """
+        Sauvegarde les ratios financiers dans la base de données
+        
+        Args:
+            ratios_data: Dict contenant les ratios
+            db: Session de base de données
+            
+        Returns:
+            FinancialRatios object ou None si erreur
+        """
+        try:
+            if 'error' in ratios_data:
+                self.logger.warning(f"Impossible de sauvegarder les ratios pour {ratios_data.get('symbol')}: erreur dans les données")
+                return None
+            
+            symbol = ratios_data['symbol']
+            retrieved_date = date.today()
+            
+            # Vérifier si un enregistrement existe déjà pour aujourd'hui
+            existing = db.query(FinancialRatios).filter(
+                FinancialRatios.symbol == symbol,
+                FinancialRatios.retrieved_date == retrieved_date
             ).first()
             
-            if existing_record:
-                # Mettre à jour l'enregistrement existant
-                for key, value in overview.items():
-                    if hasattr(existing_record, key):
-                        setattr(existing_record, key, value)
+            if existing:
+                # Mettre à jour
+                existing.company_name = ratios_data.get('company_name')
+                existing.sector = ratios_data.get('sector')
+                existing.industry = ratios_data.get('industry')
+                existing.pe_ratio = ratios_data.get('pe_ratio')
+                existing.forward_pe = ratios_data.get('forward_pe')
+                existing.ps_ratio = ratios_data.get('ps_ratio')
+                existing.pb_ratio = ratios_data.get('pb_ratio')
+                existing.peg_ratio = ratios_data.get('peg_ratio')
+                existing.profit_margin = ratios_data.get('profit_margin')
+                existing.operating_margin = ratios_data.get('operating_margin')
+                existing.roe = ratios_data.get('roe')
+                existing.roa = ratios_data.get('roa')
+                existing.current_ratio = ratios_data.get('current_ratio')
+                existing.quick_ratio = ratios_data.get('quick_ratio')
+                existing.debt_to_equity = ratios_data.get('debt_to_equity')
+                existing.market_cap = ratios_data.get('market_cap')
+                existing.enterprise_value = ratios_data.get('enterprise_value')
+                existing.eps = ratios_data.get('eps')
+                existing.dividend_yield = ratios_data.get('dividend_yield')
+                existing.raw_data = ratios_data
+                existing.updated_at = datetime.now()
                 
-                # Ajouter les données des états financiers
-                for key, value in income_statement.items():
-                    if hasattr(existing_record, key) and key != 'symbol':
-                        setattr(existing_record, key, value)
-                
-                for key, value in balance_sheet.items():
-                    if hasattr(existing_record, key) and key != 'symbol':
-                        setattr(existing_record, key, value)
-                
-                for key, value in cash_flow.items():
-                    if hasattr(existing_record, key) and key != 'symbol':
-                        setattr(existing_record, key, value)
-                
-                existing_record.last_updated = datetime.now()
-                
+                db.commit()
+                self.logger.info(f"Ratios financiers mis à jour pour {symbol}")
+                return existing
             else:
                 # Créer un nouvel enregistrement
-                # Combiner toutes les données en excluant les clés 'symbol' en double
-                all_data = {}
-                all_data.update(overview)
-                all_data.update({k: v for k, v in income_statement.items() if k != 'symbol'})
-                all_data.update({k: v for k, v in balance_sheet.items() if k != 'symbol'})
-                all_data.update({k: v for k, v in cash_flow.items() if k != 'symbol'})
+                new_ratios = FinancialRatios(
+                    symbol=symbol,
+                    retrieved_date=retrieved_date,
+                    company_name=ratios_data.get('company_name'),
+                    sector=ratios_data.get('sector'),
+                    industry=ratios_data.get('industry'),
+                    pe_ratio=ratios_data.get('pe_ratio'),
+                    forward_pe=ratios_data.get('forward_pe'),
+                    ps_ratio=ratios_data.get('ps_ratio'),
+                    pb_ratio=ratios_data.get('pb_ratio'),
+                    peg_ratio=ratios_data.get('peg_ratio'),
+                    profit_margin=ratios_data.get('profit_margin'),
+                    operating_margin=ratios_data.get('operating_margin'),
+                    roe=ratios_data.get('roe'),
+                    roa=ratios_data.get('roa'),
+                    current_ratio=ratios_data.get('current_ratio'),
+                    quick_ratio=ratios_data.get('quick_ratio'),
+                    debt_to_equity=ratios_data.get('debt_to_equity'),
+                    market_cap=ratios_data.get('market_cap'),
+                    enterprise_value=ratios_data.get('enterprise_value'),
+                    eps=ratios_data.get('eps'),
+                    dividend_yield=ratios_data.get('dividend_yield'),
+                    raw_data=ratios_data
+                )
                 
-                # S'assurer que symbol est défini
-                all_data['symbol'] = symbol
+                db.add(new_ratios)
+                db.commit()
+                self.logger.info(f"Nouveaux ratios financiers créés pour {symbol}")
+                return new_ratios
                 
-                # Générer un ID unique
-                all_data['id'] = f"{symbol}_{datetime.now().strftime('%Y%m%d')}"
-                
-                financial_ratios = FinancialRatios(**all_data)
-                db.add(financial_ratios)
+        except Exception as e:
+            self.logger.error(f"Erreur lors de la sauvegarde des ratios pour {ratios_data.get('symbol')}: {e}")
+            db.rollback()
+            return None
+    
+    def get_cached_ratios(self, symbol: str, db: Session, max_age_days: int = 7) -> Optional[Dict[str, Any]]:
+        """
+        Récupère les ratios en cache si disponibles et récents
+        
+        Args:
+            symbol: Symbole du titre
+            db: Session de base de données
+            max_age_days: Âge maximum en jours (défaut 7)
             
-            db.commit()
-            logger.info(f"Ratios financiers sauvegardés pour {symbol}")
-            return True
+        Returns:
+            Dict avec les ratios ou None si trop vieux ou inexistant
+        """
+        try:
+            from datetime import timedelta
+            
+            min_date = date.today() - timedelta(days=max_age_days)
+            
+            cached = db.query(FinancialRatios).filter(
+                FinancialRatios.symbol == symbol,
+                FinancialRatios.retrieved_date >= min_date
+            ).order_by(FinancialRatios.retrieved_date.desc()).first()
+            
+            if cached:
+                return cached.raw_data
+            
+            return None
             
         except Exception as e:
-            logger.error(f"Erreur lors de la sauvegarde des ratios financiers pour {symbol}: {e}")
-            db.rollback()
-            return False
-    
-    def _safe_decimal(self, value: Any) -> Optional[Decimal]:
-        """Convertit une valeur en Decimal de manière sécurisée"""
-        if value is None or value == 'None' or value == '':
-            return None
-        try:
-            return Decimal(str(value))
-        except (ValueError, TypeError):
+            self.logger.error(f"Erreur lors de la récupération des ratios en cache pour {symbol}: {e}")
             return None
     
-    def _safe_date(self, value: Any) -> Optional[date]:
-        """Convertit une valeur en date de manière sécurisée"""
-        if value is None or value == 'None' or value == '':
-            return None
-        try:
-            if isinstance(value, str):
-                return datetime.strptime(value, '%Y-%m-%d').date()
-            return value
-        except (ValueError, TypeError):
-            return None
+    def get_or_fetch_ratios(self, symbol: str, db: Session, max_age_days: int = 7) -> Dict[str, Any]:
+        """
+        Récupère les ratios en cache ou les fetch si nécessaire
+        
+        Args:
+            symbol: Symbole du titre
+            db: Session de base de données
+            max_age_days: Âge maximum en jours
+            
+        Returns:
+            Dict avec les ratios
+        """
+        # Essayer de récupérer depuis le cache
+        cached_ratios = self.get_cached_ratios(symbol, db, max_age_days)
+        
+        if cached_ratios:
+            self.logger.info(f"Ratios trouvés en cache pour {symbol}")
+            return cached_ratios
+        
+        # Sinon, fetch et sauvegarder
+        self.logger.info(f"Ratios non trouvés en cache pour {symbol}, récupération depuis yfinance")
+        ratios = self.get_financial_ratios(symbol)
+        
+        if 'error' not in ratios:
+            self.save_financial_ratios(ratios, db)
+        
+        return ratios

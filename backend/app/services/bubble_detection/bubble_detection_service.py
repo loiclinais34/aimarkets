@@ -14,6 +14,7 @@ from sqlalchemy import func, desc
 
 from app.models.database import HistoricalData, TechnicalIndicators
 from app.models.bubble_indicators import BubbleIndicators
+from app.services.financial_ratios_service import FinancialRatiosService
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ class BubbleDetectionService:
     def __init__(self, db: Session = None):
         self.db = db
         self.logger = logging.getLogger(__name__)
+        self.ratios_service = FinancialRatiosService()
         
         # Seuils de classification de bulle
         self.BUBBLE_THRESHOLDS = {
@@ -42,6 +44,15 @@ class BubbleDetectionService:
             'momentum': 0.25,
             'statistical': 0.25,
             'sentiment': 0.20
+        }
+        
+        # Moyennes sectorielles de référence (Technology)
+        # Ces valeurs seront calculées dynamiquement, mais on définit des valeurs par défaut
+        self.TECH_SECTOR_AVERAGES = {
+            'pe_ratio': 30.0,
+            'ps_ratio': 10.0,
+            'pb_ratio': 15.0,
+            'peg_ratio': 2.0
         }
     
     def analyze_bubble_risk(
@@ -129,8 +140,88 @@ class BubbleDetectionService:
         Calcule le score de valorisation (0-100)
         Basé sur P/E, P/S, P/B ratios vs historique et secteur
         
-        Pour Phase 1, on se base sur les données de prix disponibles
-        TODO: Intégrer les données fondamentales (API financials)
+        Utilise les ratios financiers réels de yfinance
+        """
+        try:
+            # Récupérer les ratios financiers (cache ou fetch)
+            ratios = self.ratios_service.get_or_fetch_ratios(symbol, db, max_age_days=7)
+            
+            if 'error' in ratios:
+                self.logger.warning(f"Impossible de récupérer les ratios pour {symbol}, utilisation du proxy prix")
+                # Fallback sur le proxy prix
+                return self._calculate_valuation_score_proxy(symbol, analysis_date, db)
+            
+            # Extraire les ratios
+            pe_ratio = ratios.get('pe_ratio')
+            ps_ratio = ratios.get('ps_ratio')
+            pb_ratio = ratios.get('pb_ratio')
+            peg_ratio = ratios.get('peg_ratio')
+            
+            # Si aucun ratio disponible, utiliser le proxy
+            if all(r is None for r in [pe_ratio, ps_ratio, pb_ratio]):
+                self.logger.warning(f"Aucun ratio disponible pour {symbol}, utilisation du proxy prix")
+                return self._calculate_valuation_score_proxy(symbol, analysis_date, db)
+            
+            # Calculer le score basé sur les ratios vs moyennes sectorielles
+            score = 0.0
+            details = {
+                'pe_ratio': pe_ratio,
+                'ps_ratio': ps_ratio,
+                'pb_ratio': pb_ratio,
+                'peg_ratio': peg_ratio,
+                'sector': ratios.get('sector'),
+                'industry': ratios.get('industry')
+            }
+            
+            # Score P/E (max 35 points)
+            if pe_ratio is not None and pe_ratio > 0:
+                pe_avg = self.TECH_SECTOR_AVERAGES['pe_ratio']
+                pe_deviation_pct = ((pe_ratio - pe_avg) / pe_avg) * 100
+                details['pe_vs_sector_pct'] = round(pe_deviation_pct, 2)
+                
+                if pe_ratio > pe_avg * 1.5:  # 50% au-dessus de la moyenne
+                    score += min(35, (pe_ratio / pe_avg - 1) * 50)
+            
+            # Score P/S (max 35 points)
+            if ps_ratio is not None and ps_ratio > 0:
+                ps_avg = self.TECH_SECTOR_AVERAGES['ps_ratio']
+                ps_deviation_pct = ((ps_ratio - ps_avg) / ps_avg) * 100
+                details['ps_vs_sector_pct'] = round(ps_deviation_pct, 2)
+                
+                if ps_ratio > ps_avg * 1.5:
+                    score += min(35, (ps_ratio / ps_avg - 1) * 50)
+            
+            # Score P/B (max 30 points)
+            if pb_ratio is not None and pb_ratio > 0:
+                pb_avg = self.TECH_SECTOR_AVERAGES['pb_ratio']
+                pb_deviation_pct = ((pb_ratio - pb_avg) / pb_avg) * 100
+                details['pb_vs_sector_pct'] = round(pb_deviation_pct, 2)
+                
+                if pb_ratio > pb_avg * 1.5:
+                    score += min(30, (pb_ratio / pb_avg - 1) * 40)
+            
+            # Bonus PEG ratio (si > 2, signe de surévaluation)
+            if peg_ratio is not None and peg_ratio > 2:
+                score += min(20, (peg_ratio - 2) * 10)
+                details['peg_note'] = 'PEG > 2 indique une possible surévaluation'
+            
+            score = min(100, score)
+            details['method'] = 'real_financial_ratios'
+            
+            return score, details
+            
+        except Exception as e:
+            self.logger.error(f"Erreur calcul score valorisation pour {symbol}: {e}")
+            return 50.0, {'error': str(e)}
+    
+    def _calculate_valuation_score_proxy(
+        self,
+        symbol: str,
+        analysis_date: date,
+        db: Session
+    ) -> Tuple[float, Dict[str, Any]]:
+        """
+        Calcule le score de valorisation avec un proxy prix (fallback)
         """
         try:
             # Récupérer les données historiques
@@ -142,7 +233,7 @@ class BubbleDetectionService:
             if not historical_data or len(historical_data) < 30:
                 return 50.0, {'status': 'insufficient_data'}
             
-            # Pour l'instant, utiliser un proxy basé sur le prix actuel vs moyenne historique
+            # Utiliser un proxy basé sur le prix actuel vs moyenne historique
             current_price = float(historical_data[0].close)
             historical_prices = [float(h.close) for h in historical_data]
             
@@ -156,34 +247,29 @@ class BubbleDetectionService:
             price_vs_365d = ((current_price - avg_price_365d) / avg_price_365d) * 100
             
             # Score basé sur la surévaluation relative
-            # Plus le prix est au-dessus de la moyenne, plus le score est élevé
             score = 0.0
             
-            # Contribution de chaque période
             if price_vs_30d > 20:
-                score += min(30, price_vs_30d / 2)  # Max 30 points
+                score += min(30, price_vs_30d / 2)
             if price_vs_180d > 30:
-                score += min(35, price_vs_180d / 2)  # Max 35 points
+                score += min(35, price_vs_180d / 2)
             if price_vs_365d > 40:
-                score += min(35, price_vs_365d / 2)  # Max 35 points
+                score += min(35, price_vs_365d / 2)
             
             score = min(100, score)
             
             details = {
+                'method': 'price_proxy_fallback',
                 'current_price': current_price,
-                'avg_price_30d': avg_price_30d,
-                'avg_price_180d': avg_price_180d,
-                'avg_price_365d': avg_price_365d,
                 'price_vs_30d_pct': round(price_vs_30d, 2),
                 'price_vs_180d_pct': round(price_vs_180d, 2),
-                'price_vs_365d_pct': round(price_vs_365d, 2),
-                'note': 'Phase 1: Proxy basé sur prix vs moyennes historiques. Ratios P/E, P/S, P/B à intégrer.'
+                'price_vs_365d_pct': round(price_vs_365d, 2)
             }
             
             return score, details
             
         except Exception as e:
-            self.logger.error(f"Erreur calcul score valorisation pour {symbol}: {e}")
+            self.logger.error(f"Erreur calcul score valorisation proxy pour {symbol}: {e}")
             return 50.0, {'error': str(e)}
     
     def _calculate_momentum_score(
