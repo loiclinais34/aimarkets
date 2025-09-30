@@ -589,6 +589,26 @@ class BubbleDetectionService:
         """Met à jour les champs individuels de l'indicateur"""
         # Champs de valorisation
         val_details = details.get('valuation', {})
+        
+        # Ratios financiers
+        if 'pe_ratio' in val_details and val_details['pe_ratio'] is not None:
+            indicator.pe_ratio = val_details.get('pe_ratio')
+        if 'ps_ratio' in val_details and val_details['ps_ratio'] is not None:
+            indicator.ps_ratio = val_details.get('ps_ratio')
+        if 'pb_ratio' in val_details and val_details['pb_ratio'] is not None:
+            indicator.pb_ratio = val_details.get('pb_ratio')
+        if 'peg_ratio' in val_details and val_details['peg_ratio'] is not None:
+            indicator.peg_ratio = val_details.get('peg_ratio')
+        
+        # Écarts vs secteur
+        if 'pe_vs_sector_pct' in val_details:
+            indicator.pe_vs_sector_avg = val_details.get('pe_vs_sector_pct')
+        if 'ps_vs_sector_pct' in val_details:
+            indicator.ps_vs_sector_avg = val_details.get('ps_vs_sector_pct')
+        if 'pb_vs_sector_pct' in val_details:
+            indicator.pb_vs_sector_avg = val_details.get('pb_vs_sector_pct')
+        
+        # Fallback pour les proxys prix (méthode ancienne)
         if 'price_vs_30d_pct' in val_details:
             indicator.price_growth_30d = val_details.get('price_vs_30d_pct')
         if 'price_vs_180d_pct' in val_details:
