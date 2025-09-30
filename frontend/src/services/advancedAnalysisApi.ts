@@ -105,6 +105,13 @@ export interface HybridAnalysisResponse {
     volatility_score: number;
     analysis_timestamp?: string;
     updated_at?: string;
+    // Indicateurs de marché
+    momentum_trend?: string;
+    correlation_strength?: string;
+    market_regime?: string;
+    // Indicateur de bulle
+    bubble_score?: number;
+    bubble_level?: string;
   }>;
   analysis_timestamp: string;
   metadata?: {

@@ -509,13 +509,31 @@ async def search_opportunities(
         # Limiter les résultats
         opportunities = query.limit(limit).all()
         
-        # Formater les résultats avec indicateurs de marché
+        # Formater les résultats avec indicateurs de marché et bulle
         results = []
         for opp in opportunities:
             # Récupérer les indicateurs de marché pour ce symbole
             market_indicators = get_market_indicators_for_symbol(opp.symbol, db)
             
-            results.append({
+            # Récupérer les indicateurs de bulle pour ce symbole
+            from app.models.bubble_indicators import BubbleIndicators
+            from datetime import date
+            
+            bubble_indicator = db.query(BubbleIndicators).filter(
+                BubbleIndicators.symbol == opp.symbol,
+                BubbleIndicators.analysis_date == date.today()
+            ).first()
+            
+            bubble_data = None
+            if bubble_indicator:
+                bubble_data = {
+                    "bubble_score": float(bubble_indicator.bubble_score),
+                    "bubble_level": bubble_indicator.bubble_level,
+                    "valuation_score": float(bubble_indicator.valuation_score),
+                    "momentum_score": float(bubble_indicator.momentum_score)
+                }
+            
+            result_item = {
                 "symbol": opp.symbol,
                 "analysis_date": opp.analysis_date.isoformat() if opp.analysis_date else None,
                 "updated_at": opp.updated_at.isoformat() if opp.updated_at else None,
@@ -535,7 +553,20 @@ async def search_opportunities(
                     "volatility": float(opp.volatility_score)
                 },
                 "market_indicators": market_indicators
-            })
+            }
+            
+            # Ajouter les indicateurs de bulle si disponibles
+            if bubble_data:
+                result_item["bubble_score"] = bubble_data["bubble_score"]
+                result_item["bubble_level"] = bubble_data["bubble_level"]
+            
+            # Ajouter les indicateurs de marché individuels
+            if market_indicators:
+                result_item["momentum_trend"] = market_indicators.get("momentum_trend")
+                result_item["correlation_strength"] = market_indicators.get("correlation_strength")
+                result_item["market_regime"] = market_indicators.get("market_regime")
+            
+            results.append(result_item)
         
         # Compter le total sans limite pour les métadonnées
         total_count = db.query(AdvancedOpportunity).count()

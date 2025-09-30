@@ -225,6 +225,15 @@ app.include_router(
     tags=["ML Backtesting"]
 )
 
+# Bubble Detection API
+from app.api.endpoints import bubble_detection
+
+app.include_router(
+    bubble_detection.router,
+    prefix="/api/v1/bubble-detection",
+    tags=["Bubble Detection"]
+)
+
 # Endpoints LightGBM temporairement désactivés à cause de problèmes de stabilité
 # app.include_router(
 #     lightgbm_models.router,

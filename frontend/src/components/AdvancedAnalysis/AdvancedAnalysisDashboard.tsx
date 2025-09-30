@@ -13,6 +13,7 @@ import {
 import TechnicalSignalsChart from './TechnicalSignalsChart';
 import SentimentAnalysisPanel from './SentimentAnalysisPanel';
 import MarketIndicatorsWidget from './MarketIndicatorsWidget';
+import BubbleRiskPanel from './BubbleRiskPanel';
 import HybridOpportunityCard from './HybridOpportunityCard';
 import { advancedAnalysisApi, HybridAnalysisRequest, HybridAnalysisResponse, AdvancedSearchFilters, GenerateDailyOpportunitiesRequest, GenerateDailyOpportunitiesResponse } from '@/services/advancedAnalysisApi';
 
@@ -327,9 +328,9 @@ const AdvancedAnalysisDashboard: React.FC<AdvancedAnalysisDashboardProps> = ({ c
   const [showFiltersAndSort, setShowFiltersAndSort] = useState(false);
   const [selectedOpportunity, setSelectedOpportunity] = useState<{
     symbol: string;
-    tab: 'technical' | 'sentiment' | 'market' | 'hybrid';
+    tab: 'technical' | 'sentiment' | 'market' | 'bubble' | 'hybrid';
   } | null>(null);
-  const [activeTab, setActiveTab] = useState<'technical' | 'sentiment' | 'market' | 'hybrid'>('technical');
+  const [activeTab, setActiveTab] = useState<'technical' | 'sentiment' | 'market' | 'bubble' | 'hybrid'>('technical');
 
   useEffect(() => {
     loadDefaultOpportunities();
@@ -405,7 +406,7 @@ const AdvancedAnalysisDashboard: React.FC<AdvancedAnalysisDashboardProps> = ({ c
     // No longer needed
   };
 
-  const handleViewDetails = (symbol: string, tab: 'technical' | 'sentiment' | 'market' | 'hybrid') => {
+  const handleViewDetails = (symbol: string, tab: 'technical' | 'sentiment' | 'market' | 'bubble' | 'hybrid') => {
     setSelectedOpportunity({ symbol, tab });
     setActiveTab(tab);
   };
@@ -419,6 +420,7 @@ const AdvancedAnalysisDashboard: React.FC<AdvancedAnalysisDashboardProps> = ({ c
     { id: 'technical', name: 'Technique', icon: ArrowTrendingUpIcon },
     { id: 'sentiment', name: 'Sentiment', icon: ExclamationTriangleIcon },
     { id: 'market', name: 'Marché', icon: ChartBarIcon },
+    { id: 'bubble', name: 'Bulle', icon: ExclamationTriangleIcon },
     { id: 'hybrid', name: 'Composite', icon: Cog6ToothIcon }
   ];
 
@@ -492,6 +494,10 @@ const AdvancedAnalysisDashboard: React.FC<AdvancedAnalysisDashboardProps> = ({ c
           
           {activeTab === 'market' && (
             <MarketIndicatorsWidget symbol={selectedOpportunity.symbol} />
+          )}
+          
+          {activeTab === 'bubble' && (
+            <BubbleRiskPanel symbol={selectedOpportunity.symbol} />
           )}
           
           {activeTab === 'hybrid' && (
