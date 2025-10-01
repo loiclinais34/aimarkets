@@ -340,42 +340,42 @@ const BubbleRiskPanel: React.FC<BubbleRiskPanelProps> = ({ symbol, className = '
           <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
             <span className="text-sm font-medium text-gray-700">Croissance 30 jours</span>
             <span className={`text-lg font-bold ${bubbleData.momentum_indicators.price_growth_30d && bubbleData.momentum_indicators.price_growth_30d > 20 ? 'text-orange-600' : 'text-gray-900'}`}>
-              {bubbleData.momentum_indicators.price_growth_30d !== null ? `${bubbleData.momentum_indicators.price_growth_30d.toFixed(2)}%` : 'N/A'}
+              {bubbleData.momentum_indicators.price_growth_30d !== null && bubbleData.momentum_indicators.price_growth_30d !== undefined ? `${bubbleData.momentum_indicators.price_growth_30d.toFixed(2)}%` : 'N/A'}
             </span>
           </div>
           
           <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
             <span className="text-sm font-medium text-gray-700">Croissance 90 jours</span>
             <span className={`text-lg font-bold ${bubbleData.momentum_indicators.price_growth_90d && bubbleData.momentum_indicators.price_growth_90d > 40 ? 'text-orange-600' : 'text-gray-900'}`}>
-              {bubbleData.momentum_indicators.price_growth_90d !== null ? `${bubbleData.momentum_indicators.price_growth_90d.toFixed(2)}%` : 'N/A'}
+              {bubbleData.momentum_indicators.price_growth_90d !== null && bubbleData.momentum_indicators.price_growth_90d !== undefined ? `${bubbleData.momentum_indicators.price_growth_90d.toFixed(2)}%` : 'N/A'}
             </span>
           </div>
           
           <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
             <span className="text-sm font-medium text-gray-700">Croissance 180 jours</span>
             <span className={`text-lg font-bold ${bubbleData.momentum_indicators.price_growth_180d && bubbleData.momentum_indicators.price_growth_180d > 60 ? 'text-orange-600' : 'text-gray-900'}`}>
-              {bubbleData.momentum_indicators.price_growth_180d !== null ? `${bubbleData.momentum_indicators.price_growth_180d.toFixed(2)}%` : 'N/A'}
+              {bubbleData.momentum_indicators.price_growth_180d !== null && bubbleData.momentum_indicators.price_growth_180d !== undefined ? `${bubbleData.momentum_indicators.price_growth_180d.toFixed(2)}%` : 'N/A'}
             </span>
           </div>
           
           <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
             <span className="text-sm font-medium text-gray-700">RSI 14 jours</span>
             <span className={`text-lg font-bold ${bubbleData.momentum_indicators.rsi_14d && bubbleData.momentum_indicators.rsi_14d > 70 ? 'text-red-600' : 'text-gray-900'}`}>
-              {bubbleData.momentum_indicators.rsi_14d !== null ? bubbleData.momentum_indicators.rsi_14d.toFixed(2) : 'N/A'}
+              {bubbleData.momentum_indicators.rsi_14d !== null && bubbleData.momentum_indicators.rsi_14d !== undefined ? bubbleData.momentum_indicators.rsi_14d.toFixed(2) : 'N/A'}
             </span>
           </div>
           
           <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
             <span className="text-sm font-medium text-gray-700">Distance SMA 50</span>
             <span className={`text-lg font-bold ${bubbleData.momentum_indicators.distance_from_sma50 && Math.abs(bubbleData.momentum_indicators.distance_from_sma50) > 20 ? 'text-orange-600' : 'text-gray-900'}`}>
-              {bubbleData.momentum_indicators.distance_from_sma50 !== null ? `${bubbleData.momentum_indicators.distance_from_sma50.toFixed(2)}%` : 'N/A'}
+              {bubbleData.momentum_indicators.distance_from_sma50 !== null && bubbleData.momentum_indicators.distance_from_sma50 !== undefined ? `${bubbleData.momentum_indicators.distance_from_sma50.toFixed(2)}%` : 'N/A'}
             </span>
           </div>
           
           <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
             <span className="text-sm font-medium text-gray-700">Distance SMA 200</span>
             <span className={`text-lg font-bold ${bubbleData.momentum_indicators.distance_from_sma200 && Math.abs(bubbleData.momentum_indicators.distance_from_sma200) > 30 ? 'text-orange-600' : 'text-gray-900'}`}>
-              {bubbleData.momentum_indicators.distance_from_sma200 !== null ? `${bubbleData.momentum_indicators.distance_from_sma200.toFixed(2)}%` : 'N/A'}
+              {bubbleData.momentum_indicators.distance_from_sma200 !== null && bubbleData.momentum_indicators.distance_from_sma200 !== undefined ? `${bubbleData.momentum_indicators.distance_from_sma200.toFixed(2)}%` : 'N/A'}
             </span>
           </div>
         </div>
@@ -392,7 +392,7 @@ const BubbleRiskPanel: React.FC<BubbleRiskPanelProps> = ({ symbol, className = '
               <p className="text-xs text-gray-500">Écart par rapport à la moyenne</p>
             </div>
             <span className={`text-lg font-bold ${bubbleData.statistical_indicators.price_zscore && Math.abs(bubbleData.statistical_indicators.price_zscore) > 2 ? 'text-red-600' : 'text-gray-900'}`}>
-              {bubbleData.statistical_indicators.price_zscore !== null ? bubbleData.statistical_indicators.price_zscore.toFixed(4) : 'N/A'}
+              {bubbleData.statistical_indicators.price_zscore !== null && bubbleData.statistical_indicators.price_zscore !== undefined ? bubbleData.statistical_indicators.price_zscore.toFixed(4) : 'N/A'}
             </span>
           </div>
           
@@ -402,7 +402,7 @@ const BubbleRiskPanel: React.FC<BubbleRiskPanelProps> = ({ symbol, className = '
               <p className="text-xs text-gray-500">Actuelle vs Historique</p>
             </div>
             <span className="text-lg font-bold text-gray-900">
-              {bubbleData.statistical_indicators.volatility_ratio !== null ? bubbleData.statistical_indicators.volatility_ratio.toFixed(4) : 'N/A'}
+              {bubbleData.statistical_indicators.volatility_ratio !== null && bubbleData.statistical_indicators.volatility_ratio !== undefined ? bubbleData.statistical_indicators.volatility_ratio.toFixed(4) : 'N/A'}
             </span>
           </div>
           
@@ -412,7 +412,7 @@ const BubbleRiskPanel: React.FC<BubbleRiskPanelProps> = ({ symbol, className = '
               <p className="text-xs text-gray-500">Asymétrie des rendements</p>
             </div>
             <span className="text-lg font-bold text-gray-900">
-              {bubbleData.statistical_indicators.returns_skewness !== null ? bubbleData.statistical_indicators.returns_skewness.toFixed(4) : 'N/A'}
+              {bubbleData.statistical_indicators.returns_skewness !== null && bubbleData.statistical_indicators.returns_skewness !== undefined ? bubbleData.statistical_indicators.returns_skewness.toFixed(4) : 'N/A'}
             </span>
           </div>
           
@@ -422,7 +422,7 @@ const BubbleRiskPanel: React.FC<BubbleRiskPanelProps> = ({ symbol, className = '
               <p className="text-xs text-gray-500">Queues de distribution</p>
             </div>
             <span className={`text-lg font-bold ${bubbleData.statistical_indicators.returns_kurtosis && bubbleData.statistical_indicators.returns_kurtosis > 5 ? 'text-orange-600' : 'text-gray-900'}`}>
-              {bubbleData.statistical_indicators.returns_kurtosis !== null ? bubbleData.statistical_indicators.returns_kurtosis.toFixed(4) : 'N/A'}
+              {bubbleData.statistical_indicators.returns_kurtosis !== null && bubbleData.statistical_indicators.returns_kurtosis !== undefined ? bubbleData.statistical_indicators.returns_kurtosis.toFixed(4) : 'N/A'}
             </span>
           </div>
         </div>
