@@ -298,28 +298,28 @@ const BubbleRiskPanel: React.FC<BubbleRiskPanelProps> = ({ symbol, className = '
           <div className="text-center p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-600 mb-1">P/E Ratio</p>
             <p className="text-2xl font-bold text-gray-900">
-              {bubbleData.ratios.pe_ratio !== null ? bubbleData.ratios.pe_ratio.toFixed(2) : 'N/A'}
+              {bubbleData.ratios.pe_ratio !== null && bubbleData.ratios.pe_ratio !== undefined ? bubbleData.ratios.pe_ratio.toFixed(2) : 'N/A'}
             </p>
           </div>
           
           <div className="text-center p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-600 mb-1">P/S Ratio</p>
             <p className="text-2xl font-bold text-gray-900">
-              {bubbleData.ratios.ps_ratio !== null ? bubbleData.ratios.ps_ratio.toFixed(2) : 'N/A'}
+              {bubbleData.ratios.ps_ratio !== null && bubbleData.ratios.ps_ratio !== undefined ? bubbleData.ratios.ps_ratio.toFixed(2) : 'N/A'}
             </p>
           </div>
           
           <div className="text-center p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-600 mb-1">P/B Ratio</p>
             <p className="text-2xl font-bold text-gray-900">
-              {bubbleData.ratios.pb_ratio !== null ? bubbleData.ratios.pb_ratio.toFixed(2) : 'N/A'}
+              {bubbleData.ratios.pb_ratio !== null && bubbleData.ratios.pb_ratio !== undefined ? bubbleData.ratios.pb_ratio.toFixed(2) : 'N/A'}
             </p>
           </div>
           
           <div className="text-center p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-600 mb-1">PEG Ratio</p>
             <p className="text-2xl font-bold text-gray-900">
-              {bubbleData.ratios.peg_ratio !== null ? bubbleData.ratios.peg_ratio.toFixed(2) : 'N/A'}
+              {bubbleData.ratios.peg_ratio !== null && bubbleData.ratios.peg_ratio !== undefined ? bubbleData.ratios.peg_ratio.toFixed(2) : 'N/A'}
             </p>
           </div>
         </div>
