@@ -426,11 +426,12 @@ async def search_opportunities(
             allowed_risks = risk_levels[:max_risk_index + 1]
             query = query.filter(AdvancedOpportunity.risk_level.in_(allowed_risks))
         
-        # Filtres de dates (basés sur updated_at)
+        # Filtres de dates (basés sur analysis_date)
         if date_from:
             try:
                 date_from_obj = datetime.strptime(date_from, "%Y-%m-%d")
-                query = query.filter(AdvancedOpportunity.updated_at >= date_from_obj)
+                # Filtrer sur analysis_date (qui peut être datetime ou date)
+                query = query.filter(AdvancedOpportunity.analysis_date >= date_from_obj)
             except ValueError:
                 raise HTTPException(status_code=400, detail="Format de date_from invalide. Utilisez YYYY-MM-DD")
         
@@ -439,7 +440,7 @@ async def search_opportunities(
                 date_to_obj = datetime.strptime(date_to, "%Y-%m-%d")
                 # Ajouter 23:59:59 pour inclure toute la journée
                 date_to_obj = date_to_obj.replace(hour=23, minute=59, second=59)
-                query = query.filter(AdvancedOpportunity.updated_at <= date_to_obj)
+                query = query.filter(AdvancedOpportunity.analysis_date <= date_to_obj)
             except ValueError:
                 raise HTTPException(status_code=400, detail="Format de date_to invalide. Utilisez YYYY-MM-DD")
         
