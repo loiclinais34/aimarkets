@@ -83,7 +83,7 @@ export default function StrategiesPage() {
 
   const handleTestAPI = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/v1/strategies/');
+      const response = await fetch('/api/v1/strategies/');
       const data = await response.json();
       console.log('Test API Response:', data);
       alert(`API Test: ${data.strategies?.length || 0} stratégies trouvées`);

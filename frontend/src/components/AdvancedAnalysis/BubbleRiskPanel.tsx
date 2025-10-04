@@ -56,7 +56,7 @@ const BubbleRiskPanel: React.FC<BubbleRiskPanelProps> = ({ symbol, className = '
     setError(null);
     
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/bubble-detection/bubble-risk/${symbol}`);
+      const response = await fetch(`/api/v1/bubble-detection/bubble-risk/${symbol}`);
       
       if (!response.ok) {
         throw new Error(`Erreur HTTP: ${response.status}`);

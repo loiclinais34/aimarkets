@@ -74,6 +74,8 @@ class AuthApiService {
    */
   async register(userData: RegisterRequest): Promise<{ user: User; message: string }> {
     try {
+      console.log('DEBUG: API_BASE_URL =', API_BASE_URL);
+      console.log('DEBUG: Full URL =', `${API_BASE_URL}/auth/register`);
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: {

@@ -78,7 +78,7 @@ const TechnicalSignalsChart: React.FC<TechnicalSignalsChartProps> = ({ symbol, c
   const fetchTechnicalData = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:8000/api/v1/technical-analysis/signals/${symbol}?period=${historicalDepth}`);
+      const response = await fetch(`/api/v1/technical-analysis/signals/${symbol}?period=${historicalDepth}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

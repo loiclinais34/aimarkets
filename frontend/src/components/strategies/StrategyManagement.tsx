@@ -148,7 +148,7 @@ export const StrategyList: React.FC<StrategyListProps> = ({
         if (filters?.is_active !== undefined) params.append('is_active', filters.is_active.toString());
         // if (filters?.created_by) params.append('created_by', filters.created_by);
 
-        const response = await fetch(`http://localhost:8000/api/v1/strategies/?${params.toString()}`);
+        const response = await fetch(`/api/v1/strategies/?${params.toString()}`);
         console.log('Response status:', response.status);
         
         if (!response.ok) {
@@ -162,7 +162,7 @@ export const StrategyList: React.FC<StrategyListProps> = ({
         setTotal(data.total || 0);
 
         // Récupérer les types prédéfinis
-        const typesResponse = await fetch(`http://localhost:8000/api/v1/strategies/predefined/types`);
+        const typesResponse = await fetch(`/api/v1/strategies/predefined/types`);
         if (typesResponse.ok) {
           const typesData = await typesResponse.json();
           setPredefinedTypes(typesData.data || []);

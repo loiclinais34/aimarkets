@@ -168,7 +168,8 @@ async def login_user(
     session_token = auth_service.create_session(user.id)
     
     # Calculer la date d'expiration
-    expires_at = datetime.utcnow() + auth_service.SESSION_LIFETIME
+    from app.services.authentication_service import SESSION_LIFETIME
+    expires_at = datetime.utcnow() + SESSION_LIFETIME
     
     return TokenResponse(
         access_token=session_token,

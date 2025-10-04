@@ -4,15 +4,38 @@
 
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth, useRequireAuth } from '@/contexts/AuthContext';
 import Header from '@/components/Layout/Header';
+import { Portfolio, getPortfolios } from '@/services/portfolioApi';
 
 export default function DashboardPage() {
   const { isAuthenticated, isLoading } = useRequireAuth();
   const { user } = useAuth();
   const router = useRouter();
+  const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
+  const [portfoliosLoading, setPortfoliosLoading] = useState(true);
+
+  // Charger les portefeuilles
+  useEffect(() => {
+    const fetchPortfolios = async () => {
+      try {
+        setPortfoliosLoading(true);
+        const data = await getPortfolios();
+        setPortfolios(data);
+      } catch (error) {
+        console.error('Erreur lors du chargement des portefeuilles:', error);
+      } finally {
+        setPortfoliosLoading(false);
+      }
+    };
+
+    if (isAuthenticated) {
+      fetchPortfolios();
+    }
+  }, [isAuthenticated]);
 
   if (isLoading) {
     return (
@@ -66,7 +89,7 @@ export default function DashboardPage() {
                         Portefeuilles
                       </dt>
                       <dd className="text-lg font-medium text-gray-900">
-                        0
+                        {portfoliosLoading ? '...' : portfolios.length}
                       </dd>
                     </dl>
                   </div>
@@ -88,7 +111,16 @@ export default function DashboardPage() {
                         Valeur Totale
                       </dt>
                       <dd className="text-lg font-medium text-gray-900">
-                        €0.00
+                        {portfoliosLoading ? '...' : 
+                          new Intl.NumberFormat('fr-FR', {
+                            style: 'currency',
+                            currency: 'EUR',
+                          }).format(
+                            portfolios.reduce((total, portfolio) => 
+                              total + (portfolio.total_value || 0), 0
+                            )
+                          )
+                        }
                       </dd>
                     </dl>
                   </div>
@@ -110,7 +142,16 @@ export default function DashboardPage() {
                         Performance
                       </dt>
                       <dd className="text-lg font-medium text-gray-900">
-                        +0.00%
+                        {portfoliosLoading ? '...' : 
+                          portfolios.length > 0 ? 
+                            (() => {
+                              const totalPnl = portfolios.reduce((total, portfolio) => 
+                                total + (portfolio.total_pnl_percent || 0), 0
+                              );
+                              const avgPnl = totalPnl / portfolios.length;
+                              return `${avgPnl >= 0 ? '+' : ''}${avgPnl.toFixed(2)}%`;
+                            })() : '+0.00%'
+                        }
                       </dd>
                     </dl>
                   </div>
@@ -149,7 +190,7 @@ export default function DashboardPage() {
                   Actions Rapides
                 </h3>
                 <div className="space-y-3">
-                  <button className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+                  <Link href="/portfolios" className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors block">
                     <div className="flex items-center">
                       <svg className="h-5 w-5 text-green-600 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -159,9 +200,9 @@ export default function DashboardPage() {
                         <p className="text-sm text-gray-500">Commencez un nouveau portefeuille d'investissement</p>
                       </div>
                     </div>
-                  </button>
+                  </Link>
                   
-                  <button className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+                  <Link href="/advanced-analysis" className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors block">
                     <div className="flex items-center">
                       <svg className="h-5 w-5 text-blue-600 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -171,7 +212,7 @@ export default function DashboardPage() {
                         <p className="text-sm text-gray-500">Découvrez les meilleures opportunités du marché</p>
                       </div>
                     </div>
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>
