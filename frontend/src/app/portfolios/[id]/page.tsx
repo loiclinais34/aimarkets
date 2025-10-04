@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Portfolio, getPortfolio } from '@/services/portfolioApi';
+import { Portfolio, getPortfolio, updatePortfolio, UpdatePortfolioRequest } from '@/services/portfolioApi';
+import { EditPortfolioModal } from '@/components/Portfolio/EditPortfolioModal';
+import { WalletManager } from '@/components/Portfolio/WalletManager';
 
 export default function PortfolioDetailPage() {
   const params = useParams();
@@ -10,6 +12,8 @@ export default function PortfolioDetailPage() {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const portfolioId = parseInt(params.id as string);
 
@@ -31,6 +35,34 @@ export default function PortfolioDetailPage() {
       fetchPortfolio();
     }
   }, [portfolioId]);
+
+  const handleUpdatePortfolio = async (data: UpdatePortfolioRequest) => {
+    if (!portfolio) return;
+    
+    try {
+      setIsUpdating(true);
+      await updatePortfolio(portfolio.id, data);
+      // Recharger les données du portefeuille
+      const updatedPortfolio = await getPortfolio(portfolioId);
+      setPortfolio(updatedPortfolio);
+      setIsEditModalOpen(false);
+    } catch (err) {
+      console.error('Erreur lors de la mise à jour:', err);
+      alert('Erreur lors de la mise à jour du portefeuille');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleWalletUpdate = async () => {
+    // Recharger les données du portefeuille quand un wallet est modifié
+    try {
+      const updatedPortfolio = await getPortfolio(portfolioId);
+      setPortfolio(updatedPortfolio);
+    } catch (err) {
+      console.error('Erreur lors du rechargement:', err);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -95,16 +127,27 @@ export default function PortfolioDetailPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* En-tête */}
         <div className="mb-8">
-          <div className="flex items-center space-x-4 mb-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => router.push('/portfolios')}
+                className="text-gray-400 hover:text-gray-600 transition-colors duration-200"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <h1 className="text-3xl font-bold text-gray-900">{portfolio.name}</h1>
+            </div>
             <button
-              onClick={() => router.push('/portfolios')}
-              className="text-gray-400 hover:text-gray-600 transition-colors duration-200"
+              onClick={() => setIsEditModalOpen(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
+              <span>Modifier</span>
             </button>
-            <h1 className="text-3xl font-bold text-gray-900">{portfolio.name}</h1>
           </div>
           {portfolio.description && (
             <p className="text-gray-600 ml-10">{portfolio.description}</p>
@@ -120,16 +163,16 @@ export default function PortfolioDetailPage() {
               <div>
                 <p className="text-sm text-gray-500">Type</p>
                 <p className="text-sm font-medium text-gray-900">
-                  {portfolio.portfolio_type === 'PERSONAL' ? 'Personnel' :
-                   portfolio.portfolio_type === 'JOINT' ? 'Conjoint' :
-                   portfolio.portfolio_type === 'CORPORATE' ? 'Entreprise' : 'Retraite'}
+                  {portfolio.portfolio_type === 'personal' ? 'Personnel' :
+                   portfolio.portfolio_type === 'joint' ? 'Conjoint' :
+                   portfolio.portfolio_type === 'corporate' ? 'Entreprise' : 'Retraite'}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Statut</p>
                 <p className="text-sm font-medium text-gray-900">
-                  {portfolio.status === 'ACTIVE' ? 'Actif' :
-                   portfolio.status === 'INACTIVE' ? 'Inactif' : 'Archivé'}
+                  {portfolio.status === 'active' ? 'Actif' :
+                   portfolio.status === 'paused' ? 'En pause' : 'Fermé'}
                 </p>
               </div>
               <div>
@@ -140,12 +183,12 @@ export default function PortfolioDetailPage() {
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-500">Rééquilibrage</p>
+                <p className="text-sm text-gray-500">Capital initial</p>
                 <p className="text-sm font-medium text-gray-900">
-                  {portfolio.rebalancing_frequency === 'MONTHLY' ? 'Mensuel' :
-                   portfolio.rebalancing_frequency === 'QUARTERLY' ? 'Trimestriel' :
-                   portfolio.rebalancing_frequency === 'SEMI_ANNUALLY' ? 'Semestriel' :
-                   portfolio.rebalancing_frequency === 'ANNUALLY' ? 'Annuel' : 'Manuel'}
+                  {new Intl.NumberFormat('fr-FR', {
+                    style: 'currency',
+                    currency: 'EUR',
+                  }).format(portfolio.initial_capital || 0)}
                 </p>
               </div>
             </div>
@@ -191,83 +234,24 @@ export default function PortfolioDetailPage() {
           </div>
         </div>
 
-        {/* Objectifs et paramètres */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Objectifs d'investissement</h2>
-            {portfolio.investment_goal ? (
-              <p className="text-gray-700">{portfolio.investment_goal}</p>
-            ) : (
-              <p className="text-gray-500">Aucun objectif défini</p>
-            )}
-          </div>
-
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Paramètres de risque</h2>
-            <div className="space-y-3">
-              {portfolio.target_return !== undefined && (
-                <div>
-                  <p className="text-sm text-gray-500">Rendement cible</p>
-                  <p className="text-sm font-medium text-gray-900">{portfolio.target_return}%</p>
-                </div>
-              )}
-              {portfolio.max_drawdown !== undefined && (
-                <div>
-                  <p className="text-sm text-gray-500">Drawdown maximum</p>
-                  <p className="text-sm font-medium text-gray-900">{portfolio.max_drawdown}%</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
         {/* Wallets */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Wallets</h2>
-            <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200">
-              Ajouter un wallet
-            </button>
-          </div>
-          {portfolio.wallets && portfolio.wallets.length > 0 ? (
-            <div className="space-y-4">
-              {portfolio.wallets.map((wallet) => (
-                <div key={wallet.id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-medium text-gray-900">{wallet.name}</h3>
-                      {wallet.description && (
-                        <p className="text-sm text-gray-600 mt-1">{wallet.description}</p>
-                      )}
-                      <div className="flex space-x-4 mt-2 text-sm text-gray-500">
-                        <span>{wallet.wallet_type}</span>
-                        <span>{wallet.currency}</span>
-                        <span>{wallet.status}</span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-semibold text-gray-900">
-                        {new Intl.NumberFormat('fr-FR', {
-                          style: 'currency',
-                          currency: wallet.currency,
-                        }).format(wallet.total_balance)}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        Disponible: {new Intl.NumberFormat('fr-FR', {
-                          style: 'currency',
-                          currency: wallet.currency,
-                        }).format(wallet.available_balance)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-gray-500">Aucun wallet configuré</p>
-          )}
+        <div className="mb-8">
+          <WalletManager 
+            wallets={portfolio.wallets || []} 
+            portfolioId={portfolio.id}
+            onWalletUpdate={handleWalletUpdate}
+          />
         </div>
       </div>
+
+      {/* Modal d'édition */}
+      <EditPortfolioModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSave={handleUpdatePortfolio}
+        portfolio={portfolio}
+        isLoading={isUpdating}
+      />
     </div>
   );
 }

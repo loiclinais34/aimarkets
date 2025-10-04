@@ -51,10 +51,6 @@ export interface UpdatePortfolioRequest {
   name?: string;
   description?: string;
   risk_tolerance?: 'CONSERVATIVE' | 'MODERATE' | 'AGGRESSIVE';
-  investment_goal?: string;
-  target_return?: number;
-  max_drawdown?: number;
-  rebalancing_frequency?: 'MONTHLY' | 'QUARTERLY' | 'SEMI_ANNUALLY' | 'ANNUALLY' | 'MANUAL';
 }
 
 export interface CreateWalletRequest {

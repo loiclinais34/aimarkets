@@ -18,13 +18,13 @@ export const PortfolioCard: React.FC<PortfolioCardProps> = ({
 }) => {
   const getPortfolioTypeColor = (type: string) => {
     switch (type) {
-      case 'PERSONAL':
+      case 'personal':
         return 'bg-blue-100 text-blue-800';
-      case 'JOINT':
+      case 'joint':
         return 'bg-green-100 text-green-800';
-      case 'CORPORATE':
+      case 'corporate':
         return 'bg-purple-100 text-purple-800';
-      case 'RETIREMENT':
+      case 'retirement':
         return 'bg-orange-100 text-orange-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -33,11 +33,11 @@ export const PortfolioCard: React.FC<PortfolioCardProps> = ({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'ACTIVE':
+      case 'active':
         return 'bg-green-100 text-green-800';
-      case 'INACTIVE':
+      case 'paused':
         return 'bg-yellow-100 text-yellow-800';
-      case 'ARCHIVED':
+      case 'closed':
         return 'bg-gray-100 text-gray-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -72,17 +72,17 @@ export const PortfolioCard: React.FC<PortfolioCardProps> = ({
               portfolio.portfolio_type
             )}`}
           >
-            {portfolio.portfolio_type === 'PERSONAL' ? 'Personnel' :
-             portfolio.portfolio_type === 'JOINT' ? 'Conjoint' :
-             portfolio.portfolio_type === 'CORPORATE' ? 'Entreprise' : 'Retraite'}
+            {portfolio.portfolio_type === 'personal' ? 'Personnel' :
+             portfolio.portfolio_type === 'joint' ? 'Conjoint' :
+             portfolio.portfolio_type === 'corporate' ? 'Entreprise' : 'Retraite'}
           </span>
           <span
             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
               portfolio.status
             )}`}
           >
-            {portfolio.status === 'ACTIVE' ? 'Actif' :
-             portfolio.status === 'INACTIVE' ? 'Inactif' : 'Archivé'}
+            {portfolio.status === 'active' ? 'Actif' :
+             portfolio.status === 'paused' ? 'En pause' : 'Fermé'}
           </span>
         </div>
       </div>
@@ -96,12 +96,12 @@ export const PortfolioCard: React.FC<PortfolioCardProps> = ({
           </p>
         </div>
         <div>
-          <p className="text-xs text-gray-500 uppercase tracking-wide">Rééquilibrage</p>
+          <p className="text-xs text-gray-500 uppercase tracking-wide">Capital initial</p>
           <p className="text-sm font-medium text-gray-900">
-            {portfolio.rebalancing_frequency === 'MONTHLY' ? 'Mensuel' :
-             portfolio.rebalancing_frequency === 'QUARTERLY' ? 'Trimestriel' :
-             portfolio.rebalancing_frequency === 'SEMI_ANNUALLY' ? 'Semestriel' :
-             portfolio.rebalancing_frequency === 'ANNUALLY' ? 'Annuel' : 'Manuel'}
+            {new Intl.NumberFormat('fr-FR', {
+              style: 'currency',
+              currency: 'EUR',
+            }).format(portfolio.initial_capital || 0)}
           </p>
         </div>
       </div>
