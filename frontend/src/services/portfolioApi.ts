@@ -2,7 +2,7 @@
  * Service API pour la gestion des portefeuilles
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 // Types pour les portefeuilles
 export interface Wallet {
@@ -83,6 +83,7 @@ export interface PortfolioPerformance {
 // Fonctions utilitaires pour les tokens
 function getAuthHeaders(): HeadersInit {
   const token = localStorage.getItem('auth_token');
+  console.log('DEBUG: Token from localStorage:', token ? 'Found' : 'Not found');
   return {
     'Content-Type': 'application/json',
     ...(token && { Authorization: `Bearer ${token}` }),
@@ -93,9 +94,11 @@ function getAuthHeaders(): HeadersInit {
 
 export async function getPortfolios(): Promise<Portfolio[]> {
   try {
+    const headers = getAuthHeaders();
+    console.log('DEBUG: Headers being sent:', headers);
     const response = await fetch(`${API_BASE_URL}/portfolios`, {
       method: 'GET',
-      headers: getAuthHeaders(),
+      headers,
     });
 
     if (!response.ok) {
