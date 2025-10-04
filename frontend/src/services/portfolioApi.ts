@@ -45,7 +45,6 @@ export interface CreatePortfolioRequest {
   portfolio_type: 'personal' | 'joint' | 'corporate' | 'retirement';
   initial_capital?: number;
   risk_tolerance?: string;
-  currency?: string;
 }
 
 export interface UpdatePortfolioRequest {

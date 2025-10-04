@@ -26,7 +26,6 @@ class PortfolioCreate(BaseModel):
     portfolio_type: PortfolioType = PortfolioType.PERSONAL
     initial_capital: Decimal = Decimal('0.00')
     risk_tolerance: str = "MODERATE"
-    currency: str = "USD"
 
 
 class PortfolioUpdate(BaseModel):
@@ -139,8 +138,7 @@ async def create_portfolio(
             description=portfolio_data.description,
             portfolio_type=portfolio_data.portfolio_type,
             initial_capital=portfolio_data.initial_capital,
-            risk_tolerance=portfolio_data.risk_tolerance,
-            currency=portfolio_data.currency
+            risk_tolerance=portfolio_data.risk_tolerance
         )
         
         # Récupérer le portefeuille avec toutes ses relations

@@ -36,8 +36,7 @@ class PortfolioService:
         description: Optional[str] = None,
         portfolio_type: PortfolioType = PortfolioType.PERSONAL,
         initial_capital: Decimal = Decimal('0.00'),
-        risk_tolerance: str = "MODERATE",
-        currency: str = "USD"
+        risk_tolerance: str = "MODERATE"
     ) -> Portfolio:
         """Crée un nouveau portefeuille"""
         
@@ -58,7 +57,6 @@ class PortfolioService:
             initial_capital=initial_capital,
             current_value=initial_capital,
             risk_tolerance=risk_tolerance,
-            currency=currency,
             status=PortfolioStatus.ACTIVE
         )
         
@@ -66,11 +64,11 @@ class PortfolioService:
         self.db.commit()
         self.db.refresh(portfolio)
         
-        # Créer un wallet par défaut dans la devise principale
+        # Créer un wallet par défaut en EUR
         self.create_wallet(
             portfolio_id=portfolio.id,
-            name=f"Wallet {currency}",
-            currency=currency,
+            name="Wallet EUR",
+            currency="EUR",
             initial_balance=initial_capital
         )
         

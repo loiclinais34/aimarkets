@@ -22,7 +22,6 @@ export const CreatePortfolioModal: React.FC<CreatePortfolioModalProps> = ({
     portfolio_type: 'personal',
     initial_capital: 0,
     risk_tolerance: 'MODERATE',
-    currency: 'EUR',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -160,23 +159,6 @@ export const CreatePortfolioModal: React.FC<CreatePortfolioModalProps> = ({
             {errors.initial_capital && <p className="mt-1 text-sm text-red-600">{errors.initial_capital}</p>}
           </div>
 
-          {/* Devise */}
-          <div>
-            <label htmlFor="currency" className="block text-sm font-medium text-gray-700 mb-1">
-              Devise
-            </label>
-            <select
-              id="currency"
-              value={formData.currency}
-              onChange={(e) => handleInputChange('currency', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="EUR">EUR (Euro)</option>
-              <option value="USD">USD (Dollar)</option>
-              <option value="GBP">GBP (Livre Sterling)</option>
-              <option value="CHF">CHF (Franc Suisse)</option>
-            </select>
-          </div>
 
           {/* Boutons */}
           <div className="flex space-x-3 pt-4">
