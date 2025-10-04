@@ -464,7 +464,7 @@ const BubbleRiskPanel: React.FC<BubbleRiskPanelProps> = ({ symbol, className = '
                   <li>• <strong>Euphorie détectée:</strong> Sentiment extrêmement positif ({bubbleData.scores.sentiment.toFixed(0)}/100), FOMO possible</li>
                 )}
                 {bubbleData.momentum_indicators.rsi_14d && bubbleData.momentum_indicators.rsi_14d > 80 && (
-                  <li>• <strong>RSI critique:</strong> {bubbleData.momentum_indicators.rsi_14d.toFixed(2)} (zone extrême >80)</li>
+                  <li>• <strong>RSI critique:</strong> {bubbleData.momentum_indicators.rsi_14d.toFixed(2)} (zone extrême &gt;80)</li>
                 )}
                 {bubbleData.statistical_indicators.price_zscore && Math.abs(bubbleData.statistical_indicators.price_zscore) > 3 && (
                   <li>• <strong>Anomalie statistique:</strong> Z-score de {bubbleData.statistical_indicators.price_zscore.toFixed(2)} (événement rare)</li>
