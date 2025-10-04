@@ -24,7 +24,6 @@ class Portfolio(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    wallet_id = Column(Integer, ForeignKey("wallets.id"), nullable=False, index=True)
     
     # Portfolio information
     name = Column(String(100), nullable=False)
@@ -57,7 +56,7 @@ class Portfolio(Base):
     
     # Relationships
     owner = relationship("User", back_populates="portfolios")
-    wallet = relationship("Wallet", back_populates="portfolios")
+    wallets = relationship("Wallet", back_populates="portfolio", cascade="all, delete-orphan")
     positions = relationship("Position", back_populates="portfolio", cascade="all, delete-orphan")
     transactions = relationship("PortfolioTransaction", back_populates="portfolio", cascade="all, delete-orphan")
     performance_records = relationship("PortfolioPerformance", back_populates="portfolio", cascade="all, delete-orphan")

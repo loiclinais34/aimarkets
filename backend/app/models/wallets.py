@@ -21,7 +21,7 @@ class Wallet(Base):
     __tablename__ = "wallets"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False, index=True)
     name = Column(String(100), nullable=False)
     description = Column(String(255), nullable=True)
     wallet_type = Column(Enum(WalletType), default=WalletType.CASH, nullable=False)
@@ -43,12 +43,11 @@ class Wallet(Base):
     last_transaction_at = Column(DateTime, nullable=True)
     
     # Relationships
-    owner = relationship("User", back_populates="wallets")
+    portfolio = relationship("Portfolio", back_populates="wallets")
     transactions = relationship("WalletTransaction", back_populates="wallet", cascade="all, delete-orphan")
-    portfolios = relationship("Portfolio", back_populates="wallet", cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<Wallet(id={self.id}, user_id={self.user_id}, name='{self.name}', balance={self.total_balance})>"
+        return f"<Wallet(id={self.id}, portfolio_id={self.portfolio_id}, name='{self.name}', balance={self.total_balance})>"
 
 
 class WalletTransaction(Base):
