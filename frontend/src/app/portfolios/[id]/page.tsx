@@ -7,6 +7,7 @@ import { EditPortfolioModal } from '@/components/Portfolio/EditPortfolioModal';
 import { WalletManager } from '@/components/Portfolio/WalletManager';
 
 export default function PortfolioDetailPage() {
+  console.log('🚀 PortfolioDetailPage MOUNTED');
   const params = useParams();
   const router = useRouter();
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);

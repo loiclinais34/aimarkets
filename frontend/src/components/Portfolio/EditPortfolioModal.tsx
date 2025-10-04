@@ -18,6 +18,7 @@ export const EditPortfolioModal: React.FC<EditPortfolioModalProps> = ({
   portfolio,
   isLoading = false,
 }) => {
+  console.log('🚀 EditPortfolioModal MOUNTED avec props:', { isOpen, portfolio: portfolio?.name });
   const [formData, setFormData] = useState<UpdatePortfolioRequest>({
     name: '',
     description: '',
@@ -74,8 +75,10 @@ export const EditPortfolioModal: React.FC<EditPortfolioModalProps> = ({
     onClose();
   };
 
-  console.log('EditPortfolioModal render, isOpen:', isOpen, 'portfolio:', portfolio);
-  console.log('Conditions: !isOpen =', !isOpen, ', !portfolio =', !portfolio);
+  console.log('🔍 EditPortfolioModal render, isOpen:', isOpen, 'portfolio:', portfolio);
+  console.log('🔍 Conditions: !isOpen =', !isOpen, ', !portfolio =', !portfolio);
+  console.log('🔍 Type de isOpen:', typeof isOpen, 'Valeur:', isOpen);
+  console.log('🔍 Type de portfolio:', typeof portfolio, 'Valeur:', portfolio);
   
   if (!isOpen || !portfolio) {
     console.log('Modal non rendue: isOpen=', isOpen, 'portfolio=', !!portfolio);
