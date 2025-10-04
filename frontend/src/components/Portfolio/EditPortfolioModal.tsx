@@ -74,7 +74,10 @@ export const EditPortfolioModal: React.FC<EditPortfolioModalProps> = ({
     onClose();
   };
 
+  console.log('EditPortfolioModal render, isOpen:', isOpen, 'portfolio:', portfolio);
+  
   if (!isOpen || !portfolio) {
+    console.log('Modal non rendue: isOpen=', isOpen, 'portfolio=', !!portfolio);
     return null;
   }
 
