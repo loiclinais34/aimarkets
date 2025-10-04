@@ -177,9 +177,9 @@ export default function PortfolioDetailPage() {
               <div>
                 <p className="text-sm text-gray-500">Type</p>
                 <p className="text-sm font-medium text-gray-900">
-                  {portfolio.portfolio_type === 'personal' ? 'Personnel' :
-                   portfolio.portfolio_type === 'joint' ? 'Conjoint' :
-                   portfolio.portfolio_type === 'corporate' ? 'Entreprise' : 'Retraite'}
+                  {portfolio.portfolio_type === 'PERSONAL' ? 'Personnel' :
+                   portfolio.portfolio_type === 'JOINT' ? 'Conjoint' :
+                   portfolio.portfolio_type === 'CORPORATE' ? 'Entreprise' : 'Retraite'}
                 </p>
               </div>
               <div>

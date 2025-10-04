@@ -17,6 +17,12 @@ class WalletStatus(enum.Enum):
     CLOSED = "closed"
 
 
+class WalletTransactionType(enum.Enum):
+    DEPOSIT = "DEPOSIT"
+    WITHDRAWAL = "WITHDRAWAL"
+    TRANSFER = "TRANSFER"
+
+
 class Wallet(Base):
     __tablename__ = "wallets"
 
@@ -57,22 +63,16 @@ class WalletTransaction(Base):
     wallet_id = Column(Integer, ForeignKey("wallets.id"), nullable=False, index=True)
     
     # Transaction details
-    transaction_type = Column(String(50), nullable=False)  # deposit, withdrawal, transfer_in, transfer_out, fee
+    transaction_type = Column(Enum(WalletTransactionType), nullable=False)
     amount = Column(Numeric(15, 2), nullable=False)
-    currency = Column(String(10), default="USD", nullable=False)
-    balance_before = Column(Numeric(15, 2), nullable=False)
     balance_after = Column(Numeric(15, 2), nullable=False)
+    target_wallet_id = Column(Integer, nullable=True)
     
     # Reference information
-    reference_id = Column(String(100), nullable=True)  # External transaction ID
+    reference = Column(String(100), nullable=True)
     description = Column(String(255), nullable=True)
-    notes = Column(String(500), nullable=True)
-    
-    # Status
-    status = Column(String(20), default="completed", nullable=False)  # pending, completed, failed, cancelled
     
     # Timestamps
-    transaction_date = Column(DateTime, default=func.now(), nullable=False)
     created_at = Column(DateTime, default=func.now(), nullable=False)
     
     # Relationships
