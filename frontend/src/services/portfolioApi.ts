@@ -12,7 +12,7 @@ export interface Wallet {
   description?: string;
   wallet_type: 'CASH' | 'MARGIN' | 'OPTIONS' | 'CRYPTO';
   currency: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+  status: 'active' | 'suspended' | 'closed';
   available_balance: number;
   total_balance: number;
   created_at: string;
@@ -24,13 +24,10 @@ export interface Portfolio {
   user_id: number;
   name: string;
   description?: string;
-  portfolio_type: 'PERSONAL' | 'JOINT' | 'CORPORATE' | 'RETIREMENT';
-  status: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
+  portfolio_type: 'personal' | 'joint' | 'corporate' | 'retirement';
+  status: 'active' | 'paused' | 'closed';
   risk_tolerance: 'CONSERVATIVE' | 'MODERATE' | 'AGGRESSIVE';
-  investment_goal?: string;
-  target_return?: number;
-  max_drawdown?: number;
-  rebalancing_frequency: 'MONTHLY' | 'QUARTERLY' | 'SEMI_ANNUALLY' | 'ANNUALLY' | 'MANUAL';
+  initial_capital?: number;
   created_at: string;
   updated_at?: string;
   wallets?: Wallet[];
