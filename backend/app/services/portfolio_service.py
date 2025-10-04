@@ -15,7 +15,7 @@ from app.models.portfolios import (
     PortfolioTransaction,
     PortfolioPerformance
 )
-from app.models.wallets import Wallet, WalletType, WalletStatus
+from app.models.wallets import Wallet, WalletType, WalletStatus, WalletTransaction, WalletTransactionType
 from app.models.users import User
 from app.services.authentication_service import AuthenticationService
 
@@ -542,3 +542,113 @@ class PortfolioService:
             "active_portfolios": active_portfolios,
             "total_positions": total_positions
         }
+    
+    # ==================== TRANSACTIONS DE WALLETS ====================
+    
+    def create_wallet_transaction(
+        self,
+        wallet_id: int,
+        transaction_type: WalletTransactionType,
+        amount: Decimal,
+        description: Optional[str] = None,
+        target_wallet_id: Optional[int] = None
+    ) -> WalletTransaction:
+        """Crée une transaction sur un wallet"""
+        
+        from app.models.wallets import Wallet, WalletTransaction
+        from sqlalchemy.orm import joinedload
+        
+        # Récupérer le wallet avec verrouillage pour éviter les conditions de course
+        wallet = self.db.query(Wallet).filter(Wallet.id == wallet_id).first()
+        if not wallet:
+            raise ValueError("Wallet non trouvé")
+        
+        # Validation des montants
+        if amount <= 0:
+            raise ValueError("Le montant doit être positif")
+        
+        if transaction_type == WalletTransactionType.WITHDRAWAL:
+            if amount > wallet.available_balance:
+                raise ValueError("Solde insuffisant")
+        
+        # Gestion des virements
+        target_wallet = None
+        if transaction_type == WalletTransactionType.TRANSFER:
+            if not target_wallet_id:
+                raise ValueError("Wallet de destination requis pour un virement")
+            
+            target_wallet = self.db.query(Wallet).filter(Wallet.id == target_wallet_id).first()
+            if not target_wallet:
+                raise ValueError("Wallet de destination non trouvé")
+            
+            if amount > wallet.available_balance:
+                raise ValueError("Solde insuffisant pour le virement")
+        
+        # Calculer le nouveau solde
+        if transaction_type == WalletTransactionType.DEPOSIT:
+            new_balance = wallet.available_balance + amount
+        elif transaction_type == WalletTransactionType.WITHDRAWAL:
+            new_balance = wallet.available_balance - amount
+        else:  # TRANSFER
+            new_balance = wallet.available_balance - amount
+        
+        # Créer la transaction
+        transaction = WalletTransaction(
+            wallet_id=wallet_id,
+            transaction_type=transaction_type,
+            amount=amount,
+            balance_after=new_balance,
+            description=description,
+            reference=f"TXN-{datetime.now().strftime('%Y%m%d%H%M%S')}-{wallet_id}",
+            target_wallet_id=target_wallet_id
+        )
+        
+        # Mettre à jour le solde du wallet
+        wallet.available_balance = new_balance
+        wallet.total_balance = new_balance  # Pour simplifier, on considère que total = available
+        wallet.updated_at = datetime.now()
+        
+        # Gérer le wallet de destination pour les virements
+        if transaction_type == WalletTransactionType.TRANSFER and target_wallet:
+            target_wallet.available_balance += amount
+            target_wallet.total_balance += amount
+            target_wallet.updated_at = datetime.now()
+            
+            # Créer la transaction correspondante pour le wallet de destination
+            target_transaction = WalletTransaction(
+                wallet_id=target_wallet_id,
+                transaction_type=WalletTransactionType.DEPOSIT,
+                amount=amount,
+                balance_after=target_wallet.available_balance,
+                description=f"Virement reçu depuis {wallet.name}",
+                reference=transaction.reference,
+                target_wallet_id=wallet_id
+            )
+            self.db.add(target_transaction)
+        
+        self.db.add(transaction)
+        self.db.commit()
+        self.db.refresh(transaction)
+        
+        return transaction
+    
+    def get_wallet_transactions(
+        self,
+        wallet_id: int,
+        limit: int = 50,
+        skip: int = 0
+    ) -> List[WalletTransaction]:
+        """Récupère l'historique des transactions d'un wallet"""
+        
+        from app.models.wallets import WalletTransaction
+        
+        transactions = (
+            self.db.query(WalletTransaction)
+            .filter(WalletTransaction.wallet_id == wallet_id)
+            .order_by(WalletTransaction.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+        
+        return transactions

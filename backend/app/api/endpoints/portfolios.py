@@ -14,6 +14,7 @@ from app.services.portfolio_service import PortfolioService
 from app.services.authentication_service import AuthenticationService
 from app.api.endpoints.auth import get_current_user
 from app.models.portfolios import PortfolioType, PortfolioStatus
+from app.models.wallets import WalletTransaction, WalletTransactionType
 
 router = APIRouter()
 
@@ -51,6 +52,25 @@ class WalletResponse(BaseModel):
     available_balance: Decimal
     total_balance: Decimal
     created_at: str
+
+
+class WalletTransactionRequest(BaseModel):
+    transaction_type: WalletTransactionType
+    amount: float
+    description: Optional[str] = None
+    target_wallet_id: Optional[int] = None
+
+
+class WalletTransactionResponse(BaseModel):
+    id: int
+    wallet_id: int
+    transaction_type: str
+    amount: float
+    balance_after: float
+    description: Optional[str] = None
+    reference: Optional[str] = None
+    created_at: str
+    target_wallet_id: Optional[int] = None
 
 
 class PositionResponse(BaseModel):
@@ -554,6 +574,101 @@ async def update_portfolio_performance(
         )
     
     return {"message": "Performance mise à jour avec succès"}
+
+
+# ==================== ENDPOINTS POUR LES TRANSACTIONS DE WALLETS ====================
+
+@router.post("/{portfolio_id}/wallets/{wallet_id}/transactions", response_model=WalletTransactionResponse)
+async def create_wallet_transaction(
+    portfolio_id: int,
+    wallet_id: int,
+    transaction_data: WalletTransactionRequest,
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Effectue une transaction sur un wallet"""
+    
+    portfolio_service = PortfolioService(db)
+    
+    # Vérifier que le portefeuille appartient à l'utilisateur
+    portfolio = portfolio_service.get_portfolio_by_id(portfolio_id, current_user.id)
+    if not portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Portefeuille non trouvé"
+        )
+    
+    # Effectuer la transaction
+    try:
+        transaction = portfolio_service.create_wallet_transaction(
+            wallet_id=wallet_id,
+            transaction_type=transaction_data.transaction_type,
+            amount=Decimal(str(transaction_data.amount)),
+            description=transaction_data.description,
+            target_wallet_id=transaction_data.target_wallet_id
+        )
+        
+        return WalletTransactionResponse(
+            id=transaction.id,
+            wallet_id=transaction.wallet_id,
+            transaction_type=transaction.transaction_type.value,
+            amount=float(transaction.amount),
+            balance_after=float(transaction.balance_after),
+            description=transaction.description,
+            reference=transaction.reference,
+            created_at=transaction.created_at.isoformat(),
+            target_wallet_id=transaction.target_wallet_id
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la transaction: {str(e)}"
+        )
+
+
+@router.get("/{portfolio_id}/wallets/{wallet_id}/transactions", response_model=List[WalletTransactionResponse])
+async def get_wallet_transactions(
+    portfolio_id: int,
+    wallet_id: int,
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    limit: int = Query(50, ge=1, le=100),
+    skip: int = Query(0, ge=0)
+):
+    """Récupère l'historique des transactions d'un wallet"""
+    
+    portfolio_service = PortfolioService(db)
+    
+    # Vérifier que le portefeuille appartient à l'utilisateur
+    portfolio = portfolio_service.get_portfolio_by_id(portfolio_id, current_user.id)
+    if not portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Portefeuille non trouvé"
+        )
+    
+    # Récupérer les transactions
+    transactions = portfolio_service.get_wallet_transactions(wallet_id, limit, skip)
+    
+    return [
+        WalletTransactionResponse(
+            id=transaction.id,
+            wallet_id=transaction.wallet_id,
+            transaction_type=transaction.transaction_type.value,
+            amount=float(transaction.amount),
+            balance_after=float(transaction.balance_after),
+            description=transaction.description,
+            reference=transaction.reference,
+            created_at=transaction.created_at.isoformat(),
+            target_wallet_id=transaction.target_wallet_id
+        )
+        for transaction in transactions
+    ]
 
 
 @router.get("/stats/overview", response_model=PortfolioStatsResponse)

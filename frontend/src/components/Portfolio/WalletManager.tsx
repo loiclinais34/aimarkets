@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Wallet } from '@/services/portfolioApi';
+import { Wallet, createWalletTransaction, CreateTransactionRequest } from '@/services/portfolioApi';
+import { TransactionModal } from './TransactionModal';
+import { TransactionHistory } from './TransactionHistory';
 
 interface WalletManagerProps {
   wallets: Wallet[];
@@ -15,6 +17,10 @@ export const WalletManager: React.FC<WalletManagerProps> = ({
   onWalletUpdate,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [selectedWallet, setSelectedWallet] = useState<Wallet | null>(null);
+  const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [isTransactionHistoryOpen, setIsTransactionHistoryOpen] = useState(false);
+  const [isProcessingTransaction, setIsProcessingTransaction] = useState(false);
 
   const formatCurrency = (amount: number, currency: string) => {
     return new Intl.NumberFormat('fr-FR', {
@@ -47,6 +53,41 @@ export const WalletManager: React.FC<WalletManagerProps> = ({
       case 'suspended': return 'Suspendu';
       case 'closed': return 'Fermé';
       default: return status;
+    }
+  };
+
+  const handleTransaction = (wallet: Wallet) => {
+    setSelectedWallet(wallet);
+    setIsTransactionModalOpen(true);
+  };
+
+  const handleTransactionHistory = (wallet: Wallet) => {
+    setSelectedWallet(wallet);
+    setIsTransactionHistoryOpen(true);
+  };
+
+  const handleTransactionSubmit = async (data: CreateTransactionRequest) => {
+    if (!selectedWallet) return;
+    
+    try {
+      setIsProcessingTransaction(true);
+      
+      // Appeler l'API pour effectuer la transaction
+      await createWalletTransaction(portfolioId, selectedWallet.id, data);
+      
+      setIsTransactionModalOpen(false);
+      setIsProcessingTransaction(false);
+      
+      // Recharger les données du portefeuille
+      if (onWalletUpdate) {
+        onWalletUpdate();
+      }
+      
+      alert('Transaction effectuée avec succès !');
+    } catch (error) {
+      console.error('Erreur lors de la transaction:', error);
+      alert(`Erreur lors de la transaction: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+      setIsProcessingTransaction(false);
     }
   };
 
@@ -119,16 +160,61 @@ export const WalletManager: React.FC<WalletManagerProps> = ({
                 </div>
 
                 <div className="mt-3 flex space-x-2">
-                  <button className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
-                    Modifier
+                  <button 
+                    onClick={() => handleTransaction(wallet)}
+                    className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors duration-200"
+                  >
+                    Transaction
                   </button>
-                  <button className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
-                    Transactions
+                  <button 
+                    onClick={() => handleTransactionHistory(wallet)}
+                    className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors duration-200"
+                  >
+                    Historique
                   </button>
                 </div>
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {/* Modal de transaction */}
+      <TransactionModal
+        isOpen={isTransactionModalOpen}
+        onClose={() => setIsTransactionModalOpen(false)}
+        onSubmit={handleTransactionSubmit}
+        wallet={selectedWallet}
+        isLoading={isProcessingTransaction}
+      />
+
+      {/* Modal d'historique des transactions */}
+      {isTransactionHistoryOpen && selectedWallet && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="flex justify-between items-center p-6 border-b">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Historique des transactions - {selectedWallet.name}
+              </h2>
+              <button
+                onClick={() => setIsTransactionHistoryOpen(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors duration-200"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              <TransactionHistory 
+                wallet={selectedWallet}
+                portfolioId={portfolioId}
+                onTransactionAdded={() => {
+                  if (onWalletUpdate) onWalletUpdate();
+                }}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>

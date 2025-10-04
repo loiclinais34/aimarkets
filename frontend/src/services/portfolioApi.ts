@@ -19,6 +19,25 @@ export interface Wallet {
   updated_at?: string;
 }
 
+export interface WalletTransaction {
+  id: number;
+  wallet_id: number;
+  transaction_type: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER';
+  amount: number;
+  balance_after: number;
+  description?: string;
+  reference?: string;
+  created_at: string;
+  target_wallet_id?: number;
+}
+
+export interface CreateTransactionRequest {
+  transaction_type: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER';
+  amount: number;
+  description?: string;
+  target_wallet_id?: number;
+}
+
 export interface Portfolio {
   id: number;
   user_id: number;
@@ -179,6 +198,56 @@ export async function deletePortfolio(portfolioId: number): Promise<void> {
     }
   } catch (error) {
     console.error('Erreur lors de la suppression du portefeuille:', error);
+    throw error;
+  }
+}
+
+// ==================== FONCTIONS POUR LES TRANSACTIONS DE WALLETS ====================
+
+export async function createWalletTransaction(
+  portfolioId: number,
+  walletId: number,
+  transactionData: CreateTransactionRequest
+): Promise<WalletTransaction> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/portfolios/${portfolioId}/wallets/${walletId}/transactions`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(transactionData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Erreur ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Erreur lors de la création de la transaction:', error);
+    throw error;
+  }
+}
+
+export async function getWalletTransactions(
+  portfolioId: number,
+  walletId: number,
+  limit: number = 50,
+  skip: number = 0
+): Promise<WalletTransaction[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/portfolios/${portfolioId}/wallets/${walletId}/transactions?limit=${limit}&skip=${skip}`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Erreur ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Erreur lors du chargement des transactions:', error);
     throw error;
   }
 }
