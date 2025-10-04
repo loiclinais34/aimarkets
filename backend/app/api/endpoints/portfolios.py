@@ -157,7 +157,7 @@ async def create_portfolio(
             total_return=full_portfolio.total_return,
             total_return_percentage=full_portfolio.total_return_percentage,
             risk_tolerance=full_portfolio.risk_tolerance,
-            currency=full_portfolio.currency,
+            currency="EUR",  # Devise par défaut
             auto_rebalance=full_portfolio.auto_rebalance,
             created_at=full_portfolio.created_at.isoformat(),
             updated_at=full_portfolio.updated_at.isoformat(),
@@ -240,7 +240,7 @@ async def get_portfolios(
                 total_return=portfolio.total_return,
                 total_return_percentage=portfolio.total_return_percentage,
                 risk_tolerance=portfolio.risk_tolerance,
-                currency=portfolio.currency,
+                currency="EUR",  # Devise par défaut
                 auto_rebalance=portfolio.auto_rebalance,
                 created_at=portfolio.created_at.isoformat(),
                 updated_at=portfolio.updated_at.isoformat(),
@@ -315,7 +315,7 @@ async def get_portfolio(
         total_return=portfolio.total_return,
         total_return_percentage=portfolio.total_return_percentage,
         risk_tolerance=portfolio.risk_tolerance,
-        currency=portfolio.currency,
+        currency="EUR",  # Devise par défaut
         auto_rebalance=portfolio.auto_rebalance,
         created_at=portfolio.created_at.isoformat(),
         updated_at=portfolio.updated_at.isoformat(),
@@ -398,7 +398,7 @@ async def update_portfolio(
             total_return=full_portfolio.total_return,
             total_return_percentage=full_portfolio.total_return_percentage,
             risk_tolerance=full_portfolio.risk_tolerance,
-            currency=full_portfolio.currency,
+            currency="EUR",  # Devise par défaut
             auto_rebalance=full_portfolio.auto_rebalance,
             created_at=full_portfolio.created_at.isoformat(),
             updated_at=full_portfolio.updated_at.isoformat(),
