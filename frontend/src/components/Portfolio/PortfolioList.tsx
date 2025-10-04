@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Portfolio, getPortfolios, deletePortfolio } from '@/services/portfolioApi';
 import { PortfolioCard } from './PortfolioCard';
 import { CreatePortfolioModal } from './CreatePortfolioModal';
@@ -11,6 +12,7 @@ interface PortfolioListProps {
 }
 
 export const PortfolioList: React.FC<PortfolioListProps> = ({ onPortfolioSelect }) => {
+  const router = useRouter();
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +70,9 @@ export const PortfolioList: React.FC<PortfolioListProps> = ({ onPortfolioSelect 
   const handleViewDetails = (portfolio: Portfolio) => {
     if (onPortfolioSelect) {
       onPortfolioSelect(portfolio);
+    } else {
+      // Navigation vers la page de détail
+      router.push(`/portfolios/${portfolio.id}`);
     }
   };
 
@@ -96,12 +101,21 @@ export const PortfolioList: React.FC<PortfolioListProps> = ({ onPortfolioSelect 
             <div className="mt-2 text-sm text-red-700">
               <p>{error}</p>
             </div>
-            <div className="mt-4">
+            <div className="mt-4 space-x-2">
               <button
                 onClick={fetchPortfolios}
                 className="bg-red-100 text-red-800 px-3 py-1 rounded-md text-sm hover:bg-red-200 transition-colors duration-200"
               >
                 Réessayer
+              </button>
+              <button
+                onClick={() => {
+                  console.log('DEBUG: localStorage auth_token:', localStorage.getItem('auth_token'));
+                  console.log('DEBUG: localStorage user:', localStorage.getItem('user'));
+                }}
+                className="bg-blue-100 text-blue-800 px-3 py-1 rounded-md text-sm hover:bg-blue-200 transition-colors duration-200"
+              >
+                Debug Auth
               </button>
             </div>
           </div>
