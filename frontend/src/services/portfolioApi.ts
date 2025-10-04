@@ -105,7 +105,10 @@ export async function getPortfolios(): Promise<Portfolio[]> {
       throw new Error(`Erreur ${response.status}: ${response.statusText}`);
     }
 
-    return await response.json();
+    const data = await response.json();
+    // L'API retourne un objet avec portfolios, total, skip, limit
+    // On retourne seulement le tableau portfolios
+    return data.portfolios || [];
   } catch (error) {
     console.error('Erreur lors de la récupération des portefeuilles:', error);
     throw error;

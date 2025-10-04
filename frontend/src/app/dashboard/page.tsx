@@ -112,14 +112,15 @@ export default function DashboardPage() {
                       </dt>
                       <dd className="text-lg font-medium text-gray-900">
                         {portfoliosLoading ? '...' : 
-                          new Intl.NumberFormat('fr-FR', {
-                            style: 'currency',
-                            currency: 'EUR',
-                          }).format(
-                            portfolios.reduce((total, portfolio) => 
-                              total + (portfolio.total_value || 0), 0
-                            )
-                          )
+                          Array.isArray(portfolios) ? 
+                            new Intl.NumberFormat('fr-FR', {
+                              style: 'currency',
+                              currency: 'EUR',
+                            }).format(
+                              portfolios.reduce((total, portfolio) => 
+                                total + (portfolio.total_value || 0), 0
+                              )
+                            ) : '0,00 €'
                         }
                       </dd>
                     </dl>
