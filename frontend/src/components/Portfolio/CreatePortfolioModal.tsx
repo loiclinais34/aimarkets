@@ -19,7 +19,7 @@ export const CreatePortfolioModal: React.FC<CreatePortfolioModalProps> = ({
   const [formData, setFormData] = useState<CreatePortfolioRequest>({
     name: '',
     description: '',
-    portfolio_type: 'PERSONAL',
+    portfolio_type: 'personal',
     initial_capital: 0,
     risk_tolerance: 'MODERATE',
     currency: 'EUR',
@@ -116,10 +116,10 @@ export const CreatePortfolioModal: React.FC<CreatePortfolioModalProps> = ({
               onChange={(e) => handleInputChange('portfolio_type', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="PERSONAL">Personnel</option>
-              <option value="JOINT">Conjoint</option>
-              <option value="CORPORATE">Entreprise</option>
-              <option value="RETIREMENT">Retraite</option>
+              <option value="personal">Personnel</option>
+              <option value="joint">Conjoint</option>
+              <option value="corporate">Entreprise</option>
+              <option value="retirement">Retraite</option>
             </select>
           </div>
 

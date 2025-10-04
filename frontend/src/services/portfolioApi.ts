@@ -42,7 +42,7 @@ export interface Portfolio {
 export interface CreatePortfolioRequest {
   name: string;
   description?: string;
-  portfolio_type: 'PERSONAL' | 'JOINT' | 'CORPORATE' | 'RETIREMENT';
+  portfolio_type: 'personal' | 'joint' | 'corporate' | 'retirement';
   initial_capital?: number;
   risk_tolerance?: string;
   currency?: string;
