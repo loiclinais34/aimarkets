@@ -20,11 +20,9 @@ export const CreatePortfolioModal: React.FC<CreatePortfolioModalProps> = ({
     name: '',
     description: '',
     portfolio_type: 'PERSONAL',
+    initial_capital: 0,
     risk_tolerance: 'MODERATE',
-    investment_goal: '',
-    target_return: undefined,
-    max_drawdown: undefined,
-    rebalancing_frequency: 'QUARTERLY',
+    currency: 'EUR',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -37,11 +35,8 @@ export const CreatePortfolioModal: React.FC<CreatePortfolioModalProps> = ({
     if (!formData.name.trim()) {
       newErrors.name = 'Le nom est requis';
     }
-    if (formData.target_return !== undefined && (formData.target_return < 0 || formData.target_return > 100)) {
-      newErrors.target_return = 'Le rendement cible doit être entre 0 et 100%';
-    }
-    if (formData.max_drawdown !== undefined && (formData.max_drawdown < 0 || formData.max_drawdown > 100)) {
-      newErrors.max_drawdown = 'Le drawdown maximum doit être entre 0 et 100%';
+    if (formData.initial_capital !== undefined && formData.initial_capital < 0) {
+      newErrors.initial_capital = 'Le capital initial ne peut pas être négatif';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -145,79 +140,41 @@ export const CreatePortfolioModal: React.FC<CreatePortfolioModalProps> = ({
             </select>
           </div>
 
-          {/* Objectif d'investissement */}
+          {/* Capital initial */}
           <div>
-            <label htmlFor="investment_goal" className="block text-sm font-medium text-gray-700 mb-1">
-              Objectif d'investissement
-            </label>
-            <textarea
-              id="investment_goal"
-              value={formData.investment_goal}
-              onChange={(e) => handleInputChange('investment_goal', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={2}
-              placeholder="Ex: Épargne retraite, achat immobilier..."
-            />
-          </div>
-
-          {/* Rendement cible */}
-          <div>
-            <label htmlFor="target_return" className="block text-sm font-medium text-gray-700 mb-1">
-              Rendement cible (%)
+            <label htmlFor="initial_capital" className="block text-sm font-medium text-gray-700 mb-1">
+              Capital initial
             </label>
             <input
               type="number"
-              id="target_return"
-              value={formData.target_return || ''}
-              onChange={(e) => handleInputChange('target_return', e.target.value ? parseFloat(e.target.value) : undefined)}
+              id="initial_capital"
+              value={formData.initial_capital || ''}
+              onChange={(e) => handleInputChange('initial_capital', e.target.value ? parseFloat(e.target.value) : 0)}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.target_return ? 'border-red-300' : 'border-gray-300'
+                errors.initial_capital ? 'border-red-300' : 'border-gray-300'
               }`}
-              placeholder="5.0"
+              placeholder="0.00"
               min="0"
-              max="100"
-              step="0.1"
+              step="0.01"
             />
-            {errors.target_return && <p className="mt-1 text-sm text-red-600">{errors.target_return}</p>}
+            {errors.initial_capital && <p className="mt-1 text-sm text-red-600">{errors.initial_capital}</p>}
           </div>
 
-          {/* Drawdown maximum */}
+          {/* Devise */}
           <div>
-            <label htmlFor="max_drawdown" className="block text-sm font-medium text-gray-700 mb-1">
-              Drawdown maximum (%)
-            </label>
-            <input
-              type="number"
-              id="max_drawdown"
-              value={formData.max_drawdown || ''}
-              onChange={(e) => handleInputChange('max_drawdown', e.target.value ? parseFloat(e.target.value) : undefined)}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.max_drawdown ? 'border-red-300' : 'border-gray-300'
-              }`}
-              placeholder="10.0"
-              min="0"
-              max="100"
-              step="0.1"
-            />
-            {errors.max_drawdown && <p className="mt-1 text-sm text-red-600">{errors.max_drawdown}</p>}
-          </div>
-
-          {/* Fréquence de rééquilibrage */}
-          <div>
-            <label htmlFor="rebalancing_frequency" className="block text-sm font-medium text-gray-700 mb-1">
-              Fréquence de rééquilibrage
+            <label htmlFor="currency" className="block text-sm font-medium text-gray-700 mb-1">
+              Devise
             </label>
             <select
-              id="rebalancing_frequency"
-              value={formData.rebalancing_frequency}
-              onChange={(e) => handleInputChange('rebalancing_frequency', e.target.value)}
+              id="currency"
+              value={formData.currency}
+              onChange={(e) => handleInputChange('currency', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="MONTHLY">Mensuel</option>
-              <option value="QUARTERLY">Trimestriel</option>
-              <option value="SEMI_ANNUALLY">Semestriel</option>
-              <option value="ANNUALLY">Annuel</option>
-              <option value="MANUAL">Manuel</option>
+              <option value="EUR">EUR (Euro)</option>
+              <option value="USD">USD (Dollar)</option>
+              <option value="GBP">GBP (Livre Sterling)</option>
+              <option value="CHF">CHF (Franc Suisse)</option>
             </select>
           </div>
 

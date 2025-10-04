@@ -43,11 +43,9 @@ export interface CreatePortfolioRequest {
   name: string;
   description?: string;
   portfolio_type: 'PERSONAL' | 'JOINT' | 'CORPORATE' | 'RETIREMENT';
-  risk_tolerance: 'CONSERVATIVE' | 'MODERATE' | 'AGGRESSIVE';
-  investment_goal?: string;
-  target_return?: number;
-  max_drawdown?: number;
-  rebalancing_frequency: 'MONTHLY' | 'QUARTERLY' | 'SEMI_ANNUALLY' | 'ANNUALLY' | 'MANUAL';
+  initial_capital?: number;
+  risk_tolerance?: string;
+  currency?: string;
 }
 
 export interface UpdatePortfolioRequest {
