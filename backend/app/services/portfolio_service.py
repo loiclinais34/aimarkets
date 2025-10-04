@@ -555,8 +555,7 @@ class PortfolioService:
     ) -> WalletTransaction:
         """Crée une transaction sur un wallet"""
         
-        from app.models.wallets import Wallet, WalletTransaction
-        from sqlalchemy.orm import joinedload
+        from app.models.wallets import Wallet, WalletTransaction, WalletTransactionType
         
         # Récupérer le wallet avec verrouillage pour éviter les conditions de course
         wallet = self.db.query(Wallet).filter(Wallet.id == wallet_id).first()
