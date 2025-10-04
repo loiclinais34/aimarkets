@@ -141,3 +141,9 @@ class Settings(BaseSettings):
 
 # Instance globale des paramètres
 settings = Settings()
+
+
+# Fonction pour obtenir les paramètres (compatible avec l'ancien code)
+def get_settings() -> Settings:
+    """Retourne l'instance globale des paramètres."""
+    return settings

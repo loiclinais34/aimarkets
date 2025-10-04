@@ -11,11 +11,11 @@ from fastapi import HTTPException, status
 
 from app.models.portfolios import (
     Portfolio, PortfolioType, PortfolioStatus, 
-    Wallet, WalletType, WalletStatus,
-    Position, PositionTransaction, PositionType,
-    PortfolioTransaction, TransactionType,
+    Position, PositionTransaction,
+    PortfolioTransaction,
     PortfolioPerformance
 )
+from app.models.wallets import Wallet, WalletType, WalletStatus
 from app.models.users import User
 from app.services.authentication_service import AuthenticationService
 
@@ -299,8 +299,7 @@ class PortfolioService:
             market_value=market_value,
             unrealized_pnl=Decimal('0.00'),
             unrealized_pnl_percent=Decimal('0.00'),
-            currency=currency,
-            position_type=PositionType.LONG
+            currency=currency
         )
         
         self.db.add(position)

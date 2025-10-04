@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 // Configuration de l'API
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
 // Instance axios configurée
 const apiClient = axios.create({

@@ -10,9 +10,10 @@ from sqlalchemy import and_, or_, func, desc
 from fastapi import HTTPException, status
 
 from app.models.portfolios import (
-    Position, PositionTransaction, PositionType,
-    Portfolio, Wallet
+    Position, PositionTransaction,
+    Portfolio
 )
+from app.models.wallets import Wallet
 from app.services.authentication_service import AuthenticationService
 
 
@@ -190,8 +191,7 @@ class PositionService:
             market_value=cost_basis,
             unrealized_pnl=Decimal('0.00'),
             unrealized_pnl_percent=Decimal('0.00'),
-            currency=currency,
-            position_type=PositionType.LONG
+            currency=currency
         )
         
         self.db.add(position)
