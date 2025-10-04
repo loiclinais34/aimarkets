@@ -64,6 +64,15 @@ export default function PortfolioDetailPage() {
     }
   };
 
+  // Debug: surveiller les changements d'état de la modal
+  useEffect(() => {
+    console.log('🔄 isEditModalOpen changed:', isEditModalOpen);
+  }, [isEditModalOpen]);
+
+  useEffect(() => {
+    console.log('🔄 portfolio changed:', portfolio ? portfolio.name : 'null');
+  }, [portfolio]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -250,6 +259,12 @@ export default function PortfolioDetailPage() {
 
       {/* Modal d'édition */}
       {console.log('Rendu de la modal, isEditModalOpen:', isEditModalOpen, 'portfolio:', portfolio)}
+      {console.log('Props passées à EditPortfolioModal:', {
+        isOpen: isEditModalOpen,
+        portfolio: portfolio ? 'exists' : 'null',
+        portfolioId: portfolio?.id,
+        portfolioName: portfolio?.name
+      })}
       <EditPortfolioModal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}

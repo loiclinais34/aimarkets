@@ -75,11 +75,20 @@ export const EditPortfolioModal: React.FC<EditPortfolioModalProps> = ({
   };
 
   console.log('EditPortfolioModal render, isOpen:', isOpen, 'portfolio:', portfolio);
+  console.log('Conditions: !isOpen =', !isOpen, ', !portfolio =', !portfolio);
   
   if (!isOpen || !portfolio) {
     console.log('Modal non rendue: isOpen=', isOpen, 'portfolio=', !!portfolio);
+    console.log('portfolio détails:', {
+      id: portfolio?.id,
+      name: portfolio?.name,
+      portfolio_type: portfolio?.portfolio_type,
+      status: portfolio?.status
+    });
     return null;
   }
+  
+  console.log('✅ Modal va être rendue - toutes les conditions sont OK');
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
