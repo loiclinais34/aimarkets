@@ -82,7 +82,7 @@ export interface PortfolioPerformance {
 
 // Fonctions utilitaires pour les tokens
 function getAuthHeaders(): HeadersInit {
-  const token = localStorage.getItem('access_token');
+  const token = localStorage.getItem('auth_token');
   return {
     'Content-Type': 'application/json',
     ...(token && { Authorization: `Bearer ${token}` }),
