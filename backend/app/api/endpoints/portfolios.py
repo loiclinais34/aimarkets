@@ -55,7 +55,7 @@ class WalletResponse(BaseModel):
 
 
 class WalletTransactionRequest(BaseModel):
-    transaction_type: WalletTransactionType
+    transaction_type: str
     amount: float
     description: Optional[str] = None
     target_wallet_id: Optional[int] = None
@@ -600,9 +600,18 @@ async def create_wallet_transaction(
     
     # Effectuer la transaction
     try:
+        # Convertir la string en enum
+        try:
+            transaction_type_enum = WalletTransactionType(transaction_data.transaction_type)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Type de transaction invalide: {transaction_data.transaction_type}"
+            )
+        
         transaction = portfolio_service.create_wallet_transaction(
             wallet_id=wallet_id,
-            transaction_type=transaction_data.transaction_type,
+            transaction_type=transaction_type_enum,
             amount=Decimal(str(transaction_data.amount)),
             description=transaction_data.description,
             target_wallet_id=transaction_data.target_wallet_id

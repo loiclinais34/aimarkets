@@ -12,7 +12,7 @@ interface TransactionModalProps {
 }
 
 interface TransactionData {
-  type: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER';
+  transaction_type: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER';
   amount: number;
   description?: string;
   target_wallet_id?: number;
@@ -26,7 +26,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   isLoading = false,
 }) => {
   const [formData, setFormData] = useState<TransactionData>({
-    type: 'DEPOSIT',
+    transaction_type: 'DEPOSIT',
     amount: 0,
     description: '',
   });
@@ -35,7 +35,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setFormData({
-        type: 'DEPOSIT',
+        transaction_type: 'DEPOSIT',
         amount: 0,
         description: '',
       });
@@ -50,11 +50,11 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       newErrors.amount = 'Le montant doit être positif';
     }
 
-    if (formData.type === 'WITHDRAWAL' && wallet && formData.amount > wallet.available_balance) {
+    if (formData.transaction_type === 'WITHDRAWAL' && wallet && formData.amount > wallet.available_balance) {
       newErrors.amount = 'Montant insuffisant';
     }
 
-    if (formData.type === 'TRANSFER' && !formData.target_wallet_id) {
+    if (formData.transaction_type === 'TRANSFER' && !formData.target_wallet_id) {
       newErrors.target_wallet_id = 'Veuillez sélectionner un wallet de destination';
     }
 
@@ -118,8 +118,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               Type de transaction
             </label>
             <select
-              value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
+              value={formData.transaction_type}
+              onChange={(e) => setFormData({ ...formData, transaction_type: e.target.value as any })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="DEPOSIT">Dépôt</option>
@@ -150,7 +150,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           </div>
 
           {/* Wallet de destination (pour les virements) */}
-          {formData.type === 'TRANSFER' && (
+          {formData.transaction_type === 'TRANSFER' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Wallet de destination
@@ -192,8 +192,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               <div className="flex justify-between">
                 <span className="text-blue-700">Type:</span>
                 <span className="text-blue-900">
-                  {formData.type === 'DEPOSIT' ? 'Dépôt' :
-                   formData.type === 'WITHDRAWAL' ? 'Retrait' : 'Virement'}
+                  {formData.transaction_type === 'DEPOSIT' ? 'Dépôt' :
+                   formData.transaction_type === 'WITHDRAWAL' ? 'Retrait' : 'Virement'}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -205,7 +205,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                   }).format(formData.amount)}
                 </span>
               </div>
-              {formData.type === 'DEPOSIT' && (
+              {formData.transaction_type === 'DEPOSIT' && (
                 <div className="flex justify-between">
                   <span className="text-blue-700">Nouveau solde:</span>
                   <span className="text-blue-900 font-semibold">
@@ -216,7 +216,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                   </span>
                 </div>
               )}
-              {formData.type === 'WITHDRAWAL' && (
+              {formData.transaction_type === 'WITHDRAWAL' && (
                 <div className="flex justify-between">
                   <span className="text-blue-700">Nouveau solde:</span>
                   <span className="text-blue-900 font-semibold">

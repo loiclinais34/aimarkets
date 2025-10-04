@@ -210,6 +210,8 @@ export async function createWalletTransaction(
   transactionData: CreateTransactionRequest
 ): Promise<WalletTransaction> {
   try {
+    console.log('DEBUG: Données de transaction envoyées:', transactionData);
+    
     const response = await fetch(`${API_BASE_URL}/portfolios/${portfolioId}/wallets/${walletId}/transactions`, {
       method: 'POST',
       headers: getAuthHeaders(),
@@ -218,10 +220,13 @@ export async function createWalletTransaction(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.error('DEBUG: Erreur de réponse:', response.status, errorData);
       throw new Error(errorData.detail || `Erreur ${response.status}: ${response.statusText}`);
     }
 
-    return await response.json();
+    const result = await response.json();
+    console.log('DEBUG: Transaction créée avec succès:', result);
+    return result;
   } catch (error) {
     console.error('Erreur lors de la création de la transaction:', error);
     throw error;
