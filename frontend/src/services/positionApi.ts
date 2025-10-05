@@ -103,7 +103,7 @@ function getAuthHeaders(): HeadersInit {
 
 export async function getPositions(portfolioId: number): Promise<Position[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/${portfolioId}/positions`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/${portfolioId}/positions`, {
       method: 'GET',
       headers: getAuthHeaders(),
     });
@@ -122,7 +122,7 @@ export async function getPositions(portfolioId: number): Promise<Position[]> {
 
 export async function getPosition(portfolioId: number, positionId: number): Promise<Position> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/${portfolioId}/positions/${positionId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/positions/${positionId}`, {
       method: 'GET',
       headers: getAuthHeaders(),
     });
@@ -146,7 +146,7 @@ export async function getPositionTransactions(
 ): Promise<PositionTransaction[]> {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/portfolios/${portfolioId}/positions/${positionId}/transactions?limit=${limit}&skip=${skip}`,
+      `${API_BASE_URL}/api/v1/positions/${positionId}/transactions?limit=${limit}&skip=${skip}`,
       {
         method: 'GET',
         headers: getAuthHeaders(),
@@ -172,7 +172,7 @@ export async function executeBuyOrder(
   order: BuyOrderRequest
 ): Promise<OrderExecutionResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/${portfolioId}/positions/buy`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/${portfolioId}/buy`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(order),
@@ -195,7 +195,7 @@ export async function executeSellOrder(
   order: SellOrderRequest
 ): Promise<OrderExecutionResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/${portfolioId}/positions/sell`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/${portfolioId}/sell`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(order),
@@ -220,7 +220,7 @@ export async function getPositionPerformance(
   positionId: number
 ): Promise<PositionPerformance> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/${portfolioId}/positions/${positionId}/performance`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/positions/${positionId}/performance`, {
       method: 'GET',
       headers: getAuthHeaders(),
     });
@@ -238,7 +238,7 @@ export async function getPositionPerformance(
 
 export async function getPortfolioSummary(portfolioId: number): Promise<PortfolioSummary> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/${portfolioId}/positions/summary`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/${portfolioId}/summary`, {
       method: 'GET',
       headers: getAuthHeaders(),
     });
@@ -262,7 +262,7 @@ export async function updatePositionPrice(
   priceUpdate: PriceUpdateRequest
 ): Promise<Position> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/${portfolioId}/positions/${positionId}/price`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/positions/${positionId}/price`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(priceUpdate),
@@ -284,7 +284,7 @@ export async function updateAllPositionsPrices(
   priceUpdates: PriceUpdateRequest[]
 ): Promise<Position[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/${portfolioId}/positions/prices`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/${portfolioId}/prices/update`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify({ price_updates: priceUpdates }),
