@@ -19,7 +19,6 @@ export interface Position {
   unrealized_pnl_percentage: number;
   realized_pnl: number;
   currency: string;
-  position_type: 'LONG' | 'SHORT';
   created_at: string;
   updated_at?: string;
 }

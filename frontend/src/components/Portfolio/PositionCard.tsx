@@ -49,15 +49,6 @@ export default function PositionCard({ position, onViewDetails, onEdit }: Positi
               <p className="text-sm text-gray-600">{position.company_name}</p>
             )}
           </div>
-          <div className="flex items-center space-x-2">
-            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-              position.position_type === 'LONG' 
-                ? 'bg-blue-100 text-blue-800' 
-                : 'bg-orange-100 text-orange-800'
-            }`}>
-              {position.position_type}
-            </span>
-          </div>
         </div>
 
         {/* Position Details */}
