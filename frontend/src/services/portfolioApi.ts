@@ -2,7 +2,7 @@
  * Service API pour la gestion des portefeuilles
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
 // Types pour les portefeuilles
 export interface Wallet {
