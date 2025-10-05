@@ -4,12 +4,14 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth, useRequireAuth } from '@/contexts/AuthContext';
 import AppLayout from '@/components/Layout/AppLayout';
 import { Portfolio, getPortfolios } from '@/services/portfolioApi';
+import { usePortfoliosValuation } from '@/hooks/usePortfolioValuation';
+import { advancedAnalysisApi, AdvancedSearchFilters } from '@/services/advancedAnalysisApi';
 
 export default function DashboardPage() {
   const { isAuthenticated, isLoading } = useRequireAuth();
@@ -17,6 +19,33 @@ export default function DashboardPage() {
   const router = useRouter();
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [portfoliosLoading, setPortfoliosLoading] = useState(true);
+  const [opportunitiesCount, setOpportunitiesCount] = useState<number>(0);
+  const [opportunitiesLoading, setOpportunitiesLoading] = useState(true);
+
+  // Utiliser le hook de valorisation pour calculer les valeurs en temps réel
+  const valuations = usePortfoliosValuation(portfolios);
+
+  // Calculer les statistiques agrégées
+  const dashboardStats = useMemo(() => {
+    if (valuations.length === 0) {
+      return {
+        totalValue: 0,
+        totalPnL: 0,
+        totalPnLPercent: 0
+      };
+    }
+
+    const totalValue = valuations.reduce((sum, val) => sum + (val.totalValue || 0), 0);
+    const totalCost = valuations.reduce((sum, val) => sum + (val.totalCost || 0), 0);
+    const totalPnL = totalValue - totalCost;
+    const totalPnLPercent = totalCost > 0 ? (totalPnL / totalCost) * 100 : 0;
+
+    return {
+      totalValue,
+      totalPnL,
+      totalPnLPercent
+    };
+  }, [valuations]);
 
   // Charger les portefeuilles
   useEffect(() => {
@@ -34,6 +63,40 @@ export default function DashboardPage() {
 
     if (isAuthenticated) {
       fetchPortfolios();
+    }
+  }, [isAuthenticated]);
+
+  // Charger les opportunités Buy Strong des 2 derniers jours
+  useEffect(() => {
+    const fetchOpportunities = async () => {
+      try {
+        setOpportunitiesLoading(true);
+        
+        // Calculer la date d'il y a 2 jours
+        const twoDaysAgo = new Date();
+        twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+        const dateFrom = twoDaysAgo.toISOString().split('T')[0]; // Format YYYY-MM-DD
+        
+        const filters: AdvancedSearchFilters = {
+          recommendations: 'BUY_STRONG',
+          date_from: dateFrom,
+          limit: 100, // Limite maximale autorisée
+          sort_by: 'analysis_date',
+          sort_order: 'desc'
+        };
+        
+        const response = await advancedAnalysisApi.searchStoredOpportunities(filters);
+        setOpportunitiesCount(response.metadata?.total_found || 0);
+      } catch (error) {
+        console.error('Erreur lors du chargement des opportunités:', error);
+        setOpportunitiesCount(0);
+      } finally {
+        setOpportunitiesLoading(false);
+      }
+    };
+
+    if (isAuthenticated) {
+      fetchOpportunities();
     }
   }, [isAuthenticated]);
 
@@ -109,15 +172,10 @@ export default function DashboardPage() {
                       </dt>
                       <dd className="text-lg font-medium text-gray-900">
                         {portfoliosLoading ? '...' : 
-                          Array.isArray(portfolios) ? 
-                            new Intl.NumberFormat('fr-FR', {
-                              style: 'currency',
-                              currency: 'EUR',
-                            }).format(
-                              portfolios.reduce((total, portfolio) => 
-                                total + (portfolio.total_value || 0), 0
-                              )
-                            ) : '0,00 €'
+                          new Intl.NumberFormat('fr-FR', {
+                            style: 'currency',
+                            currency: 'EUR',
+                          }).format(dashboardStats.totalValue)
                         }
                       </dd>
                     </dl>
@@ -139,16 +197,11 @@ export default function DashboardPage() {
                       <dt className="text-sm font-medium text-gray-500 truncate">
                         Performance
                       </dt>
-                      <dd className="text-lg font-medium text-gray-900">
+                      <dd className={`text-lg font-medium ${
+                        dashboardStats.totalPnL >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
                         {portfoliosLoading ? '...' : 
-                          portfolios.length > 0 ? 
-                            (() => {
-                              const totalPnl = portfolios.reduce((total, portfolio) => 
-                                total + (portfolio.total_pnl_percent || 0), 0
-                              );
-                              const avgPnl = totalPnl / portfolios.length;
-                              return `${avgPnl >= 0 ? '+' : ''}${avgPnl.toFixed(2)}%`;
-                            })() : '+0.00%'
+                          `${dashboardStats.totalPnLPercent >= 0 ? '+' : ''}${dashboardStats.totalPnLPercent.toFixed(2)}%`
                         }
                       </dd>
                     </dl>
@@ -171,7 +224,7 @@ export default function DashboardPage() {
                         Opportunités
                       </dt>
                       <dd className="text-lg font-medium text-gray-900">
-                        0
+                        {opportunitiesLoading ? '...' : opportunitiesCount}
                       </dd>
                     </dl>
                   </div>
