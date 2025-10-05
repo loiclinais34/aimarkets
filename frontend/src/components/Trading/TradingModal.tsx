@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, TrendingUp, TrendingDown } from 'lucide-react';
+import { X, TrendingUp, TrendingDown, Search } from 'lucide-react';
 import { buyStock, sellStock, BuyStockRequest, SellStockRequest, formatCurrency } from '@/services/tradingApi';
 import { getWallets, Wallet } from '@/services/portfolioApi';
+import { symbolsApi, Symbol } from '@/services/symbolsApi';
 
 interface TradingModalProps {
   isOpen: boolean;
@@ -30,6 +31,9 @@ export default function TradingModal({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [symbols, setSymbols] = useState<Symbol[]>([]);
+  const [symbolSearch, setSymbolSearch] = useState('');
+  const [showSymbolSearch, setShowSymbolSearch] = useState(false);
   
   const [formData, setFormData] = useState({
     wallet_id: 0,
@@ -44,6 +48,7 @@ export default function TradingModal({
   useEffect(() => {
     if (isOpen && portfolioId) {
       loadWallets();
+      loadSymbols();
     }
   }, [isOpen, portfolioId]);
 
@@ -71,6 +76,34 @@ export default function TradingModal({
       console.error('Erreur lors du chargement des wallets:', error);
     }
   };
+
+  const loadSymbols = async () => {
+    try {
+      const symbolsData = await symbolsApi.getSymbols('', 100);
+      setSymbols(symbolsData);
+    } catch (error) {
+      console.error('Erreur lors du chargement des symboles:', error);
+    }
+  };
+
+  // Recherche de symboles en temps réel
+  useEffect(() => {
+    const searchSymbols = async () => {
+      if (symbolSearch.length > 1) {
+        try {
+          const results = await symbolsApi.searchSymbols(symbolSearch);
+          setSymbols(results);
+        } catch (error) {
+          console.error('Erreur lors de la recherche de symboles:', error);
+        }
+      } else if (symbolSearch.length === 0) {
+        loadSymbols();
+      }
+    };
+
+    const timeoutId = setTimeout(searchSymbols, 300);
+    return () => clearTimeout(timeoutId);
+  }, [symbolSearch]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -186,67 +219,84 @@ export default function TradingModal({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Symbole
             </label>
-            <select
-              name="symbol"
-              value={formData.symbol}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            >
-              <option value="">Sélectionner un symbole</option>
-              <option value="AAPL">AAPL - Apple Inc.</option>
-              <option value="MSFT">MSFT - Microsoft Corporation</option>
-              <option value="GOOGL">GOOGL - Alphabet Inc.</option>
-              <option value="AMZN">AMZN - Amazon.com Inc.</option>
-              <option value="TSLA">TSLA - Tesla Inc.</option>
-              <option value="META">META - Meta Platforms Inc.</option>
-              <option value="NVDA">NVDA - NVIDIA Corporation</option>
-              <option value="NFLX">NFLX - Netflix Inc.</option>
-              <option value="AMD">AMD - Advanced Micro Devices</option>
-              <option value="INTC">INTC - Intel Corporation</option>
-              <option value="CRM">CRM - Salesforce Inc.</option>
-              <option value="ADBE">ADBE - Adobe Inc.</option>
-              <option value="ORCL">ORCL - Oracle Corporation</option>
-              <option value="CSCO">CSCO - Cisco Systems Inc.</option>
-              <option value="IBM">IBM - International Business Machines</option>
-              <option value="UBER">UBER - Uber Technologies Inc.</option>
-              <option value="SPOT">SPOT - Spotify Technology</option>
-              <option value="SQ">SQ - Square Inc.</option>
-              <option value="PYPL">PYPL - PayPal Holdings Inc.</option>
-              <option value="SHOP">SHOP - Shopify Inc.</option>
-              <option value="ZM">ZM - Zoom Video Communications</option>
-              <option value="DOCU">DOCU - DocuSign Inc.</option>
-              <option value="ROKU">ROKU - Roku Inc.</option>
-              <option value="TWLO">TWLO - Twilio Inc.</option>
-              <option value="OKTA">OKTA - Okta Inc.</option>
-              <option value="SNOW">SNOW - Snowflake Inc.</option>
-              <option value="CRWD">CRWD - CrowdStrike Holdings</option>
-              <option value="PLTR">PLTR - Palantir Technologies</option>
-              <option value="DDOG">DDOG - Datadog Inc.</option>
-              <option value="NET">NET - Cloudflare Inc.</option>
-              <option value="ABNB">ABNB - Airbnb Inc.</option>
-              <option value="TTWO">TTWO - Take-Two Interactive</option>
-              <option value="EA">EA - Electronic Arts Inc.</option>
-              <option value="ATVI">ATVI - Activision Blizzard</option>
-              <option value="DIS">DIS - The Walt Disney Company</option>
-              <option value="CMCSA">CMCSA - Comcast Corporation</option>
-              <option value="VZ">VZ - Verizon Communications</option>
-              <option value="T">T - AT&T Inc.</option>
-              <option value="TMUS">TMUS - T-Mobile US Inc.</option>
-              <option value="CUSTOM">Autre symbole...</option>
-            </select>
             
-            {/* Custom Symbol Input - appears when "Autre symbole..." is selected */}
-            {formData.symbol === 'CUSTOM' && (
+            {/* Search Input */}
+            <div className="relative">
               <input
                 type="text"
-                name="customSymbol"
-                placeholder="Entrez le symbole (ex: AAPL)"
-                onChange={(e) => {
-                  setFormData(prev => ({ ...prev, symbol: e.target.value.toUpperCase() }));
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
-                autoFocus
+                placeholder="Rechercher un symbole..."
+                value={symbolSearch}
+                onChange={(e) => setSymbolSearch(e.target.value)}
+                className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onFocus={() => setShowSymbolSearch(true)}
+              />
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+            </div>
+
+            {/* Symbol Dropdown */}
+            {showSymbolSearch && (
+              <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                {symbols.length > 0 ? (
+                  symbols.map((symbol) => (
+                    <div
+                      key={symbol.symbol}
+                      className="px-3 py-2 hover:bg-gray-100 cursor-pointer flex justify-between items-center"
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, symbol: symbol.symbol }));
+                        setSymbolSearch('');
+                        setShowSymbolSearch(false);
+                      }}
+                    >
+                      <div>
+                        <span className="font-medium text-gray-900">{symbol.symbol}</span>
+                        <span className="text-gray-600 ml-2">{symbol.company_name}</span>
+                      </div>
+                      {symbol.sector && (
+                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                          {symbol.sector}
+                        </span>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="px-3 py-2 text-gray-500">
+                    {symbolSearch.length > 1 ? 'Aucun symbole trouvé' : 'Tapez pour rechercher...'}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Selected Symbol Display */}
+            {formData.symbol && (
+              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className="font-medium text-blue-900">{formData.symbol}</span>
+                    {symbols.find(s => s.symbol === formData.symbol) && (
+                      <span className="text-blue-700 ml-2">
+                        {symbols.find(s => s.symbol === formData.symbol)?.company_name}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, symbol: '' }));
+                      setSymbolSearch('');
+                    }}
+                    className="text-blue-600 hover:text-blue-800"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Click outside to close dropdown */}
+            {showSymbolSearch && (
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setShowSymbolSearch(false)}
               />
             )}
           </div>
