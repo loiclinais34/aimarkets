@@ -186,15 +186,69 @@ export default function TradingModal({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Symbole
             </label>
-            <input
-              type="text"
+            <select
               name="symbol"
               value={formData.symbol}
               onChange={handleInputChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
-              disabled
-            />
+            >
+              <option value="">Sélectionner un symbole</option>
+              <option value="AAPL">AAPL - Apple Inc.</option>
+              <option value="MSFT">MSFT - Microsoft Corporation</option>
+              <option value="GOOGL">GOOGL - Alphabet Inc.</option>
+              <option value="AMZN">AMZN - Amazon.com Inc.</option>
+              <option value="TSLA">TSLA - Tesla Inc.</option>
+              <option value="META">META - Meta Platforms Inc.</option>
+              <option value="NVDA">NVDA - NVIDIA Corporation</option>
+              <option value="NFLX">NFLX - Netflix Inc.</option>
+              <option value="AMD">AMD - Advanced Micro Devices</option>
+              <option value="INTC">INTC - Intel Corporation</option>
+              <option value="CRM">CRM - Salesforce Inc.</option>
+              <option value="ADBE">ADBE - Adobe Inc.</option>
+              <option value="ORCL">ORCL - Oracle Corporation</option>
+              <option value="CSCO">CSCO - Cisco Systems Inc.</option>
+              <option value="IBM">IBM - International Business Machines</option>
+              <option value="UBER">UBER - Uber Technologies Inc.</option>
+              <option value="SPOT">SPOT - Spotify Technology</option>
+              <option value="SQ">SQ - Square Inc.</option>
+              <option value="PYPL">PYPL - PayPal Holdings Inc.</option>
+              <option value="SHOP">SHOP - Shopify Inc.</option>
+              <option value="ZM">ZM - Zoom Video Communications</option>
+              <option value="DOCU">DOCU - DocuSign Inc.</option>
+              <option value="ROKU">ROKU - Roku Inc.</option>
+              <option value="TWLO">TWLO - Twilio Inc.</option>
+              <option value="OKTA">OKTA - Okta Inc.</option>
+              <option value="SNOW">SNOW - Snowflake Inc.</option>
+              <option value="CRWD">CRWD - CrowdStrike Holdings</option>
+              <option value="PLTR">PLTR - Palantir Technologies</option>
+              <option value="DDOG">DDOG - Datadog Inc.</option>
+              <option value="NET">NET - Cloudflare Inc.</option>
+              <option value="ABNB">ABNB - Airbnb Inc.</option>
+              <option value="TTWO">TTWO - Take-Two Interactive</option>
+              <option value="EA">EA - Electronic Arts Inc.</option>
+              <option value="ATVI">ATVI - Activision Blizzard</option>
+              <option value="DIS">DIS - The Walt Disney Company</option>
+              <option value="CMCSA">CMCSA - Comcast Corporation</option>
+              <option value="VZ">VZ - Verizon Communications</option>
+              <option value="T">T - AT&T Inc.</option>
+              <option value="TMUS">TMUS - T-Mobile US Inc.</option>
+              <option value="CUSTOM">Autre symbole...</option>
+            </select>
+            
+            {/* Custom Symbol Input - appears when "Autre symbole..." is selected */}
+            {formData.symbol === 'CUSTOM' && (
+              <input
+                type="text"
+                name="customSymbol"
+                placeholder="Entrez le symbole (ex: AAPL)"
+                onChange={(e) => {
+                  setFormData(prev => ({ ...prev, symbol: e.target.value.toUpperCase() }));
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
+                autoFocus
+              />
+            )}
           </div>
 
           {/* Quantity */}
