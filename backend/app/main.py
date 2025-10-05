@@ -207,15 +207,6 @@ app.include_router(
     tags=["Comparaison Asynchrone de Modèles"]
 )
 
-# Import du router advanced_analysis
-from app.api.endpoints import advanced_analysis
-
-app.include_router(
-    advanced_analysis.router,
-    prefix="/api/v1/advanced-analysis",
-    tags=["Analyse Avancée"]
-)
-
 # Import du router ml_backtesting
 from app.api.endpoints import ml_backtesting
 
@@ -259,20 +250,6 @@ app.include_router(
     prefix="/api/v1/positions",
     tags=["Gestion des Positions"]
 )
-
-# Endpoints LightGBM temporairement désactivés à cause de problèmes de stabilité
-# app.include_router(
-#     lightgbm_models.router,
-#     prefix="/api/v1/lightgbm",
-#     tags=["Modèles LightGBM"]
-# )
-
-# app.include_router(
-#     lightgbm_test.router,
-#     prefix="/api/v1/lightgbm-test",
-#     tags=["LightGBM Test"]
-# )
-
 
 if __name__ == "__main__":
     uvicorn.run(

@@ -2,10 +2,9 @@
 Service d'authentification pour la gestion des utilisateurs et sessions
 """
 
-import os
 import secrets
 from datetime import datetime, timedelta
-from typing import Optional, Tuple
+from typing import Optional
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status

@@ -65,55 +65,10 @@ except ImportError:
     LIGHTGBM_AVAILABLE = False
     print("LightGBM non disponible. Installez avec: pip install lightgbm")
 
-# Désactiver TensorFlow temporairement à cause du mutex
+# Désactiver TensorFlow et PyTorch temporairement pour éviter les conflits
 TENSORFLOW_AVAILABLE = False
-print("TensorFlow désactivé temporairement (problème de mutex)")
-
-# try:
-#     import tensorflow as tf
-#     from tensorflow.keras.models import Sequential
-#     from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization
-#     from tensorflow.keras.optimizers import Adam
-#     from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
-#     from tensorflow.keras.regularizers import l1_l2
-#     TENSORFLOW_AVAILABLE = True
-# except ImportError:
-#     TENSORFLOW_AVAILABLE = False
-#     print("TensorFlow non disponible. Installez avec: pip install tensorflow")
-# except Exception as e:
-#     TENSORFLOW_AVAILABLE = False
-#     print(f"TensorFlow non disponible (erreur mutex): {e}")
-
-# Vérification de la disponibilité de PyTorch avec support Mac M1
 PYTORCH_AVAILABLE = False
-try:
-    import torch
-    import torch.nn as nn
-    import torch.optim as optim
-    from torch.utils.data import DataLoader, TensorDataset
-    
-    # Test simple pour vérifier que PyTorch fonctionne
-    x = torch.tensor([1.0, 2.0, 3.0])
-    y = x * 2
-    
-    # Vérifier le support MPS pour Mac M1
-    if torch.backends.mps.is_available():
-        print("PyTorch disponible avec support MPS (Mac M1)")
-        DEVICE_TYPE = "mps"
-    elif torch.cuda.is_available():
-        print("PyTorch disponible avec support CUDA")
-        DEVICE_TYPE = "cuda"
-    else:
-        print("PyTorch disponible (CPU seulement)")
-        DEVICE_TYPE = "cpu"
-    
-    PYTORCH_AVAILABLE = True
-except ImportError:
-    PYTORCH_AVAILABLE = False
-    print("PyTorch non disponible. Installez avec: pip install torch")
-except Exception as e:
-    PYTORCH_AVAILABLE = False
-    print(f"PyTorch non disponible: {e}")
+print("TensorFlow et PyTorch désactivés temporairement (problème de mutex)")
 
 try:
     from sklearn.neural_network import MLPClassifier, MLPRegressor
@@ -292,14 +247,11 @@ class NeuralNetworkModel(BaseModel):
         )
 
 class LSTMModel(BaseModel):
-    """Modèle LSTM spécialisé pour les données financières séquentielles"""
+    """Modèle LSTM spécialisé pour les données financières séquentielles (DÉSACTIVÉ - TensorFlow requis)"""
     
     def __init__(self, name: str = "LSTM", parameters: Optional[Dict[str, Any]] = None):
         super().__init__(name, **parameters if parameters else {})
-        self.scaler = MinMaxScaler()
-        self.sequence_length = self.parameters.get('sequence_length', 60)  # 60 jours de lookback
-        self.feature_columns = None
-        self.is_fitted = False
+        raise ImportError("LSTMModel désactivé - TensorFlow non disponible")
         
     def _create_model(self):
         if not TENSORFLOW_AVAILABLE:
@@ -510,21 +462,11 @@ class LSTMModel(BaseModel):
 
 
 class GRUModel(BaseModel):
-    """Modèle GRU PyTorch robuste pour les données financières séquentielles"""
+    """Modèle GRU PyTorch robuste pour les données financières séquentielles (DÉSACTIVÉ - PyTorch requis)"""
     
     def __init__(self, name: str = "GRU", parameters: Optional[Dict[str, Any]] = None):
         super().__init__(name, **parameters if parameters else {})
-        self.scaler = MinMaxScaler()
-        self.sequence_length = self.parameters.get('sequence_length', 5)
-        self.hidden_size = self.parameters.get('hidden_size', 16)
-        self.num_layers = self.parameters.get('num_layers', 1)
-        self.dropout_rate = self.parameters.get('dropout_rate', 0.1)
-        self.learning_rate = self.parameters.get('learning_rate', 0.001)
-        self.epochs = self.parameters.get('epochs', 5)
-        self.batch_size = self.parameters.get('batch_size', 8)
-        self.feature_columns = None
-        self.is_fitted = False
-        self.device = torch.device("cpu")
+        raise ImportError("GRUModel désactivé - PyTorch non disponible")
         
     def _create_model(self):
         if not PYTORCH_AVAILABLE:

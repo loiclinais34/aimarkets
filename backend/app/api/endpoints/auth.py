@@ -3,7 +3,6 @@ Endpoints d'authentification
 """
 
 from datetime import datetime
-from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session

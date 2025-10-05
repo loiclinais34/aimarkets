@@ -5,7 +5,6 @@ Service pour récupérer les ratios financiers via yfinance
 import logging
 from typing import Dict, Any, Optional
 from datetime import datetime, date
-import yfinance as yf
 from sqlalchemy.orm import Session
 
 from app.models.financial_ratios import FinancialRatios

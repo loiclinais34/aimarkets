@@ -3,7 +3,7 @@ Endpoints API pour les ratios financiers
 """
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any, Optional
+from typing import List, Optional
 from datetime import datetime, timedelta
 
 from app.core.database import get_db

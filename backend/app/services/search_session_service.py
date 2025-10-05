@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
 from ..models.database import SearchSession, ScreenerResult, MLModels
-from ..models.schemas import SearchSessionCreate, SearchSessionUpdate
 
 
 class SearchSessionService:
