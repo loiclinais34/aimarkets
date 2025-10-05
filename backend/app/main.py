@@ -14,6 +14,7 @@ from .api.endpoints.search import screener, signals, advanced_signals
 from .api.endpoints.ml import ml_models, ml_backtesting, model_comparison, async_model_comparison, backtesting
 from .api.endpoints.data import data, data_update, financial_ratios, indicators, correlations
 from .api.endpoints.management import symbol_metadata, target_parameters, trading_strategies, celery_management
+from .api.endpoints.symbols import router as symbols_router
 
 
 @asynccontextmanager
@@ -256,6 +257,13 @@ app.include_router(
     trading.router,
     prefix="/api/v1/trading",
     tags=["Trading de Titres"]
+)
+
+# Symbols API
+app.include_router(
+    symbols_router,
+    prefix="/api/v1",
+    tags=["Symboles et Métadonnées"]
 )
 
 if __name__ == "__main__":
