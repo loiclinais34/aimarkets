@@ -53,10 +53,11 @@ class PositionService:
         
         # Vérifier que le wallet existe et a suffisamment de fonds
         if wallet_id:
+            from app.models.wallets import WalletStatus
             wallet = self.db.query(Wallet).filter(
                 Wallet.id == wallet_id,
                 Wallet.portfolio_id == portfolio_id,
-                Wallet.status == "active"
+                Wallet.status == WalletStatus.ACTIVE
             ).first()
             
             if not wallet:
