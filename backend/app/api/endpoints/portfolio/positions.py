@@ -46,6 +46,18 @@ class PositionTransactionResponse(BaseModel):
     transaction_date: str
 
 
+class PortfolioTransactionResponse(BaseModel):
+    id: int
+    transaction_type: str
+    symbol: str
+    quantity: Decimal
+    price: Decimal
+    total_amount: Decimal
+    fees: Decimal
+    transaction_date: str
+    status: str
+
+
 class PositionResponse(BaseModel):
     id: int
     symbol: str
@@ -80,7 +92,7 @@ class PositionPerformanceResponse(BaseModel):
 
 class OrderExecutionResponse(BaseModel):
     position: PositionResponse
-    transaction: PositionTransactionResponse
+    transaction: PortfolioTransactionResponse
     message: str
 
 
@@ -152,14 +164,16 @@ async def execute_buy_order(
                 created_at=position.created_at.isoformat(),
                 updated_at=position.updated_at.isoformat()
             ),
-            transaction=PositionTransactionResponse(
+            transaction=PortfolioTransactionResponse(
                 id=transaction.id,
                 transaction_type=transaction.transaction_type,
+                symbol=transaction.symbol,
                 quantity=transaction.quantity,
                 price=transaction.price,
-                fee=transaction.fee,
-                currency=transaction.currency,
-                transaction_date=transaction.transaction_date.isoformat()
+                total_amount=transaction.total_amount,
+                fees=transaction.fees,
+                transaction_date=transaction.transaction_date.isoformat(),
+                status=transaction.status
             ),
             message=f"Achat de {order.quantity} {order.symbol} à {order.price} exécuté avec succès"
         )
@@ -218,14 +232,16 @@ async def execute_sell_order(
                 created_at=position.created_at.isoformat(),
                 updated_at=position.updated_at.isoformat()
             ),
-            transaction=PositionTransactionResponse(
+            transaction=PortfolioTransactionResponse(
                 id=transaction.id,
                 transaction_type=transaction.transaction_type,
+                symbol=transaction.symbol,
                 quantity=transaction.quantity,
                 price=transaction.price,
-                fee=transaction.fee,
-                currency=transaction.currency,
-                transaction_date=transaction.transaction_date.isoformat()
+                total_amount=transaction.total_amount,
+                fees=transaction.fees,
+                transaction_date=transaction.transaction_date.isoformat(),
+                status=transaction.status
             ),
             message=f"Vente de {order.quantity} {order.symbol} à {order.price} exécutée avec succès"
         )

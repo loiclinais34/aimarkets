@@ -10,7 +10,7 @@ from sqlalchemy import and_, or_, func, desc
 from fastapi import HTTPException, status
 
 from app.models.portfolios import (
-    Position, PositionTransaction,
+    Position, PositionTransaction, PortfolioTransaction,
     Portfolio
 )
 from app.models.wallets import Wallet
@@ -37,8 +37,8 @@ class PositionService:
         fee: Decimal = Decimal('0.00'),
         currency: str = "USD",
         wallet_id: int = None
-    ) -> Tuple[Position, PositionTransaction]:
-        """Exécute un ordre d'achat"""
+    ) -> Tuple[Position, PortfolioTransaction]:
+        """Exécute un ordre d'achat - crée d'abord une transaction, puis met à jour la position"""
         
         # Vérifier que le portefeuille existe
         portfolio = self.db.query(Portfolio).filter(
@@ -65,63 +65,65 @@ class PositionService:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Wallet non trouvé ou inactif"
                 )
-            
-            total_cost = (quantity * price) + fee
-            
-            # Convertir le coût total vers la devise du wallet si nécessaire
-            if currency != wallet.currency:
-                converted_cost = self.exchange_service.convert_amount(
-                    total_cost, currency, wallet.currency
-                )
-                if not converted_cost:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Impossible de convertir {currency} vers {wallet.currency}"
-                    )
-                total_cost = converted_cost
-            
-            if wallet.available_balance < total_cost:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Fonds insuffisants. Solde: {wallet.available_balance} {wallet.currency}, "
-                           f"Nécessaire: {total_cost} {wallet.currency}"
-                )
-        
-        # Si aucun wallet spécifique n'est fourni, utiliser le wallet par défaut pour la devise
-        if not wallet_id:
+        else:
+            # Si aucun wallet spécifique n'est fourni, utiliser le wallet par défaut pour la devise
             wallet = self._get_or_create_wallet(portfolio_id, currency)
             wallet_id = wallet.id
         
-        # Vérifier si une position existe déjà pour ce symbole et cette devise
-        existing_position = self.db.query(Position).filter(
-            Position.portfolio_id == portfolio_id,
-            Position.symbol == symbol,
-            Position.currency == currency
-        ).first()
+        # Calculer le coût total
+        total_cost = (quantity * price) + fee
         
-        if existing_position:
-            # Ajouter à la position existante
-            self._add_to_position(existing_position, quantity, price)
-            position = existing_position
-        else:
-            # Créer une nouvelle position
-            position = self._create_new_position(
-                portfolio_id, symbol, quantity, price, currency
+        # Convertir le coût total vers la devise du wallet si nécessaire
+        if currency != wallet.currency:
+            converted_cost = self.exchange_service.convert_amount(
+                total_cost, currency, wallet.currency
+            )
+            if not converted_cost:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Impossible de convertir {currency} vers {wallet.currency}"
+                )
+            total_cost = converted_cost
+        
+        # Vérifier les fonds disponibles
+        if wallet.available_balance < total_cost:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Fonds insuffisants. Solde: {wallet.available_balance} {wallet.currency}, "
+                       f"Nécessaire: {total_cost} {wallet.currency}"
             )
         
-        # Créer la transaction
-        transaction = self._create_position_transaction(
-            position.id, "BUY", quantity, price, fee, currency
+        # 1. Créer la transaction de portefeuille
+        portfolio_transaction = self._create_portfolio_transaction(
+            portfolio_id=portfolio_id,
+            transaction_type="buy",
+            symbol=symbol,
+            quantity=quantity,
+            price=price,
+            fee=fee,
+            currency=currency
         )
         
-        # Débiter le wallet
+        # 2. Mettre à jour ou créer la position
+        position = self._update_position_from_transaction(
+            portfolio_id=portfolio_id,
+            symbol=symbol,
+            transaction_type="buy",
+            quantity=quantity,
+            price=price,
+            fee=fee,
+            currency=currency,
+            portfolio_transaction_id=portfolio_transaction.id
+        )
+        
+        # 3. Débiter le wallet
         wallet.available_balance -= total_cost
         wallet.total_balance -= total_cost
         wallet.updated_at = datetime.utcnow()
         
         self.db.commit()
         
-        return position, transaction
+        return position, portfolio_transaction
     
     def execute_sell_order(
         self,
@@ -132,8 +134,8 @@ class PositionService:
         fee: Decimal = Decimal('0.00'),
         currency: str = "USD",
         wallet_id: int = None
-    ) -> Tuple[Position, PositionTransaction]:
-        """Exécute un ordre de vente"""
+    ) -> Tuple[Position, PortfolioTransaction]:
+        """Exécute un ordre de vente - crée d'abord une transaction, puis met à jour la position"""
         
         # Vérifier que le portefeuille existe
         portfolio = self.db.query(Portfolio).filter(
@@ -165,24 +167,243 @@ class PositionService:
                 detail=f"Quantité insuffisante. Disponible: {position.quantity}, Demandée: {quantity}"
             )
         
-        # Réduire la position
-        realized_pnl = self._reduce_position(position, quantity, price)
+        # Récupérer le wallet
+        if wallet_id:
+            from app.models.wallets import WalletStatus
+            wallet = self.db.query(Wallet).filter(
+                Wallet.id == wallet_id,
+                Wallet.portfolio_id == portfolio_id,
+                Wallet.status == WalletStatus.ACTIVE
+            ).first()
+        else:
+            wallet = self._get_or_create_wallet(portfolio_id, currency)
+            wallet_id = wallet.id
         
-        # Créer la transaction
-        transaction = self._create_position_transaction(
-            position.id, "SELL", quantity, price, fee, currency
+        # 1. Créer la transaction de portefeuille
+        portfolio_transaction = self._create_portfolio_transaction(
+            portfolio_id=portfolio_id,
+            transaction_type="sell",
+            symbol=symbol,
+            quantity=quantity,
+            price=price,
+            fee=fee,
+            currency=currency
         )
         
-        # Créditer le wallet
+        # 2. Mettre à jour la position
+        position = self._update_position_from_transaction(
+            portfolio_id=portfolio_id,
+            symbol=symbol,
+            transaction_type="sell",
+            quantity=quantity,
+            price=price,
+            fee=fee,
+            currency=currency,
+            portfolio_transaction_id=portfolio_transaction.id
+        )
+        
+        # 3. Calculer le produit net et créditer le wallet
         net_proceeds = (quantity * price) - fee
-        wallet = self._get_or_create_wallet(portfolio_id, currency)
+        
+        # Convertir vers la devise du wallet si nécessaire
+        if currency != wallet.currency:
+            converted_proceeds = self.exchange_service.convert_amount(
+                net_proceeds, currency, wallet.currency
+            )
+            if not converted_proceeds:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Impossible de convertir {currency} vers {wallet.currency}"
+                )
+            net_proceeds = converted_proceeds
+        
         wallet.available_balance += net_proceeds
         wallet.total_balance += net_proceeds
         wallet.updated_at = datetime.utcnow()
         
         self.db.commit()
         
-        return position, transaction
+        return position, portfolio_transaction
+    
+    def _create_portfolio_transaction(
+        self,
+        portfolio_id: int,
+        transaction_type: str,
+        symbol: str,
+        quantity: Decimal,
+        price: Decimal,
+        fee: Decimal,
+        currency: str
+    ) -> PortfolioTransaction:
+        """Crée une transaction de portefeuille"""
+        
+        total_amount = (quantity * price) + fee
+        
+        transaction = PortfolioTransaction(
+            portfolio_id=portfolio_id,
+            transaction_type=transaction_type,
+            symbol=symbol,
+            quantity=quantity,
+            price=price,
+            total_amount=total_amount,
+            fees=fee,
+            transaction_date=datetime.utcnow()
+        )
+        
+        self.db.add(transaction)
+        self.db.flush()  # Pour obtenir l'ID
+        
+        return transaction
+    
+    def _update_position_from_transaction(
+        self,
+        portfolio_id: int,
+        symbol: str,
+        transaction_type: str,
+        quantity: Decimal,
+        price: Decimal,
+        fee: Decimal,
+        currency: str,
+        portfolio_transaction_id: int
+    ) -> Position:
+        """Met à jour une position basée sur une transaction"""
+        
+        # Chercher la position existante
+        position = self.db.query(Position).filter(
+            Position.portfolio_id == portfolio_id,
+            Position.symbol == symbol,
+            Position.currency == currency
+        ).first()
+        
+        if transaction_type == "buy":
+            if position:
+                # Ajouter à la position existante
+                old_quantity = position.quantity
+                old_total_cost = position.total_cost
+                
+                new_quantity = old_quantity + quantity
+                new_total_cost = old_total_cost + (quantity * price) + fee
+                new_average_cost = new_total_cost / new_quantity
+                
+                position.quantity = new_quantity
+                position.average_cost = new_average_cost
+                position.total_cost = new_total_cost
+                position.updated_at = datetime.utcnow()
+                
+                # Créer une transaction de position
+                self._create_position_transaction(
+                    position.id, "buy", quantity, price, fee, currency,
+                    old_quantity, new_quantity, position.average_cost, new_average_cost,
+                    portfolio_transaction_id
+                )
+            else:
+                # Créer une nouvelle position
+                total_cost = (quantity * price) + fee
+                
+                position = Position(
+                    portfolio_id=portfolio_id,
+                    symbol=symbol,
+                    quantity=quantity,
+                    average_cost=price + (fee / quantity),
+                    current_price=price,
+                    total_cost=total_cost,
+                    current_value=quantity * price,
+                    unrealized_pnl=quantity * price - total_cost,
+                    unrealized_pnl_percentage=((quantity * price - total_cost) / total_cost) * 100 if total_cost > 0 else 0,
+                    realized_pnl=Decimal('0.00'),
+                    currency=currency,
+                    position_type="LONG"
+                )
+                
+                self.db.add(position)
+                self.db.flush()
+                
+                # Créer une transaction de position
+                self._create_position_transaction(
+                    position.id, "buy", quantity, price, fee, currency,
+                    Decimal('0.00'), quantity, Decimal('0.00'), position.average_cost,
+                    portfolio_transaction_id
+                )
+        
+        elif transaction_type == "sell":
+            if not position:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Position {symbol} non trouvée"
+                )
+            
+            if position.quantity < quantity:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Quantité insuffisante. Disponible: {position.quantity}, Demandée: {quantity}"
+                )
+            
+            # Calculer le P&L réalisé
+            realized_pnl = (price - position.average_cost) * quantity - fee
+            
+            old_quantity = position.quantity
+            old_average_cost = position.average_cost
+            
+            new_quantity = old_quantity - quantity
+            new_total_cost = position.total_cost - (position.average_cost * quantity)
+            
+            if new_quantity > 0:
+                new_average_cost = new_total_cost / new_quantity
+            else:
+                new_average_cost = Decimal('0.00')
+            
+            position.quantity = new_quantity
+            position.average_cost = new_average_cost
+            position.total_cost = new_total_cost
+            position.realized_pnl += realized_pnl
+            position.updated_at = datetime.utcnow()
+            
+            # Créer une transaction de position
+            self._create_position_transaction(
+                position.id, "sell", quantity, price, fee, currency,
+                old_quantity, new_quantity, old_average_cost, new_average_cost,
+                portfolio_transaction_id
+            )
+        
+        return position
+    
+    def _create_position_transaction(
+        self,
+        position_id: int,
+        transaction_type: str,
+        quantity: Decimal,
+        price: Decimal,
+        fee: Decimal,
+        currency: str,
+        quantity_before: Decimal,
+        quantity_after: Decimal,
+        average_cost_before: Decimal,
+        average_cost_after: Decimal,
+        portfolio_transaction_id: int
+    ) -> PositionTransaction:
+        """Crée une transaction de position"""
+        
+        total_amount = (quantity * price) + fee
+        
+        transaction = PositionTransaction(
+            position_id=position_id,
+            portfolio_transaction_id=portfolio_transaction_id,
+            transaction_type=transaction_type,
+            quantity=quantity,
+            price=price,
+            total_amount=total_amount,
+            fees=fee,
+            currency=currency,
+            quantity_before=quantity_before,
+            quantity_after=quantity_after,
+            average_cost_before=average_cost_before,
+            average_cost_after=average_cost_after,
+            transaction_date=datetime.utcnow()
+        )
+        
+        self.db.add(transaction)
+        
+        return transaction
     
     def _get_or_create_wallet(self, portfolio_id: int, currency: str) -> Wallet:
         """Récupère ou crée un wallet pour une devise"""
