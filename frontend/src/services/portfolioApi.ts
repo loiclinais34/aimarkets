@@ -202,6 +202,50 @@ export async function deletePortfolio(portfolioId: number): Promise<void> {
   }
 }
 
+// ==================== INTERFACES POUR LES WALLETS ====================
+
+export interface CreateWalletRequest {
+  name: string;
+  currency: string;
+  initial_balance?: number;
+}
+
+export interface Wallet {
+  id: number;
+  name: string;
+  currency: string;
+  wallet_type: string;
+  status: string;
+  available_balance: number;
+  total_balance: number;
+  created_at: string;
+}
+
+// ==================== FONCTIONS POUR LES WALLETS ====================
+
+export async function createWallet(
+  portfolioId: number,
+  walletData: CreateWalletRequest
+): Promise<Wallet> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/${portfolioId}/wallets`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(walletData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Erreur ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Erreur lors de la création du wallet:', error);
+    throw error;
+  }
+}
+
 // ==================== FONCTIONS POUR LES TRANSACTIONS DE WALLETS ====================
 
 export async function createWalletTransaction(

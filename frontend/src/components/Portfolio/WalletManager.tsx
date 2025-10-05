@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Wallet, createWalletTransaction, CreateTransactionRequest } from '@/services/portfolioApi';
 import { TransactionModal } from './TransactionModal';
 import { TransactionHistory } from './TransactionHistory';
+import CreateWalletModal from './CreateWalletModal';
 
 interface WalletManagerProps {
   wallets: Wallet[];
@@ -21,6 +22,7 @@ export const WalletManager: React.FC<WalletManagerProps> = ({
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [isTransactionHistoryOpen, setIsTransactionHistoryOpen] = useState(false);
   const [isProcessingTransaction, setIsProcessingTransaction] = useState(false);
+  const [isCreateWalletModalOpen, setIsCreateWalletModalOpen] = useState(false);
 
   const formatCurrency = (amount: number, currency: string) => {
     return new Intl.NumberFormat('fr-FR', {
@@ -117,6 +119,16 @@ export const WalletManager: React.FC<WalletManagerProps> = ({
 
       {isExpanded && (
         <div className="mt-4 space-y-3">
+          {/* Bouton pour créer un nouveau wallet */}
+          <div className="flex justify-end">
+            <button
+              onClick={() => setIsCreateWalletModalOpen(true)}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              + Nouveau wallet
+            </button>
+          </div>
+
           {wallets.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -217,6 +229,16 @@ export const WalletManager: React.FC<WalletManagerProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal de création de wallet */}
+      <CreateWalletModal
+        isOpen={isCreateWalletModalOpen}
+        onClose={() => setIsCreateWalletModalOpen(false)}
+        portfolioId={portfolioId}
+        onWalletCreated={() => {
+          if (onWalletUpdate) onWalletUpdate();
+        }}
+      />
     </div>
   );
 };
