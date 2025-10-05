@@ -13,8 +13,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
-from ...core.database import get_db
-from ...services.model_comparison_service import ModelComparisonService
+from app.core.database import get_db
+from app.services.model_comparison_service import ModelComparisonService
 
 logger = logging.getLogger(__name__)
 

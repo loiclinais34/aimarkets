@@ -12,10 +12,10 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
-from ...core.database import get_db
-from ...services.market_indicators import VolatilityIndicators, CorrelationAnalyzer, MomentumIndicators
-from ...models.market_indicators import MarketIndicators as MarketIndicatorsModel, VolatilityIndicators as VolatilityIndicatorsModel, CorrelationAnalysis, MomentumIndicators as MomentumIndicatorsModel, MarketSentimentSummary
-from ...utils.json_encoder import make_json_safe
+from app.core.database import get_db
+from app.services.market_indicators import VolatilityIndicators, CorrelationAnalyzer, MomentumIndicators
+from app.models.market_indicators import MarketIndicators as MarketIndicatorsModel, VolatilityIndicators as VolatilityIndicatorsModel, CorrelationAnalysis, MomentumIndicators as MomentumIndicatorsModel, MarketSentimentSummary
+from app.utils.json_encoder import make_json_safe
 
 router = APIRouter()
 
@@ -40,7 +40,7 @@ async def get_volatility_indicators(
     """
     try:
         # Récupérer les données historiques depuis la base de données
-        from ...models.database import HistoricalData, TechnicalIndicators
+        from app.models.database import HistoricalData, TechnicalIndicators
         
         # Récupérer les données historiques stockées
         end_date = datetime.now().date()
@@ -221,7 +221,7 @@ async def get_correlation_analysis(
     """
     try:
         # Récupérer les données historiques
-        from ...services.polygon_service import PolygonService
+        from app.services.polygon_service import PolygonService
         data_service = PolygonService()
         
         end_date = datetime.now()
@@ -303,7 +303,7 @@ async def get_momentum_indicators(
     """
     try:
         # Récupérer les données historiques depuis la base de données
-        from ...models.database import HistoricalData, TechnicalIndicators
+        from app.models.database import HistoricalData, TechnicalIndicators
         
         # Récupérer les données historiques stockées
         end_date = datetime.now().date()
@@ -549,7 +549,7 @@ async def get_comprehensive_market_analysis(
     """
     try:
         # Récupérer les données historiques
-        from ...services.polygon_service import PolygonService
+        from app.services.polygon_service import PolygonService
         data_service = PolygonService()
         
         end_date = datetime.now()

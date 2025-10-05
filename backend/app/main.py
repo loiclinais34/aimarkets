@@ -6,7 +6,13 @@ import uvicorn
 
 from .core.config import settings
 from .core.database import init_db, close_db
-from .api.endpoints import data, target_parameters, ml_models, symbol_metadata, backtesting, trading_strategies, model_comparison, async_model_comparison, financial_ratios, technical_analysis, sentiment_analysis, market_indicators, ml_backtesting, auth, users, portfolios, positions
+from .api.endpoints.auth import auth, users
+from .api.endpoints.portfolio import portfolios, positions
+from .api.endpoints.analysis import advanced_analysis, technical_analysis, sentiment_analysis, market_indicators, bubble_detection
+from .api.endpoints.search import screener, signals, advanced_signals
+from .api.endpoints.ml import ml_models, ml_backtesting, model_comparison, async_model_comparison, backtesting
+from .api.endpoints.data import data, data_update, financial_ratios, indicators, correlations
+from .api.endpoints.management import symbol_metadata, target_parameters, trading_strategies, celery_management
 
 
 @asynccontextmanager
@@ -99,7 +105,7 @@ app.include_router(
 )
 
 # Import du router screener
-from app.api.endpoints import screener
+from app.api.endpoints.search import screener
 
 app.include_router(
     screener.router,
@@ -108,7 +114,7 @@ app.include_router(
 )
 
 # Import du router data_update
-from app.api.endpoints import data_update
+from app.api.endpoints.data import data_update
 
 app.include_router(
     data_update.router,
@@ -117,7 +123,7 @@ app.include_router(
 )
 
 # Import du router celery_management
-from app.api.endpoints import celery_management
+from app.api.endpoints.management import celery_management
 
 app.include_router(
     celery_management.router,
@@ -126,7 +132,7 @@ app.include_router(
 )
 
 # Import du router financial_ratios
-from app.api.endpoints import financial_ratios
+from app.api.endpoints.data import financial_ratios
 
 app.include_router(
     financial_ratios.router,
@@ -135,7 +141,7 @@ app.include_router(
 )
 
 # Import du router advanced_analysis
-from app.api.endpoints import advanced_analysis
+from app.api.endpoints.analysis import advanced_analysis
 
 app.include_router(
     advanced_analysis.router,
@@ -163,7 +169,7 @@ app.include_router(
 )
 
 # Import du router indicators_recalculation
-from app.api.endpoints import indicators_recalculation
+from app.api.endpoints.data import indicators_recalculation
 
 app.include_router(
     indicators_recalculation.router,
@@ -172,7 +178,7 @@ app.include_router(
 )
 
 # Import du router backtesting
-from app.api.endpoints import backtesting
+from app.api.endpoints.ml import backtesting
 
 app.include_router(
     backtesting.router,
@@ -181,7 +187,7 @@ app.include_router(
 )
 
 # Import du router trading_strategies
-from app.api.endpoints import trading_strategies
+from app.api.endpoints.management import trading_strategies
 
 app.include_router(
     trading_strategies.router,
@@ -190,7 +196,7 @@ app.include_router(
 )
 
 # Import du router model_comparison
-from app.api.endpoints import model_comparison
+from app.api.endpoints.ml import model_comparison
 
 app.include_router(
     model_comparison.router,
@@ -199,7 +205,7 @@ app.include_router(
 )
 
 # Import du router async_model_comparison
-from app.api.endpoints import async_model_comparison
+from app.api.endpoints.ml import async_model_comparison
 
 app.include_router(
     async_model_comparison.router,
@@ -208,7 +214,7 @@ app.include_router(
 )
 
 # Import du router ml_backtesting
-from app.api.endpoints import ml_backtesting
+from app.api.endpoints.ml import ml_backtesting
 
 app.include_router(
     ml_backtesting.router,
@@ -217,7 +223,7 @@ app.include_router(
 )
 
 # Bubble Detection API
-from app.api.endpoints import bubble_detection
+from app.api.endpoints.analysis import bubble_detection
 
 app.include_router(
     bubble_detection.router,

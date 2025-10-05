@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, status, BackgroundTasks
 from pydantic import BaseModel, Field
 
-from ...tasks.ml_tasks import train_model_task, compare_models_async, get_task_status, celery_app
+from app.tasks.ml_tasks import train_model_task, compare_models_async, get_task_status, celery_app
 
 logger = logging.getLogger(__name__)
 

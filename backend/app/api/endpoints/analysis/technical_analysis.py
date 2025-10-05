@@ -13,9 +13,9 @@ import numpy as np
 import json
 from datetime import datetime, timedelta
 
-from ...core.database import get_db
-from ...services.technical_analysis import TechnicalIndicators, CandlestickPatterns, SupportResistanceAnalyzer, SignalGenerator
-from ...models.technical_analysis import TechnicalSignals, CandlestickPatterns as CandlestickPatternsModel, SupportResistanceLevels, TechnicalAnalysisSummary
+from app.core.database import get_db
+from app.services.technical_analysis import TechnicalIndicators, CandlestickPatterns, SupportResistanceAnalyzer, SignalGenerator
+from app.models.technical_analysis import TechnicalSignals, CandlestickPatterns as CandlestickPatternsModel, SupportResistanceLevels, TechnicalAnalysisSummary
 
 # Encoder personnalisé pour les types NumPy
 class NumpyEncoder(json.JSONEncoder):
@@ -50,7 +50,7 @@ async def get_technical_signals(
     """
     try:
         # Récupérer les données historiques depuis la base de données
-        from ...models.database import HistoricalData
+        from app.models.database import HistoricalData
         
         # Convertir la période en jours
         period_days = {
@@ -328,7 +328,7 @@ async def get_technical_signals(
                 signals_data[key] = str(value)
         
         # Persister les signaux techniques en base de données
-        from ...models.technical_analysis import TechnicalSignals as TechnicalSignalsModel
+        from app.models.technical_analysis import TechnicalSignals as TechnicalSignalsModel
         
         # Supprimer les anciens signaux pour ce symbole (garder seulement les plus récents)
         db.query(TechnicalSignalsModel).filter(
@@ -778,7 +778,7 @@ async def get_candlestick_patterns(
     """
     try:
         # Récupérer les données historiques
-        from ...services.polygon_service import PolygonService
+        from app.services.polygon_service import PolygonService
         data_service = PolygonService()
         
         end_date = datetime.now()
@@ -853,7 +853,7 @@ async def get_support_resistance_levels(
     """
     try:
         # Récupérer les données historiques
-        from ...services.polygon_service import PolygonService
+        from app.services.polygon_service import PolygonService
         data_service = PolygonService()
         
         end_date = datetime.now()
@@ -933,7 +933,7 @@ async def get_comprehensive_technical_analysis(
     """
     try:
         # Récupérer les données historiques
-        from ...services.polygon_service import PolygonService
+        from app.services.polygon_service import PolygonService
         data_service = PolygonService()
         
         end_date = datetime.now()

@@ -3,9 +3,9 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date
 
-from ...core.database import get_db
-from ...models.database import MLModels, MLPredictions
-from ...models.schemas import (
+from app.core.database import get_db
+from app.models.database import MLModels, MLPredictions
+from app.models.schemas import (
     MLModel as MLModelSchema,
     MLPrediction as MLPredictionSchema
 )

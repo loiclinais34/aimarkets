@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from app.core.database import get_db
 from app.services.position_service import PositionService
 from app.services.portfolio_service import PortfolioService
-from app.api.endpoints.auth import get_current_user
+from app.api.endpoints.auth.auth import get_current_user
 
 router = APIRouter()
 

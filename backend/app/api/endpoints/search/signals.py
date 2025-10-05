@@ -3,12 +3,32 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date
 
-from ...core.database import get_db
-from ...models.database import TradingSignals, CorrelationAlerts
-from ...models.schemas import (
-    TradingSignal as TradingSignalSchema,
-    CorrelationAlert as CorrelationAlertSchema
-)
+from app.core.database import get_db
+from app.models.database import TradingSignals, CorrelationAlerts
+from pydantic import BaseModel
+from typing import Optional
+
+class TradingSignalSchema(BaseModel):
+    id: Optional[int] = None
+    symbol: str
+    signal_type: str
+    confidence: float
+    message: str
+    created_at: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+class CorrelationAlertSchema(BaseModel):
+    id: Optional[int] = None
+    symbol1: str
+    symbol2: str
+    correlation: float
+    message: str
+    created_at: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
 
 router = APIRouter()
 

@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from app.core.database import get_db
 from app.services.portfolio_service import PortfolioService
 from app.services.authentication_service import AuthenticationService
-from app.api.endpoints.auth import get_current_user
+from app.api.endpoints.auth.auth import get_current_user
 from app.models.portfolios import PortfolioType, PortfolioStatus
 from app.models.wallets import WalletTransaction, WalletTransactionType
 

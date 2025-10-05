@@ -12,10 +12,10 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
-from ...core.database import get_db
-from ...services.sentiment_analysis import GARCHModels, MonteCarloSimulation, MarkovChainAnalysis, VolatilityForecaster
-from ...models.sentiment_analysis import SentimentAnalysis, GARCHModels as GARCHModelsModel, MonteCarloSimulations, MarkovChainAnalysis as MarkovChainAnalysisModel, VolatilityForecasts
-from ...utils.json_encoder import make_json_safe
+from app.core.database import get_db
+from app.services.sentiment_analysis import GARCHModels, MonteCarloSimulation, MarkovChainAnalysis, VolatilityForecaster
+from app.models.sentiment_analysis import SentimentAnalysis, GARCHModels as GARCHModelsModel, MonteCarloSimulations, MarkovChainAnalysis as MarkovChainAnalysisModel, VolatilityForecasts
+from app.utils.json_encoder import make_json_safe
 
 router = APIRouter()
 
@@ -42,7 +42,7 @@ async def get_garch_analysis(
     """
     try:
         # Récupérer les données historiques depuis la base de données locale
-        from ...models.database import HistoricalData
+        from app.models.database import HistoricalData
         
         end_date = datetime.now()
         start_date = end_date - timedelta(days=365)  # 1 an de données pour GARCH
@@ -191,7 +191,7 @@ async def get_monte_carlo_simulation(
     """
     try:
         # Récupérer les données historiques depuis la base de données locale
-        from ...models.database import HistoricalData
+        from app.models.database import HistoricalData
         
         end_date = datetime.now()
         start_date = end_date - timedelta(days=252 + 50)  # 1 an de données
@@ -378,7 +378,7 @@ async def get_markov_analysis(
     """
     try:
         # Récupérer les données historiques depuis la base de données locale
-        from ...models.database import HistoricalData
+        from app.models.database import HistoricalData
         
         end_date = datetime.now()
         start_date = end_date - timedelta(days=365)  # 1 an de données
@@ -627,7 +627,7 @@ async def get_volatility_forecast(
     """
     try:
         # Récupérer les données historiques
-        from ...services.polygon_service import PolygonService
+        from app.services.polygon_service import PolygonService
         data_service = PolygonService()
         
         end_date = datetime.now()
@@ -698,7 +698,7 @@ async def get_comprehensive_sentiment_analysis(
     """
     try:
         # Récupérer les données historiques
-        from ...services.polygon_service import PolygonService
+        from app.services.polygon_service import PolygonService
         data_service = PolygonService()
         
         end_date = datetime.now()

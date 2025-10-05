@@ -9,11 +9,11 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
-from ...core.database import get_db
-from ...models.database import HistoricalData
-from ...services.technical_analysis import TechnicalIndicators
-from ...models.technical_analysis import TechnicalSignals as TechnicalSignalsModel
-from ...utils.json_encoder import make_json_safe
+from app.core.database import get_db
+from app.models.database import HistoricalData
+from app.services.technical_analysis import TechnicalIndicators
+from app.models.technical_analysis import TechnicalSignals as TechnicalSignalsModel
+from app.utils.json_encoder import make_json_safe
 
 router = APIRouter()
 

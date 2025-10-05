@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 from typing import Dict, Any
 import logging
 
-from ...core.database import get_db
-from ...services.celery_manager import CeleryManager
+from app.core.database import get_db
+from app.services.celery_manager import CeleryManager
 
 logger = logging.getLogger(__name__)
 

@@ -12,10 +12,10 @@ import pandas as pd
 import logging
 from sqlalchemy.orm import Session
 
-from ...core.database import get_db
-from ...services.advanced_signal_service import AdvancedSignalService
-from ...services.polygon_service import PolygonService
-from ...utils.json_encoder import make_json_safe
+from app.core.database import get_db
+from app.services.advanced_signal_service import AdvancedSignalService
+from app.services.polygon_service import PolygonService
+from app.utils.json_encoder import make_json_safe
 
 logger = logging.getLogger(__name__)
 

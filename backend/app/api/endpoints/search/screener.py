@@ -3,16 +3,16 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 import asyncio
 
-from ...core.database import get_db
-from ...models.schemas import (
+from app.core.database import get_db
+from app.models.schemas import (
     ScreenerRequest, ScreenerResponse, ScreenerRun, ScreenerResult,
     ScreenerConfig, ScreenerConfigCreate, ScreenerConfigUpdate
 )
-from ...models.database import MLModels
+from app.models.database import MLModels
 from pydantic import BaseModel
-from ...services.screener_service import ScreenerService
-from ...services.celery_manager import CeleryManager
-from ...tasks.screener_tasks import get_task_status
+from app.services.screener_service import ScreenerService
+from app.services.celery_manager import CeleryManager
+from app.tasks.screener_tasks import get_task_status
 
 router = APIRouter()
 
@@ -734,7 +734,7 @@ def get_screener_configs(
 ):
     """Récupère les configurations de screener"""
     try:
-        from ...models.database import ScreenerConfig as ScreenerConfigDB
+        from app.models.database import ScreenerConfig as ScreenerConfigDB
         
         query = db.query(ScreenerConfigDB)
         
@@ -757,7 +757,7 @@ def create_screener_config(
 ):
     """Crée une nouvelle configuration de screener"""
     try:
-        from ...models.database import ScreenerConfig as ScreenerConfigDB
+        from app.models.database import ScreenerConfig as ScreenerConfigDB
         
         # Vérifier si une configuration similaire existe déjà
         existing_config = db.query(ScreenerConfigDB).filter(
@@ -798,7 +798,7 @@ def create_screener_config(
 def get_screener_stats(db: Session = Depends(get_db)):
     """Récupère les statistiques des screeners"""
     try:
-        from ...models.database import ScreenerRun, ScreenerResult
+        from app.models.database import ScreenerRun, ScreenerResult
         
         # Statistiques générales
         total_runs = db.query(ScreenerRun).count()
@@ -874,7 +874,7 @@ async def search_opportunities(
         ensure_celery_ready()
         
         # Créer une session de recherche
-        from ...services.search_session_service import SearchSessionService
+        from app.services.search_session_service import SearchSessionService
         search_service = SearchSessionService(db)
         
         search_session = search_service.create_search_session(
@@ -892,7 +892,7 @@ async def search_opportunities(
         )
         
         # Lancer la tâche de screener avec les modèles robustes
-        from ...tasks.full_screener_ml_limited_tasks import run_full_screener_ml_limited
+        from app.tasks.full_screener_ml_limited_tasks import run_full_screener_ml_limited
         
         task = run_full_screener_ml_limited.delay(
             screener_request.dict(),
@@ -938,7 +938,7 @@ async def get_search_opportunities(
     Récupérer les opportunités d'une session de recherche spécifique.
     """
     try:
-        from ...services.search_session_service import SearchSessionService
+        from app.services.search_session_service import SearchSessionService
         search_service = SearchSessionService(db)
         
         # Récupérer la session de recherche
@@ -959,7 +959,7 @@ async def get_search_opportunities(
             model = db.query(MLModels).filter(MLModels.id == opp.model_id).first()
             if model:
                 # Récupérer le nom de l'entreprise depuis SymbolMetadata
-                from ...models.database import SymbolMetadata
+                from app.models.database import SymbolMetadata
                 symbol_metadata = db.query(SymbolMetadata).filter(SymbolMetadata.symbol == opp.symbol).first()
                 company_name = symbol_metadata.company_name if symbol_metadata else opp.symbol
                 

@@ -8,10 +8,10 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
 
-from ...core.database import get_db
-from ...models.database import TradingStrategy, StrategyRule, StrategyParameter
-from ...services.trading_strategy_service import TradingStrategyService
-from ...services.predefined_strategies import PredefinedStrategies, StrategyInitializer
+from app.core.database import get_db
+from app.models.database import TradingStrategy, StrategyRule, StrategyParameter
+from app.services.trading_strategy_service import TradingStrategyService
+from app.services.predefined_strategies import PredefinedStrategies, StrategyInitializer
 
 router = APIRouter()
 

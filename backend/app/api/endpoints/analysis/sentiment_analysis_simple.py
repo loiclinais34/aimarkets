@@ -8,9 +8,9 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
-from ...services.polygon_service import PolygonService
-from ...services.sentiment_analysis import GARCHModels
-from ...utils.json_encoder import make_json_safe
+from app.services.polygon_service import PolygonService
+from app.services.sentiment_analysis import GARCHModels
+from app.utils.json_encoder import make_json_safe
 
 router = APIRouter()
 

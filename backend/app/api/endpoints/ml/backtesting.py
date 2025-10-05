@@ -9,9 +9,9 @@ from typing import List, Dict, Any, Optional
 from datetime import date, datetime
 from pydantic import BaseModel, Field
 
-from ...core.database import get_db
-from ...models.database import BacktestRun, MLModels
-from ...services.backtesting_service import BacktestingService
+from app.core.database import get_db
+from app.models.database import BacktestRun, MLModels
+from app.services.backtesting_service import BacktestingService
 
 router = APIRouter()
 
@@ -411,7 +411,7 @@ def delete_backtest_run(
 def get_available_symbols(db: Session = Depends(get_db)):
     """Récupérer la liste des symboles disponibles pour le backtesting"""
     try:
-        from ...models.database import MLPredictions
+        from app.models.database import MLPredictions
         
         # Récupérer les symboles qui ont des prédictions > 1
         symbols = db.query(MLPredictions.symbol).filter(
@@ -466,7 +466,7 @@ def get_models_for_symbol(
 ):
     """Récupérer les modèles disponibles pour le backtesting d'un symbole donné avec pagination"""
     try:
-        from ...models.database import MLPredictions
+        from app.models.database import MLPredictions
         
         # Requête optimisée avec une seule jointure et agrégation
         query = db.query(
@@ -539,7 +539,7 @@ def get_available_dates_for_model(
 ):
     """Récupérer les dates disponibles pour le backtesting d'un modèle"""
     try:
-        from ...models.database import MLPredictions
+        from app.models.database import MLPredictions
         
         # Vérifier que le modèle existe
         model = db.query(MLModels).filter(MLModels.id == model_id).first()

@@ -10,7 +10,7 @@ from pydantic import BaseModel, EmailStr
 from app.core.database import get_db
 from app.services.user_service import UserService
 from app.services.authentication_service import AuthenticationService
-from app.api.endpoints.auth import get_current_user, require_role
+from app.api.endpoints.auth.auth import get_current_user, require_role
 
 router = APIRouter()
 
