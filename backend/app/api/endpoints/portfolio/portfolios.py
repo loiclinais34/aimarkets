@@ -485,6 +485,44 @@ async def delete_portfolio(
     return {"message": "Portefeuille supprimé avec succès"}
 
 
+@router.get("/{portfolio_id}/wallets", response_model=List[WalletResponse])
+async def get_wallets(
+    portfolio_id: int,
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Récupère tous les wallets d'un portefeuille"""
+    
+    portfolio_service = PortfolioService(db)
+    
+    try:
+        wallets = portfolio_service.get_portfolio_wallets(portfolio_id)
+        
+        return [
+            WalletResponse(
+                id=wallet.id,
+                name=wallet.name,
+                currency=wallet.currency,
+                wallet_type=wallet.wallet_type.value,
+                status=wallet.status.value,
+                available_balance=wallet.available_balance,
+                total_balance=wallet.total_balance,
+                created_at=wallet.created_at.isoformat()
+            )
+            for wallet in wallets
+        ]
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la récupération des wallets: {str(e)}"
+        )
+
+
 @router.post("/{portfolio_id}/wallets", response_model=WalletResponse, status_code=status.HTTP_201_CREATED)
 async def create_wallet(
     portfolio_id: int,
