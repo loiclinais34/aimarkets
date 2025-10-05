@@ -79,10 +79,10 @@ class PositionService:
                     )
                 total_cost = converted_cost
             
-            if wallet.balance < total_cost:
+            if wallet.available_balance < total_cost:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Fonds insuffisants. Solde: {wallet.balance} {wallet.currency}, "
+                    detail=f"Fonds insuffisants. Solde: {wallet.available_balance} {wallet.currency}, "
                            f"Nécessaire: {total_cost} {wallet.currency}"
                 )
         
