@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.core.database import get_db
-from app.core.auth import get_current_user
+from app.api.endpoints.auth.auth import get_current_user
 from app.services.trading_service import TradingService
 from app.services.portfolio_service import PortfolioService
 

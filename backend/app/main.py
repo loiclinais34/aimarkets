@@ -7,7 +7,7 @@ import uvicorn
 from .core.config import settings
 from .core.database import init_db, close_db
 from .api.endpoints.auth import auth, users
-from .api.endpoints.portfolio import portfolios, positions
+from .api.endpoints.portfolio import portfolios
 from .api.endpoints import trading
 from .api.endpoints.analysis import advanced_analysis, technical_analysis, sentiment_analysis, market_indicators, bubble_detection
 from .api.endpoints.search import screener, signals, advanced_signals
@@ -246,12 +246,6 @@ app.include_router(
 )
 
 # Portfolio Management API
-app.include_router(
-    positions.router,
-    prefix="/api/v1",
-    tags=["Gestion des Positions"]
-)
-
 app.include_router(
     portfolios.router,
     prefix="/api/v1/portfolios",
