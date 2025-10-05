@@ -5,10 +5,10 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth, useRequireAuth } from '@/contexts/AuthContext';
-import Header from '@/components/Layout/Header';
+import AppLayout from '@/components/Layout/AppLayout';
 import { Portfolio, getPortfolios } from '@/services/portfolioApi';
 
 export default function DashboardPage() {
@@ -56,11 +56,8 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
+    <AppLayout>
+      <div className="space-y-6">
           {/* En-tête de bienvenue */}
           <div className="bg-white overflow-hidden shadow rounded-lg mb-6">
             <div className="px-4 py-5 sm:p-6">
@@ -236,7 +233,6 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-      </main>
-    </div>
+    </AppLayout>
   );
 }

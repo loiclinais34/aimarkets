@@ -2,12 +2,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useRequireAuth } from '@/contexts/AuthContext';
+import AppLayout from '@/components/Layout/AppLayout';
 import { Portfolio, getPortfolio, updatePortfolio, UpdatePortfolioRequest } from '@/services/portfolioApi';
 import { EditPortfolioModal } from '@/components/Portfolio/EditPortfolioModal';
 import { WalletManager } from '@/components/Portfolio/WalletManager';
 
 export default function PortfolioDetailPage() {
   console.log('🚀 PortfolioDetailPage MOUNTED');
+  const { isAuthenticated, isLoading: authLoading } = useRequireAuth();
   const params = useParams();
   const router = useRouter();
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
@@ -74,7 +77,7 @@ export default function PortfolioDetailPage() {
     console.log('🔄 portfolio changed:', portfolio ? portfolio.name : 'null');
   }, [portfolio]);
 
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -83,6 +86,10 @@ export default function PortfolioDetailPage() {
         </div>
       </div>
     );
+  }
+
+  if (!isAuthenticated) {
+    return null;
   }
 
   if (error) {
@@ -133,8 +140,8 @@ export default function PortfolioDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <AppLayout>
+      <div className="space-y-6">
         {/* En-tête */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
@@ -177,9 +184,9 @@ export default function PortfolioDetailPage() {
               <div>
                 <p className="text-sm text-gray-500">Type</p>
                 <p className="text-sm font-medium text-gray-900">
-                  {portfolio.portfolio_type === 'PERSONAL' ? 'Personnel' :
-                   portfolio.portfolio_type === 'JOINT' ? 'Conjoint' :
-                   portfolio.portfolio_type === 'CORPORATE' ? 'Entreprise' : 'Retraite'}
+                  {portfolio.portfolio_type === 'personal' ? 'Personnel' :
+                    portfolio.portfolio_type === 'joint' ? 'Conjoint' :
+                    portfolio.portfolio_type === 'corporate' ? 'Entreprise' : 'Retraite'}
                 </p>
               </div>
               <div>
@@ -259,13 +266,6 @@ export default function PortfolioDetailPage() {
       </div>
 
       {/* Modal d'édition */}
-      {console.log('Rendu de la modal, isEditModalOpen:', isEditModalOpen, 'portfolio:', portfolio)}
-      {console.log('Props passées à EditPortfolioModal:', {
-        isOpen: isEditModalOpen,
-        portfolio: portfolio ? 'exists' : 'null',
-        portfolioId: portfolio?.id,
-        portfolioName: portfolio?.name
-      })}
       <EditPortfolioModal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
@@ -273,6 +273,6 @@ export default function PortfolioDetailPage() {
         portfolio={portfolio}
         isLoading={isUpdating}
       />
-    </div>
+    </AppLayout>
   );
 }
