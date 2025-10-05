@@ -142,6 +142,25 @@ export async function getPortfolio(portfolioId: number): Promise<Portfolio> {
   }
 }
 
+export async function getWallets(portfolioId: number): Promise<Wallet[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/${portfolioId}/wallets`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Erreur ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Erreur lors de la récupération des wallets:', error);
+    throw error;
+  }
+}
+
 export async function createPortfolio(portfolioData: CreatePortfolioRequest): Promise<Portfolio> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/v1/portfolios`, {

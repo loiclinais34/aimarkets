@@ -45,6 +45,7 @@ export interface BuyOrderRequest {
   price: number;
   fee?: number;
   currency?: string;
+  wallet_id?: number;
 }
 
 export interface SellOrderRequest {
@@ -52,6 +53,8 @@ export interface SellOrderRequest {
   quantity: number;
   price: number;
   fee?: number;
+  currency?: string;
+  wallet_id?: number;
 }
 
 export interface PositionPerformance {

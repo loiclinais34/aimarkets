@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { BuyOrderRequest, SellOrderRequest, executeBuyOrder, executeSellOrder } from '@/services/positionApi';
+import { getWallets, Wallet } from '@/services/portfolioApi';
 
 interface BuySellModalProps {
   isOpen: boolean;
@@ -29,8 +30,10 @@ export default function BuySellModal({
     quantity: 0,
     price: currentPrice,
     fee: 0,
-    currency: 'USD'
+    currency: 'USD',
+    wallet_id: undefined as number | undefined
   });
+  const [wallets, setWallets] = useState<Wallet[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -41,11 +44,23 @@ export default function BuySellModal({
         quantity: 0,
         price: currentPrice,
         fee: 0,
-        currency: 'USD'
+        currency: 'USD',
+        wallet_id: undefined
       });
       setError('');
+      loadWallets();
     }
   }, [isOpen, symbol, currentPrice]);
+
+  const loadWallets = async () => {
+    try {
+      const walletsData = await getWallets(portfolioId);
+      setWallets(walletsData);
+    } catch (error) {
+      console.error('Erreur lors du chargement des wallets:', error);
+      setError('Erreur lors du chargement des wallets');
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -54,6 +69,14 @@ export default function BuySellModal({
       [name]: name === 'quantity' || name === 'price' || name === 'fee' 
         ? parseFloat(value) || 0 
         : value
+    }));
+  };
+
+  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'wallet_id' ? (value ? parseInt(value) : undefined) : value
     }));
   };
 
@@ -77,7 +100,8 @@ export default function BuySellModal({
           quantity: formData.quantity,
           price: formData.price,
           fee: formData.fee,
-          currency: formData.currency
+          currency: formData.currency,
+          wallet_id: formData.wallet_id
         };
         await executeBuyOrder(portfolioId, order);
       } else {
@@ -85,7 +109,9 @@ export default function BuySellModal({
           symbol: formData.symbol,
           quantity: formData.quantity,
           price: formData.price,
-          fee: formData.fee
+          fee: formData.fee,
+          currency: formData.currency,
+          wallet_id: formData.wallet_id
         };
         await executeSellOrder(portfolioId, order);
       }
@@ -157,6 +183,48 @@ export default function BuySellModal({
               />
             </div>
 
+            {/* Wallet Selection */}
+            <div>
+              <label htmlFor="wallet_id" className="block text-sm font-medium text-gray-700 mb-1">
+                Wallet source
+              </label>
+              <select
+                id="wallet_id"
+                name="wallet_id"
+                value={formData.wallet_id || ''}
+                onChange={handleSelectChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Sélectionner un wallet</option>
+                {wallets.map((wallet) => (
+                  <option key={wallet.id} value={wallet.id}>
+                    {wallet.currency} - {wallet.balance.toLocaleString('fr-FR')} {wallet.currency}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Currency */}
+            <div>
+              <label htmlFor="currency" className="block text-sm font-medium text-gray-700 mb-1">
+                Devise de transaction
+              </label>
+              <select
+                id="currency"
+                name="currency"
+                value={formData.currency}
+                onChange={handleSelectChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
+                <option value="JPY">JPY</option>
+              </select>
+            </div>
+
             {/* Quantity */}
             <div>
               <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">
@@ -219,25 +287,6 @@ export default function BuySellModal({
               />
             </div>
 
-            {/* Currency (buy mode only) */}
-            {mode === 'buy' && (
-              <div>
-                <label htmlFor="currency" className="block text-sm font-medium text-gray-700 mb-1">
-                  Devise
-                </label>
-                <select
-                  id="currency"
-                  name="currency"
-                  value={formData.currency}
-                  onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="USD">USD</option>
-                  <option value="EUR">EUR</option>
-                  <option value="GBP">GBP</option>
-                </select>
-              </div>
-            )}
 
             {/* Total Calculation */}
             <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
