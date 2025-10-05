@@ -83,6 +83,7 @@ export default function DashboardPage() {
           limit: 100, // Limite maximale autorisée
           sort_by: 'analysis_date',
           sort_order: 'desc'
+          // Ne pas spécifier min_score pour utiliser la valeur par défaut du backend (0.5)
         };
         
         const response = await advancedAnalysisApi.searchStoredOpportunities(filters);
