@@ -2,7 +2,7 @@
  * Service API pour l'authentification
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export interface User {
   id: number;
@@ -75,8 +75,8 @@ class AuthApiService {
   async register(userData: RegisterRequest): Promise<{ user: User; message: string }> {
     try {
       console.log('DEBUG: API_BASE_URL =', API_BASE_URL);
-      console.log('DEBUG: Full URL =', `${API_BASE_URL}/auth/register`);
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      console.log('DEBUG: Full URL =', `${API_BASE_URL}/api/v1/auth/register`);
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -102,7 +102,7 @@ class AuthApiService {
    */
   async login(credentials: LoginRequest): Promise<AuthResponse> {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -133,7 +133,7 @@ class AuthApiService {
    */
   async logout(): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
       });
@@ -158,7 +158,7 @@ class AuthApiService {
    */
   async getCurrentUser(): Promise<User> {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/me`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
         method: 'GET',
         headers: this.getAuthHeaders(),
       });
@@ -190,7 +190,7 @@ class AuthApiService {
    */
   async requestPasswordReset(email: string): Promise<{ message: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/password-reset-request`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/password-reset-request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -216,7 +216,7 @@ class AuthApiService {
    */
   async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/password-reset`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/password-reset`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -242,7 +242,7 @@ class AuthApiService {
    */
   async changePassword(currentPassword: string, newPassword: string): Promise<{ message: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/change-password`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify({
@@ -269,7 +269,7 @@ class AuthApiService {
    */
   async logoutAllSessions(): Promise<{ message: string; revoked_sessions: number }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/logout-all`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/logout-all`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
       });
@@ -292,7 +292,7 @@ class AuthApiService {
    */
   async getUserStats(): Promise<UserStats> {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/stats`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/stats`, {
         method: 'GET',
         headers: this.getAuthHeaders(),
       });
