@@ -42,7 +42,8 @@ const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
       const walletData: CreateWalletRequest = {
         name: formData.name,
         currency: formData.currency,
-        initial_balance: formData.initial_balance
+        initial_balance: formData.initial_balance,
+        wallet_type: 'CASH' // Type par défaut
       };
 
       await createWallet(portfolioId, walletData);

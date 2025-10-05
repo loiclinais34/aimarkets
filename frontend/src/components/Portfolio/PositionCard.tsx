@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Position } from '@/services/positionApi';
+import { Position } from '@/services/tradingApi';
 
 interface PositionCardProps {
   position: Position;

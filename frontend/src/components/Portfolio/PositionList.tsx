@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Position, getPositions } from '@/services/positionApi';
+import { Position, getPositions } from '@/services/tradingApi';
 import PositionCard from './PositionCard';
-import BuySellModal from './BuySellModal';
+import TradingModal from '@/components/Trading/TradingModal';
 
 interface PositionListProps {
   portfolioId: number;
@@ -171,16 +171,16 @@ export default function PositionList({ portfolioId, onRefresh }: PositionListPro
         </div>
       )}
 
-      {/* Buy/Sell Modal */}
-      <BuySellModal
+      {/* Trading Modal */}
+      <TradingModal
         isOpen={buySellModal.isOpen}
         onClose={handleModalClose}
         onSuccess={handleOrderSuccess}
         portfolioId={portfolioId}
         mode={buySellModal.mode}
         symbol={buySellModal.symbol}
-        currentQuantity={buySellModal.currentQuantity}
         currentPrice={buySellModal.currentPrice}
+        availableQuantity={buySellModal.currentQuantity}
       />
     </div>
   );
