@@ -169,10 +169,10 @@ export default function TradingModal({
                      selectedWallet ? selectedWallet.available_balance / formData.price : 0;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
+        <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10">
           <div className="flex items-center space-x-2">
             {mode === 'buy' ? (
               <TrendingUp className="w-5 h-5 text-green-600" />
@@ -192,30 +192,32 @@ export default function TradingModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Wallet Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Wallet
-            </label>
-            <select
-              name="wallet_id"
-              value={formData.wallet_id}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            >
-              <option value={0}>Sélectionner un wallet</option>
-              {wallets.map(wallet => (
-                <option key={wallet.id} value={wallet.id}>
-                  {wallet.currency} - {formatCurrency(wallet.available_balance, wallet.currency)} disponible
-                </option>
-              ))}
-            </select>
-          </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Row 1: Wallet & Symbol */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Wallet Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Wallet
+              </label>
+              <select
+                name="wallet_id"
+                value={formData.wallet_id}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value={0}>Sélectionner un wallet</option>
+                {wallets.map(wallet => (
+                  <option key={wallet.id} value={wallet.id}>
+                    {wallet.currency} - {formatCurrency(wallet.available_balance, wallet.currency)} disponible
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {/* Symbol */}
-          <div>
+            {/* Symbol */}
+            <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Symbole
             </label>
@@ -299,95 +301,106 @@ export default function TradingModal({
                 onClick={() => setShowSymbolSearch(false)}
               />
             )}
+            </div>
           </div>
 
-          {/* Quantity */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Quantité
-            </label>
-            <input
-              type="number"
-              name="quantity"
-              value={formData.quantity}
-              onChange={handleInputChange}
-              min="0"
-              max={maxQuantity}
-              step="0.000001"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Max: {maxQuantity.toLocaleString('fr-FR', { maximumFractionDigits: 6 })}
-            </p>
+          {/* Row 2: Quantity, Price, Fees */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Quantity */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Quantité
+              </label>
+              <input
+                type="number"
+                name="quantity"
+                value={formData.quantity}
+                onChange={handleInputChange}
+                min="0"
+                max={maxQuantity}
+                step="0.000001"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Max: ∞
+              </p>
+            </div>
+
+            {/* Price */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Prix unitaire
+              </label>
+              <input
+                type="number"
+                name="price"
+                value={formData.price}
+                onChange={handleInputChange}
+                min="0"
+                step="0.01"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+
+            {/* Fees */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Frais
+              </label>
+              <input
+                type="number"
+                name="fees"
+                value={formData.fees}
+                onChange={handleInputChange}
+                min="0"
+                step="0.01"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
 
-          {/* Price */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Prix unitaire
-            </label>
-            <input
-              type="number"
-              name="price"
-              value={formData.price}
-              onChange={handleInputChange}
-              min="0"
-              step="0.01"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
+          {/* Row 3: Description & Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Description (optionnel)
+              </label>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleInputChange}
+                rows={4}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              />
+            </div>
 
-          {/* Fees */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Frais
-            </label>
-            <input
-              type="number"
-              name="fees"
-              value={formData.fees}
-              onChange={handleInputChange}
-              min="0"
-              step="0.01"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description (optionnel)
-            </label>
-            <textarea
-              name="description"
-              value={formData.description}
-              onChange={handleInputChange}
-              rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Summary */}
-          <div className="bg-gray-50 p-4 rounded-md">
-            <h3 className="font-medium text-gray-900 mb-2">Résumé</h3>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span>Quantité:</span>
-                <span>{formData.quantity.toLocaleString('fr-FR', { maximumFractionDigits: 6 })}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Prix unitaire:</span>
-                <span>{formatCurrency(formData.price, selectedWallet?.currency || 'USD')}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Frais:</span>
-                <span>{formatCurrency(formData.fees, selectedWallet?.currency || 'USD')}</span>
-              </div>
-              <div className="flex justify-between font-medium border-t pt-1">
-                <span>{mode === 'buy' ? 'Coût total:' : 'Produit net:'}</span>
-                <span>{formatCurrency(mode === 'buy' ? totalCost : totalProceeds, selectedWallet?.currency || 'USD')}</span>
+            {/* Summary */}
+            <div>
+              <h3 className="block text-sm font-medium text-gray-900 mb-2">Résumé</h3>
+              <div className="bg-gray-50 p-4 rounded-md h-[calc(100%-2rem)]">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Quantité:</span>
+                    <span className="font-medium">{formData.quantity.toLocaleString('fr-FR', { maximumFractionDigits: 6 })}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Prix unitaire:</span>
+                    <span className="font-medium">{formatCurrency(formData.price, selectedWallet?.currency || 'USD')}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Frais:</span>
+                    <span className="font-medium">{formatCurrency(formData.fees, selectedWallet?.currency || 'USD')}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold border-t border-gray-300 pt-2 mt-2">
+                    <span>{mode === 'buy' ? 'Coût total:' : 'Produit net:'}</span>
+                    <span className={mode === 'buy' ? 'text-green-600' : 'text-red-600'}>
+                      {formatCurrency(mode === 'buy' ? totalCost : totalProceeds, selectedWallet?.currency || 'USD')}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
