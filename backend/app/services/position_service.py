@@ -15,6 +15,7 @@ from app.models.portfolios import (
 )
 from app.models.wallets import Wallet
 from app.services.authentication_service import AuthenticationService
+from app.services.exchange_rate_service import ExchangeRateService
 
 
 class PositionService:
@@ -23,6 +24,7 @@ class PositionService:
     def __init__(self, db: Session):
         self.db = db
         self.auth_service = AuthenticationService(db)
+        self.exchange_service = ExchangeRateService(db)
     
     # ==================== GESTION DES TRANSACTIONS DE POSITIONS ====================
     
@@ -32,7 +34,9 @@ class PositionService:
         symbol: str,
         quantity: Decimal,
         price: Decimal,
-        fee: Decimal = Decimal('0.00')
+        fee: Decimal = Decimal('0.00'),
+        currency: str = "USD",
+        wallet_id: int = None
     ) -> Tuple[Position, PositionTransaction]:
         """Exécute un ordre d'achat"""
         
@@ -47,20 +51,51 @@ class PositionService:
                 detail="Portefeuille non trouvé"
             )
         
-        # Vérifier qu'il y a assez de liquidités
-        total_cost = (quantity * price) + fee
-        wallet = self._get_or_create_wallet(portfolio_id, currency)
+        # Vérifier que le wallet existe et a suffisamment de fonds
+        if wallet_id:
+            wallet = self.db.query(Wallet).filter(
+                Wallet.id == wallet_id,
+                Wallet.portfolio_id == portfolio_id,
+                Wallet.status == "active"
+            ).first()
+            
+            if not wallet:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Wallet non trouvé ou inactif"
+                )
+            
+            total_cost = (quantity * price) + fee
+            
+            # Convertir le coût total vers la devise du wallet si nécessaire
+            if currency != wallet.currency:
+                converted_cost = self.exchange_service.convert_amount(
+                    total_cost, currency, wallet.currency
+                )
+                if not converted_cost:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Impossible de convertir {currency} vers {wallet.currency}"
+                    )
+                total_cost = converted_cost
+            
+            if wallet.balance < total_cost:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Fonds insuffisants. Solde: {wallet.balance} {wallet.currency}, "
+                           f"Nécessaire: {total_cost} {wallet.currency}"
+                )
         
-        if wallet.available_balance < total_cost:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Fonds insuffisants. Coût: {total_cost}, Disponible: {wallet.available_balance}"
-            )
+        # Si aucun wallet spécifique n'est fourni, utiliser le wallet par défaut pour la devise
+        if not wallet_id:
+            wallet = self._get_or_create_wallet(portfolio_id, currency)
+            wallet_id = wallet.id
         
-        # Vérifier si une position existe déjà
+        # Vérifier si une position existe déjà pour ce symbole et cette devise
         existing_position = self.db.query(Position).filter(
             Position.portfolio_id == portfolio_id,
-            Position.symbol == symbol
+            Position.symbol == symbol,
+            Position.currency == currency
         ).first()
         
         if existing_position:
@@ -70,12 +105,12 @@ class PositionService:
         else:
             # Créer une nouvelle position
             position = self._create_new_position(
-                portfolio_id, symbol, quantity, price
+                portfolio_id, symbol, quantity, price, currency
             )
         
         # Créer la transaction
         transaction = self._create_position_transaction(
-            position.id, "BUY", quantity, price, fee
+            position.id, "BUY", quantity, price, fee, currency
         )
         
         # Débiter le wallet
@@ -93,7 +128,9 @@ class PositionService:
         symbol: str,
         quantity: Decimal,
         price: Decimal,
-        fee: Decimal = Decimal('0.00')
+        fee: Decimal = Decimal('0.00'),
+        currency: str = "USD",
+        wallet_id: int = None
     ) -> Tuple[Position, PositionTransaction]:
         """Exécute un ordre de vente"""
         
@@ -111,7 +148,8 @@ class PositionService:
         # Vérifier que la position existe
         position = self.db.query(Position).filter(
             Position.portfolio_id == portfolio_id,
-            Position.symbol == symbol
+            Position.symbol == symbol,
+            Position.currency == currency
         ).first()
         
         if not position:
@@ -131,7 +169,7 @@ class PositionService:
         
         # Créer la transaction
         transaction = self._create_position_transaction(
-            position.id, "SELL", quantity, price, fee
+            position.id, "SELL", quantity, price, fee, currency
         )
         
         # Créditer le wallet
@@ -172,7 +210,8 @@ class PositionService:
         portfolio_id: int,
         symbol: str,
         quantity: Decimal,
-        price: Decimal
+        price: Decimal,
+        currency: str = "USD"
     ) -> Position:
         """Crée une nouvelle position"""
         
@@ -184,6 +223,7 @@ class PositionService:
             quantity=quantity,
             average_cost=price,
             current_price=price,
+            currency=currency,
             total_cost=total_cost,
             current_value=total_cost,
             unrealized_pnl=Decimal('0.00'),
@@ -254,7 +294,8 @@ class PositionService:
         transaction_type: str,
         quantity: Decimal,
         price: Decimal,
-        fee: Decimal
+        fee: Decimal,
+        currency: str = "USD"
     ) -> PositionTransaction:
         """Crée une transaction de position"""
         
@@ -264,6 +305,7 @@ class PositionService:
             quantity=quantity,
             price=price,
             fee=fee,
+            currency=currency,
             transaction_date=datetime.utcnow()
         )
         

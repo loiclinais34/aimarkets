@@ -23,6 +23,8 @@ class BuyOrderRequest(BaseModel):
     quantity: Decimal
     price: Decimal
     fee: Decimal = Decimal('0.00')
+    currency: str = "USD"
+    wallet_id: Optional[int] = None
 
 
 class SellOrderRequest(BaseModel):
@@ -30,6 +32,8 @@ class SellOrderRequest(BaseModel):
     quantity: Decimal
     price: Decimal
     fee: Decimal = Decimal('0.00')
+    currency: str = "USD"
+    wallet_id: Optional[int] = None
 
 
 class PositionTransactionResponse(BaseModel):
@@ -38,6 +42,7 @@ class PositionTransactionResponse(BaseModel):
     quantity: Decimal
     price: Decimal
     fee: Decimal
+    currency: str
     transaction_date: str
 
 
@@ -47,6 +52,7 @@ class PositionResponse(BaseModel):
     quantity: Decimal
     average_buy_price: Decimal
     current_price: Decimal
+    currency: str
     cost_basis: Decimal
     market_value: Decimal
     unrealized_pnl: Decimal
@@ -125,7 +131,9 @@ async def execute_buy_order(
             symbol=order.symbol,
             quantity=order.quantity,
             price=order.price,
-            fee=order.fee
+            fee=order.fee,
+            currency=order.currency,
+            wallet_id=order.wallet_id
         )
         
         return OrderExecutionResponse(
@@ -150,6 +158,7 @@ async def execute_buy_order(
                 quantity=transaction.quantity,
                 price=transaction.price,
                 fee=transaction.fee,
+                currency=transaction.currency,
                 transaction_date=transaction.transaction_date.isoformat()
             ),
             message=f"Achat de {order.quantity} {order.symbol} à {order.price} exécuté avec succès"
@@ -215,6 +224,7 @@ async def execute_sell_order(
                 quantity=transaction.quantity,
                 price=transaction.price,
                 fee=transaction.fee,
+                currency=transaction.currency,
                 transaction_date=transaction.transaction_date.isoformat()
             ),
             message=f"Vente de {order.quantity} {order.symbol} à {order.price} exécutée avec succès"

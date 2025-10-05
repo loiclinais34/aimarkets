@@ -79,6 +79,7 @@ class Position(Base):
     quantity = Column(Numeric(15, 6), nullable=False, default=0.000000)
     average_cost = Column(Numeric(15, 6), nullable=False, default=0.000000)
     current_price = Column(Numeric(15, 6), nullable=True)
+    currency = Column(String(3), nullable=False, default="USD")  # Currency of the position
     
     # Financial information
     total_cost = Column(Numeric(15, 2), nullable=False, default=0.00)
@@ -154,6 +155,7 @@ class PositionTransaction(Base):
     price = Column(Numeric(15, 6), nullable=False)
     total_amount = Column(Numeric(15, 2), nullable=False)
     fees = Column(Numeric(15, 2), default=0.00, nullable=False)
+    currency = Column(String(3), nullable=False, default="USD")  # Currency of the transaction
     
     # Position impact
     quantity_before = Column(Numeric(15, 6), nullable=False)
