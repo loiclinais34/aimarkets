@@ -253,7 +253,7 @@ app.include_router(
 
 app.include_router(
     positions.router,
-    prefix="/api/v1/positions",
+    prefix="/api/v1",
     tags=["Gestion des Positions"]
 )
 
