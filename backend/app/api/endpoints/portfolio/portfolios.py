@@ -85,7 +85,6 @@ class PositionResponse(BaseModel):
     unrealized_pnl_percent: Decimal
     realized_pnl: Decimal
     currency: str
-    position_type: str
     created_at: str
     updated_at: str
 
@@ -207,7 +206,6 @@ async def create_portfolio(
                     unrealized_pnl_percent=position.unrealized_pnl_percentage,
                     realized_pnl=position.realized_pnl,
                     currency=position.currency,
-                    position_type=position.position_type.value,
                     created_at=position.created_at.isoformat(),
                     updated_at=position.updated_at.isoformat()
                 )
@@ -290,7 +288,6 @@ async def get_portfolios(
                         unrealized_pnl_percent=position.unrealized_pnl_percentage,
                         realized_pnl=position.realized_pnl,
                         currency=position.currency,
-                        position_type=position.position_type.value,
                         created_at=position.created_at.isoformat(),
                         updated_at=position.updated_at.isoformat()
                     )
@@ -365,7 +362,6 @@ async def get_portfolio(
                 unrealized_pnl_percent=position.unrealized_pnl_percentage,
                 realized_pnl=position.realized_pnl,
                 currency=position.currency,
-                position_type=position.position_type.value,
                 created_at=position.created_at.isoformat(),
                 updated_at=position.updated_at.isoformat()
             )
@@ -448,7 +444,6 @@ async def update_portfolio(
                     unrealized_pnl_percent=position.unrealized_pnl_percentage,
                     realized_pnl=position.realized_pnl,
                     currency=position.currency,
-                    position_type=position.position_type.value,
                     created_at=position.created_at.isoformat(),
                     updated_at=position.updated_at.isoformat()
                 )
