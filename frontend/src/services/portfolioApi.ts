@@ -229,16 +229,6 @@ export interface CreateWalletRequest {
   initial_balance?: number;
 }
 
-export interface Wallet {
-  id: number;
-  name: string;
-  currency: string;
-  wallet_type: string;
-  status: string;
-  available_balance: number;
-  total_balance: number;
-  created_at: string;
-}
 
 // ==================== FONCTIONS POUR LES WALLETS ====================
 
