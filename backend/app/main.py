@@ -6,7 +6,7 @@ import uvicorn
 
 from .core.config import settings
 from .core.database import init_db, close_db
-from .api.endpoints import data, target_parameters, ml_models, lightgbm_models, lightgbm_test, symbol_metadata, backtesting, trading_strategies, model_comparison, async_model_comparison, financial_ratios, technical_analysis, sentiment_analysis, market_indicators, ml_backtesting, auth, users, portfolios, positions
+from .api.endpoints import data, target_parameters, ml_models, symbol_metadata, backtesting, trading_strategies, model_comparison, async_model_comparison, financial_ratios, technical_analysis, sentiment_analysis, market_indicators, ml_backtesting, auth, users, portfolios, positions
 
 
 @asynccontextmanager

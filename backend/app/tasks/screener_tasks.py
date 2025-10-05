@@ -5,10 +5,9 @@ import time
 from datetime import datetime, date
 from typing import Dict, List, Any
 from celery import current_task
-from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
-from app.core.database import get_db
+from app.core.database import SessionLocal
 from app.services.screener_service import ScreenerService
 from app.models.database import ScreenerRun, ScreenerResult
 from app.models.schemas import ScreenerRequest

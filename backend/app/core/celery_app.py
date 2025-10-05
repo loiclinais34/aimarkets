@@ -11,29 +11,20 @@ celery_app = Celery(
     backend=f"redis://{settings.redis_host}:{settings.redis_port}/{settings.redis_db}",
     include=[
         "app.tasks.screener_tasks",
-        "app.tasks.simple_screener_tasks", # Added simplified screener
-        "app.tasks.ultra_simple_screener_tasks", # Added ultra-simplified screener
-        "app.tasks.demo_screener_tasks", # Added demo screener
-        "app.tasks.real_screener_tasks", # Added real screener
-        "app.tasks.real_screener_limited_tasks", # Added limited real screener
-        "app.tasks.real_screener_fixed_tasks", # Added fixed real screener
-        "app.tasks.ultra_simple_real_tasks", # Added ultra-simple real screener
-        "app.tasks.full_screener_tasks", # Added full screener
-        "app.tasks.full_screener_limited_tasks", # Added full screener limited
-        "app.tasks.full_screener_simple_tasks", # Added full screener simple
-        "app.tasks.full_screener_ml_tasks", # Added full screener ML
-        "app.tasks.full_screener_ml_limited_tasks", # Added full screener ML limited
-        "app.tasks.full_screener_ml_web_tasks", # Added full screener ML web
-        "app.tasks.test_tasks", # Added for testing
-        "app.tasks.data_update_tasks", # Added data update tasks
-        "app.tasks.ml_tasks", # Added ML tasks
-        "app.tasks.financial_ratios_tasks", # Added financial ratios tasks
-        "app.tasks.advanced_analysis_pipeline_tasks", # Added advanced analysis pipeline tasks
+        "app.tasks.real_screener_tasks",
+        "app.tasks.full_screener_tasks",
+        "app.tasks.full_screener_limited_tasks",
+        "app.tasks.full_screener_ml_tasks",
+        "app.tasks.test_tasks",
+        "app.tasks.data_update_tasks",
+        "app.tasks.ml_tasks",
+        "app.tasks.financial_ratios_tasks",
+        "app.tasks.advanced_analysis_pipeline_tasks",
     ]
 )
 
 # Import des tâches pour les enregistrer
-from app.tasks import screener_tasks, test_tasks, simple_screener_tasks, ultra_simple_screener_tasks, demo_screener_tasks, real_screener_tasks, real_screener_limited_tasks, real_screener_fixed_tasks, ultra_simple_real_tasks, full_screener_tasks, full_screener_limited_tasks, full_screener_simple_tasks, full_screener_ml_tasks, full_screener_ml_limited_tasks, full_screener_ml_web_tasks, data_update_tasks, ml_tasks, financial_ratios_tasks, advanced_analysis_pipeline_tasks
+from app.tasks import screener_tasks, test_tasks, real_screener_tasks, full_screener_tasks, full_screener_limited_tasks, full_screener_ml_tasks, data_update_tasks, ml_tasks, financial_ratios_tasks, advanced_analysis_pipeline_tasks
 
 # Configuration des tâches
 celery_app.conf.update(

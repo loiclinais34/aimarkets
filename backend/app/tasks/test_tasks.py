@@ -1,7 +1,6 @@
 """
 Tâches de test simples pour déboguer Celery
 """
-from celery import current_task
 from app.core.celery_app import celery_app
 
 @celery_app.task(bind=True, name="test_simple_task")
