@@ -23,7 +23,6 @@ class BuyOrderRequest(BaseModel):
     quantity: Decimal
     price: Decimal
     fee: Decimal = Decimal('0.00')
-    currency: str = "USD"
 
 
 class SellOrderRequest(BaseModel):
@@ -31,7 +30,6 @@ class SellOrderRequest(BaseModel):
     quantity: Decimal
     price: Decimal
     fee: Decimal = Decimal('0.00')
-    currency: str = "USD"
 
 
 class PositionTransactionResponse(BaseModel):
@@ -54,7 +52,6 @@ class PositionResponse(BaseModel):
     unrealized_pnl: Decimal
     unrealized_pnl_percent: Decimal
     realized_pnl: Decimal
-    currency: str
     position_type: str
     created_at: str
     updated_at: str
@@ -128,8 +125,7 @@ async def execute_buy_order(
             symbol=order.symbol,
             quantity=order.quantity,
             price=order.price,
-            fee=order.fee,
-            currency=order.currency
+            fee=order.fee
         )
         
         return OrderExecutionResponse(
@@ -144,7 +140,6 @@ async def execute_buy_order(
                 unrealized_pnl=position.unrealized_pnl,
                 unrealized_pnl_percent=position.unrealized_pnl_percent,
                 realized_pnl=position.realized_pnl,
-                currency=position.currency,
                 position_type=position.position_type.value,
                 created_at=position.created_at.isoformat(),
                 updated_at=position.updated_at.isoformat()
@@ -195,8 +190,7 @@ async def execute_sell_order(
             symbol=order.symbol,
             quantity=order.quantity,
             price=order.price,
-            fee=order.fee,
-            currency=order.currency
+            fee=order.fee
         )
         
         return OrderExecutionResponse(
@@ -211,7 +205,6 @@ async def execute_sell_order(
                 unrealized_pnl=position.unrealized_pnl,
                 unrealized_pnl_percent=position.unrealized_pnl_percent,
                 realized_pnl=position.realized_pnl,
-                currency=position.currency,
                 position_type=position.position_type.value,
                 created_at=position.created_at.isoformat(),
                 updated_at=position.updated_at.isoformat()

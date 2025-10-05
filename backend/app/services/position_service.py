@@ -32,8 +32,7 @@ class PositionService:
         symbol: str,
         quantity: Decimal,
         price: Decimal,
-        fee: Decimal = Decimal('0.00'),
-        currency: str = "USD"
+        fee: Decimal = Decimal('0.00')
     ) -> Tuple[Position, PositionTransaction]:
         """Exécute un ordre d'achat"""
         
@@ -71,7 +70,7 @@ class PositionService:
         else:
             # Créer une nouvelle position
             position = self._create_new_position(
-                portfolio_id, symbol, quantity, price, currency
+                portfolio_id, symbol, quantity, price
             )
         
         # Créer la transaction
@@ -94,8 +93,7 @@ class PositionService:
         symbol: str,
         quantity: Decimal,
         price: Decimal,
-        fee: Decimal = Decimal('0.00'),
-        currency: str = "USD"
+        fee: Decimal = Decimal('0.00')
     ) -> Tuple[Position, PositionTransaction]:
         """Exécute un ordre de vente"""
         
@@ -174,8 +172,7 @@ class PositionService:
         portfolio_id: int,
         symbol: str,
         quantity: Decimal,
-        price: Decimal,
-        currency: str
+        price: Decimal
     ) -> Position:
         """Crée une nouvelle position"""
         
@@ -190,8 +187,7 @@ class PositionService:
             total_cost=total_cost,
             current_value=total_cost,
             unrealized_pnl=Decimal('0.00'),
-            unrealized_pnl_percentage=Decimal('0.00'),
-            currency=currency
+            unrealized_pnl_percentage=Decimal('0.00')
         )
         
         self.db.add(position)
