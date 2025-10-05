@@ -199,7 +199,7 @@ export default function BuySellModal({
                 <option value="">Sélectionner un wallet</option>
                 {wallets.map((wallet) => (
                   <option key={wallet.id} value={wallet.id}>
-                    {wallet.currency} - {wallet.balance.toLocaleString('fr-FR')} {wallet.currency}
+                    {wallet.currency} - {(wallet.available_balance || 0).toLocaleString('fr-FR')} {wallet.currency}
                   </option>
                 ))}
               </select>
