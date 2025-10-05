@@ -8,6 +8,7 @@ from .core.config import settings
 from .core.database import init_db, close_db
 from .api.endpoints.auth import auth, users
 from .api.endpoints.portfolio import portfolios, positions
+from .api.endpoints import trading
 from .api.endpoints.analysis import advanced_analysis, technical_analysis, sentiment_analysis, market_indicators, bubble_detection
 from .api.endpoints.search import screener, signals, advanced_signals
 from .api.endpoints.ml import ml_models, ml_backtesting, model_comparison, async_model_comparison, backtesting
@@ -255,6 +256,12 @@ app.include_router(
     portfolios.router,
     prefix="/api/v1/portfolios",
     tags=["Gestion des Portefeuilles"]
+)
+
+app.include_router(
+    trading.router,
+    prefix="/api/v1/trading",
+    tags=["Trading de Titres"]
 )
 
 if __name__ == "__main__":

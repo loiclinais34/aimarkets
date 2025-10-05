@@ -21,6 +21,8 @@ class WalletTransactionType(enum.Enum):
     DEPOSIT = "DEPOSIT"
     WITHDRAWAL = "WITHDRAWAL"
     TRANSFER = "TRANSFER"
+    BUY_STOCK = "BUY_STOCK"
+    SELL_STOCK = "SELL_STOCK"
 
 
 class Wallet(Base):
@@ -67,6 +69,12 @@ class WalletTransaction(Base):
     amount = Column(Numeric(15, 2), nullable=False)
     balance_after = Column(Numeric(15, 2), nullable=False)
     target_wallet_id = Column(Integer, nullable=True)
+    
+    # Stock trading details (for BUY_STOCK/SELL_STOCK transactions)
+    symbol = Column(String(20), nullable=True)
+    quantity = Column(Numeric(15, 6), nullable=True)
+    price = Column(Numeric(15, 6), nullable=True)
+    fees = Column(Numeric(15, 2), nullable=True, default=0.00)
     
     # Reference information
     reference = Column(String(100), nullable=True)
