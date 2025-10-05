@@ -7,7 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRequireAuth } from '@/contexts/AuthContext';
 import AppLayout from '@/components/Layout/AppLayout';
-import AdvancedAnalysisDashboard from '@/components/AdvancedAnalysis/AdvancedAnalysisDashboard';
+import OpportunitiesDashboard from '@/components/AdvancedAnalysis/OpportunitiesDashboard';
 
 export default function OpportunitiesPage() {
   const { isAuthenticated, isLoading } = useRequireAuth();
@@ -37,12 +37,12 @@ export default function OpportunitiesPage() {
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h1 className="text-2xl font-bold text-gray-900">🎯 Opportunités</h1>
           <p className="mt-2 text-gray-600">
-            Découvrez les meilleures opportunités d'investissement basées sur nos analyses avancées
+            Découvrez les meilleures opportunités d'investissement basées sur l'analyse avancée et le machine learning
           </p>
         </div>
 
-        {/* Dashboard d'analyse avancée pour les opportunités */}
-        <AdvancedAnalysisDashboard />
+        {/* Dashboard des opportunités */}
+        <OpportunitiesDashboard />
       </div>
     </AppLayout>
   );

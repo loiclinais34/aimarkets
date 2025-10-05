@@ -2,7 +2,7 @@
  * Service API pour la gestion des portefeuilles
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
 // Types pour les portefeuilles
 export interface Wallet {
@@ -47,12 +47,17 @@ export interface Portfolio {
   status: 'active' | 'paused' | 'closed';
   risk_tolerance: 'CONSERVATIVE' | 'MODERATE' | 'AGGRESSIVE';
   initial_capital?: number;
+  current_value?: number;
+  total_invested?: number;
+  total_withdrawn?: number;
+  total_return?: number;
+  total_return_percentage?: number;
+  currency?: string;
+  auto_rebalance?: boolean;
   created_at: string;
   updated_at?: string;
   wallets?: Wallet[];
-  total_value?: number;
-  total_pnl?: number;
-  total_pnl_percent?: number;
+  positions?: Position[];
 }
 
 export interface CreatePortfolioRequest {
@@ -221,12 +226,22 @@ export async function deletePortfolio(portfolioId: number): Promise<void> {
   }
 }
 
-// ==================== INTERFACES POUR LES WALLETS ====================
+// ==================== INTERFACES POUR LES POSITIONS ====================
 
-export interface CreateWalletRequest {
-  name: string;
+export interface Position {
+  id: number;
+  symbol: string;
+  quantity: number;
+  average_cost: number;
+  current_price: number;
+  total_cost: number;
+  current_value: number;
+  unrealized_pnl: number;
+  unrealized_pnl_percentage: number;
+  realized_pnl: number;
   currency: string;
-  initial_balance?: number;
+  created_at: string;
+  updated_at: string;
 }
 
 

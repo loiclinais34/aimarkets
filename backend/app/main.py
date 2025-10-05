@@ -12,7 +12,7 @@ from .api.endpoints import trading
 from .api.endpoints.analysis import advanced_analysis, technical_analysis, sentiment_analysis, market_indicators, bubble_detection
 from .api.endpoints.search import screener, signals, advanced_signals
 from .api.endpoints.ml import ml_models, ml_backtesting, model_comparison, async_model_comparison, backtesting
-from .api.endpoints.data import data, data_update, financial_ratios, indicators, correlations
+from .api.endpoints.data import data, data_update, financial_ratios, indicators, correlations, latest_prices
 from .api.endpoints.management import symbol_metadata, target_parameters, trading_strategies, celery_management
 from .api.endpoints.symbols import router as symbols_router
 
@@ -264,6 +264,15 @@ app.include_router(
     symbols_router,
     prefix="/api/v1",
     tags=["Symboles et Métadonnées"]
+)
+
+# Import du router latest_prices
+from app.api.endpoints.data import latest_prices
+
+app.include_router(
+    latest_prices.router,
+    prefix="/api/v1",
+    tags=["Cours en Temps Réel"]
 )
 
 if __name__ == "__main__":

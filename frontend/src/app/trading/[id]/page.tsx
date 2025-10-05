@@ -8,6 +8,7 @@ import { getPortfolio } from '@/services/portfolioApi';
 import PositionCard from '@/components/Trading/PositionCard';
 import TradingModal from '@/components/Trading/TradingModal';
 import { formatCurrency } from '@/services/tradingApi';
+import AppLayout from '@/components/Layout/AppLayout';
 
 export default function TradingPage() {
   const params = useParams();
@@ -81,19 +82,23 @@ export default function TradingPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
+      <AppLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        </div>
+      </AppLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
-          {error}
+      <AppLayout>
+        <div className="container mx-auto px-4 py-8">
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+            {error}
+          </div>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
@@ -101,114 +106,115 @@ export default function TradingPage() {
   const totalPnL = positions.reduce((sum, pos) => sum + pos.unrealized_pnl, 0);
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Trading - {portfolio?.name}
-            </h1>
-            <p className="text-gray-600">Gestion des positions et du trading</p>
-          </div>
-          <button
-            onClick={() => handleBuy()}
-            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center space-x-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Acheter</span>
-          </button>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white p-4 rounded-lg shadow-sm border">
-            <p className="text-sm text-gray-600">Valeur totale</p>
-            <p className="text-2xl font-bold">{formatCurrency(totalValue, 'USD')}</p>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow-sm border">
-            <p className="text-sm text-gray-600">P&L Non Réalisé</p>
-            <p className={`text-2xl font-bold ${totalPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {totalPnL >= 0 ? '+' : ''}{formatCurrency(totalPnL, 'USD')}
-            </p>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow-sm border">
-            <p className="text-sm text-gray-600">Nombre de positions</p>
-            <p className="text-2xl font-bold">{positions.length}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="mb-6">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
+    <AppLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Trading - {portfolio?.name}
+              </h1>
+              <p className="text-gray-600">Gestion des positions et du trading</p>
+            </div>
             <button
-              onClick={() => setActiveTab('positions')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'positions'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+              onClick={() => handleBuy()}
+              className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center space-x-2"
             >
-              <TrendingUp className="w-4 h-4 inline mr-2" />
-              Positions ({positions.length})
+              <Plus className="w-4 h-4" />
+              <span>Acheter</span>
             </button>
-            <button
-              onClick={() => setActiveTab('history')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'history'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <History className="w-4 h-4 inline mr-2" />
-              Historique ({tradingHistory.length})
-            </button>
-          </nav>
-        </div>
-      </div>
+          </div>
 
-      {/* Content */}
-      {activeTab === 'positions' && (
-        <div>
-          {positions.length === 0 ? (
-            <div className="text-center py-12">
-              <TrendingUp className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Aucune position</h3>
-              <p className="text-gray-600 mb-4">Commencez par acheter des titres</p>
+          {/* Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm text-gray-600">Valeur totale</p>
+              <p className="text-2xl font-bold">{formatCurrency(totalValue, 'USD')}</p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm text-gray-600">P&L Non Réalisé</p>
+              <p className={`text-2xl font-bold ${totalPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {totalPnL >= 0 ? '+' : ''}{formatCurrency(totalPnL, 'USD')}
+              </p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm text-gray-600">Nombre de positions</p>
+              <p className="text-2xl font-bold">{positions.length}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
               <button
-                onClick={() => handleBuy()}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                onClick={() => setActiveTab('positions')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'positions'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
               >
-                Premier achat
+                <TrendingUp className="w-4 h-4 inline mr-2" />
+                Positions ({positions.length})
               </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {positions.map(position => (
-                <PositionCard
-                  key={position.id}
-                  position={position}
-                  onBuy={() => handleBuy(position)}
-                  onSell={() => handleSell(position)}
-                />
-              ))}
-            </div>
-          )}
+              <button
+                onClick={() => setActiveTab('history')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'history'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <History className="w-4 h-4 inline mr-2" />
+                Historique ({tradingHistory.length})
+              </button>
+            </nav>
+          </div>
         </div>
-      )}
 
-      {activeTab === 'history' && (
-        <div>
-          {tradingHistory.length === 0 ? (
-            <div className="text-center py-12">
-              <History className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun historique</h3>
-              <p className="text-gray-600">Vos transactions apparaîtront ici</p>
-            </div>
-          ) : (
-            <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+        {/* Content */}
+        {activeTab === 'positions' && (
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            {positions.length === 0 ? (
+              <div className="text-center py-12">
+                <TrendingUp className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Aucune position</h3>
+                <p className="text-gray-600 mb-4">Commencez par acheter des titres</p>
+                <button
+                  onClick={() => handleBuy()}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Premier achat
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {positions.map(position => (
+                  <PositionCard
+                    key={position.id}
+                    position={position}
+                    onBuy={() => handleBuy(position)}
+                    onSell={() => handleSell(position)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'history' && (
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            {tradingHistory.length === 0 ? (
+              <div className="text-center py-12">
+                <History className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun historique</h3>
+                <p className="text-gray-600">Vos transactions apparaîtront ici</p>
+              </div>
+            ) : (
+              <div className="overflow-hidden border border-gray-200 rounded-lg">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
@@ -275,20 +281,21 @@ export default function TradingPage() {
               </div>
             </div>
           )}
-        </div>
-      )}
+          </div>
+        )}
 
-      {/* Trading Modal */}
-      <TradingModal
-        isOpen={isTradingModalOpen}
-        onClose={closeTradingModal}
-        onSuccess={handleTradingSuccess}
-        portfolioId={portfolioId}
-        mode={tradingMode}
-        symbol={selectedPosition?.symbol}
-        currentPrice={selectedPosition?.current_price}
-        availableQuantity={selectedPosition?.quantity}
-      />
-    </div>
+        {/* Trading Modal */}
+        <TradingModal
+          isOpen={isTradingModalOpen}
+          onClose={closeTradingModal}
+          onSuccess={handleTradingSuccess}
+          portfolioId={portfolioId}
+          mode={tradingMode}
+          symbol={selectedPosition?.symbol}
+          currentPrice={selectedPosition?.current_price}
+          availableQuantity={selectedPosition?.quantity}
+        />
+      </div>
+    </AppLayout>
   );
 }

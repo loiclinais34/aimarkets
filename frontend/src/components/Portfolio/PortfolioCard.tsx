@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Portfolio } from '@/services/portfolioApi';
+import { usePortfolioValuation } from '@/hooks/usePortfolioValuation';
 
 interface PortfolioCardProps {
   portfolio: Portfolio;
@@ -16,6 +17,7 @@ export const PortfolioCard: React.FC<PortfolioCardProps> = ({
   onDelete,
   onViewDetails,
 }) => {
+  const valuation = usePortfolioValuation(portfolio);
   const getPortfolioTypeColor = (type: string) => {
     switch (type) {
       case 'personal':
@@ -106,40 +108,56 @@ export const PortfolioCard: React.FC<PortfolioCardProps> = ({
         </div>
       </div>
 
-      {portfolio.total_value !== undefined && (
-        <div className="mb-4">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">Valeur totale</span>
-            <span className="text-lg font-semibold text-gray-900">
-              {new Intl.NumberFormat('fr-FR', {
-                style: 'currency',
-                currency: 'EUR',
-              }).format(portfolio.total_value)}
-            </span>
+      {/* Valorisation en temps réel */}
+      <div className="mb-4">
+        {valuation.isLoading ? (
+          <div className="animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
           </div>
-          {portfolio.total_pnl !== undefined && (
+        ) : valuation.error ? (
+          <div className="text-red-600 text-sm">
+            ⚠️ Erreur de valorisation: {valuation.error}
+          </div>
+        ) : (
+          <>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-500">Valeur actuelle</span>
+              <span className="text-lg font-semibold text-gray-900">
+                {new Intl.NumberFormat('fr-FR', {
+                  style: 'currency',
+                  currency: 'EUR',
+                }).format(valuation.totalValue)}
+              </span>
+            </div>
             <div className="flex justify-between items-center mt-1">
-              <span className="text-sm text-gray-500">P&L</span>
+              <span className="text-sm text-gray-500">P&L non réalisé</span>
               <span
                 className={`text-sm font-medium ${
-                  portfolio.total_pnl >= 0 ? 'text-green-600' : 'text-red-600'
+                  valuation.totalPnL >= 0 ? 'text-green-600' : 'text-red-600'
                 }`}
               >
                 {new Intl.NumberFormat('fr-FR', {
                   style: 'currency',
                   currency: 'EUR',
-                }).format(portfolio.total_pnl)}
-                {portfolio.total_pnl_percent !== undefined && (
-                  <span className="ml-1">
-                    ({portfolio.total_pnl_percent >= 0 ? '+' : ''}
-                    {portfolio.total_pnl_percent.toFixed(2)}%)
-                  </span>
-                )}
+                }).format(valuation.totalPnL)}
+                <span className="ml-1">
+                  ({valuation.totalPnL >= 0 ? '+' : ''}
+                  {valuation.totalPnLPercent.toFixed(2)}%)
+                </span>
               </span>
             </div>
-          )}
-        </div>
-      )}
+            {valuation.positionsWithValuation.length > 0 && (
+              <div className="mt-2 text-xs text-gray-500">
+                <span>
+                  {valuation.positionsWithValuation.length} position{valuation.positionsWithValuation.length !== 1 ? 's' : ''} • 
+                  Mis à jour: {valuation.lastUpdated.toLocaleTimeString('fr-FR')}
+                </span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       <div className="flex justify-between items-center text-xs text-gray-500 mb-4">
         <span>

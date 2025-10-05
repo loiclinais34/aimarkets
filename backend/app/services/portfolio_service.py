@@ -18,6 +18,7 @@ from app.models.portfolios import (
 from app.models.wallets import Wallet, WalletType, WalletStatus, WalletTransaction, WalletTransactionType
 from app.models.users import User
 from app.services.authentication_service import AuthenticationService
+from app.services.latest_prices_service import LatestPricesService
 
 
 class PortfolioService:
@@ -26,6 +27,7 @@ class PortfolioService:
     def __init__(self, db: Session):
         self.db = db
         self.auth_service = AuthenticationService(db)
+        self.prices_service = LatestPricesService(db)
     
     # ==================== GESTION DES PORTEFEUILLES ====================
     
@@ -74,7 +76,7 @@ class PortfolioService:
         
         return portfolio
     
-    def get_portfolio_by_id(self, portfolio_id: int, user_id: Optional[int] = None) -> Optional[Portfolio]:
+    def get_portfolio_by_id(self, portfolio_id: int, user_id: Optional[int] = None, update_prices: bool = True) -> Optional[Portfolio]:
         """Récupère un portefeuille par son ID"""
         
         query = self.db.query(Portfolio).options(
@@ -86,7 +88,20 @@ class PortfolioService:
         if user_id:
             query = query.filter(Portfolio.user_id == user_id)
         
-        return query.filter(Portfolio.id == portfolio_id).first()
+        portfolio = query.filter(Portfolio.id == portfolio_id).first()
+        
+        # Mettre à jour les prix si demandé
+        if portfolio and update_prices and portfolio.positions:
+            try:
+                portfolio.positions = self.prices_service.update_positions_with_latest_prices(portfolio.positions)
+                # Recalculer la valorisation du portefeuille
+                self._update_portfolio_valuation(portfolio)
+            except Exception as e:
+                # En cas d'erreur, continuer sans mise à jour des prix
+                print(f"Erreur lors de la mise à jour des prix pour le portefeuille {portfolio.id}: {e}")
+                pass
+        
+        return portfolio
     
     def get_user_portfolios(
         self,
@@ -94,7 +109,8 @@ class PortfolioService:
         skip: int = 0,
         limit: int = 100,
         portfolio_type: Optional[PortfolioType] = None,
-        status: Optional[PortfolioStatus] = None
+        status: Optional[PortfolioStatus] = None,
+        update_prices: bool = True
     ) -> List[Portfolio]:
         """Récupère tous les portefeuilles d'un utilisateur"""
         
@@ -109,7 +125,22 @@ class PortfolioService:
         if status:
             query = query.filter(Portfolio.status == status)
         
-        return query.offset(skip).limit(limit).all()
+        portfolios = query.offset(skip).limit(limit).all()
+        
+        # Mettre à jour les prix si demandé
+        if update_prices:
+            for portfolio in portfolios:
+                if portfolio.positions:
+                    try:
+                        portfolio.positions = self.prices_service.update_positions_with_latest_prices(portfolio.positions)
+                        # Recalculer la valorisation du portefeuille
+                        self._update_portfolio_valuation(portfolio)
+                    except Exception as e:
+                        # En cas d'erreur, continuer sans mise à jour des prix
+                        print(f"Erreur lors de la mise à jour des prix pour le portefeuille {portfolio.id}: {e}")
+                        pass
+        
+        return portfolios
     
     def update_portfolio(
         self,
@@ -269,7 +300,7 @@ class PortfolioService:
         portfolio_id: int,
         symbol: str,
         quantity: Decimal,
-        average_buy_price: Decimal,
+        average_cost: Decimal,
         currency: str = "USD"
     ) -> Position:
         """Crée une nouvelle position"""
@@ -283,20 +314,20 @@ class PortfolioService:
             )
         
         # Calculer les valeurs initiales
-        cost_basis = quantity * average_buy_price
-        market_value = cost_basis  # Prix initial
+        total_cost = quantity * average_cost
+        current_value = total_cost  # Prix initial
         
         # Créer la position
         position = Position(
             portfolio_id=portfolio_id,
             symbol=symbol,
             quantity=quantity,
-            average_buy_price=average_buy_price,
-            current_price=average_buy_price,
-            cost_basis=cost_basis,
-            market_value=market_value,
+            average_cost=average_cost,
+            current_price=average_cost,
+            total_cost=total_cost,
+            current_value=current_value,
             unrealized_pnl=Decimal('0.00'),
-            unrealized_pnl_percent=Decimal('0.00'),
+            unrealized_pnl_percentage=Decimal('0.00'),
             currency=currency
         )
         
@@ -332,12 +363,12 @@ class PortfolioService:
         
         # Mettre à jour le prix et recalculer les valeurs
         position.current_price = new_price
-        position.market_value = position.quantity * new_price
-        position.unrealized_pnl = position.market_value - position.cost_basis
+        position.current_value = position.quantity * new_price
+        position.unrealized_pnl = position.current_value - position.total_cost
         
-        if position.cost_basis > 0:
-            position.unrealized_pnl_percent = (
-                position.unrealized_pnl / position.cost_basis
+        if position.total_cost > 0:
+            position.unrealized_pnl_percentage = (
+                position.unrealized_pnl / position.total_cost
             ) * 100
         
         position.updated_at = datetime.utcnow()
@@ -358,22 +389,22 @@ class PortfolioService:
             return False
         
         # Calculer la nouvelle moyenne pondérée
-        total_cost = (position.quantity * position.average_buy_price) + (
+        total_cost = (position.quantity * position.average_cost) + (
             additional_quantity * purchase_price
         )
         total_quantity = position.quantity + additional_quantity
         
         # Mettre à jour la position
         position.quantity = total_quantity
-        position.average_buy_price = total_cost / total_quantity
-        position.cost_basis = total_cost
+        position.average_cost = total_cost / total_quantity
+        position.total_cost = total_cost
         position.current_price = purchase_price
-        position.market_value = total_quantity * purchase_price
-        position.unrealized_pnl = position.market_value - position.cost_basis
+        position.current_value = total_quantity * purchase_price
+        position.unrealized_pnl = position.current_value - position.total_cost
         
-        if position.cost_basis > 0:
-            position.unrealized_pnl_percent = (
-                position.unrealized_pnl / position.cost_basis
+        if position.total_cost > 0:
+            position.unrealized_pnl_percentage = (
+                position.unrealized_pnl / position.total_cost
             ) * 100
         
         position.updated_at = datetime.utcnow()
@@ -400,26 +431,26 @@ class PortfolioService:
             )
         
         # Calculer le P&L réalisé
-        realized_pnl = (sell_price - position.average_buy_price) * sell_quantity
+        realized_pnl = (sell_price - position.average_cost) * sell_quantity
         
         # Mettre à jour la position
         position.quantity -= sell_quantity
-        position.cost_basis -= (position.average_buy_price * sell_quantity)
+        position.total_cost -= (position.average_cost * sell_quantity)
         position.current_price = sell_price
-        position.market_value = position.quantity * sell_price
+        position.current_value = position.quantity * sell_price
         position.realized_pnl += realized_pnl
         
         # Recalculer le P&L non réalisé
         if position.quantity > 0:
-            position.unrealized_pnl = position.market_value - position.cost_basis
-            if position.cost_basis > 0:
-                position.unrealized_pnl_percent = (
-                    position.unrealized_pnl / position.cost_basis
+            position.unrealized_pnl = position.current_value - position.total_cost
+            if position.total_cost > 0:
+                position.unrealized_pnl_percentage = (
+                    position.unrealized_pnl / position.total_cost
                 ) * 100
         else:
             # Position fermée
             position.unrealized_pnl = Decimal('0.00')
-            position.unrealized_pnl_percent = Decimal('0.00')
+            position.unrealized_pnl_percentage = Decimal('0.00')
         
         position.updated_at = datetime.utcnow()
         
@@ -439,8 +470,8 @@ class PortfolioService:
         positions = self.get_portfolio_positions(portfolio_id)
         
         # Calculer les totaux
-        total_cost_basis = sum(pos.cost_basis for pos in positions)
-        total_market_value = sum(pos.market_value for pos in positions)
+        total_cost_basis = sum(pos.total_cost for pos in positions)
+        total_market_value = sum(pos.current_value for pos in positions)
         total_unrealized_pnl = sum(pos.unrealized_pnl for pos in positions)
         total_realized_pnl = sum(pos.realized_pnl for pos in positions)
         
@@ -651,3 +682,37 @@ class PortfolioService:
         )
         
         return transactions
+    
+    # ==================== MÉTHODES PRIVÉES ====================
+    
+    def _update_portfolio_valuation(self, portfolio: Portfolio) -> None:
+        """
+        Met à jour la valorisation d'un portefeuille basée sur ses positions
+        
+        Args:
+            portfolio: Portefeuille à mettre à jour
+        """
+        if not portfolio.positions:
+            return
+        
+        # Calculer la valeur totale des positions
+        total_positions_value = sum(
+            position.current_value for position in portfolio.positions 
+            if hasattr(position, 'current_value') and position.current_value
+        )
+        
+        # Calculer le cash total des wallets
+        total_cash = sum(
+            wallet.total_balance for wallet in portfolio.wallets
+            if hasattr(wallet, 'total_balance') and wallet.total_balance
+        )
+        
+        # Mettre à jour la valeur totale du portefeuille
+        portfolio.current_value = total_positions_value + total_cash
+        
+        # Calculer les rendements
+        if portfolio.initial_capital and portfolio.initial_capital > 0:
+            portfolio.total_return = portfolio.current_value - portfolio.initial_capital
+            portfolio.total_return_percentage = (
+                portfolio.total_return / portfolio.initial_capital
+            ) * 100

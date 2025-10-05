@@ -1,13 +1,27 @@
 // frontend/src/app/advanced-analysis/page.tsx
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useRequireAuth } from '@/contexts/AuthContext';
 import AppLayout from '@/components/Layout/AppLayout';
-import AdvancedAnalysisDashboard from '@/components/AdvancedAnalysis/AdvancedAnalysisDashboard';
+import DynamicSymbolSelector from '@/components/AdvancedAnalysis/DynamicSymbolSelector';
+import AnalysisDetailsView from '@/components/AdvancedAnalysis/AnalysisDetailsView';
 
 const AdvancedAnalysisPage: React.FC = () => {
   const { isAuthenticated, isLoading } = useRequireAuth();
+  const [selectedSymbol, setSelectedSymbol] = useState<string>('');
+  const [selectedCompany, setSelectedCompany] = useState<string>('');
+  const [showAnalysisDetails, setShowAnalysisDetails] = useState<boolean>(false);
+
+  const handleSymbolSelect = (symbol: string, companyName: string) => {
+    setSelectedSymbol(symbol);
+    setSelectedCompany(companyName);
+    setShowAnalysisDetails(true);
+  };
+
+  const handleBackToSelection = () => {
+    setShowAnalysisDetails(false);
+  };
 
   if (isLoading) {
     return (
@@ -27,6 +41,22 @@ const AdvancedAnalysisPage: React.FC = () => {
     return null;
   }
 
+  // Si un symbole est sélectionné, afficher les analyses détaillées
+  if (showAnalysisDetails && selectedSymbol) {
+    return (
+      <AppLayout>
+        <AnalysisDetailsView
+          symbol={selectedSymbol}
+          companyName={selectedCompany}
+          showBackButton={true}
+          onBack={handleBackToSelection}
+          initialTab="technical"
+        />
+      </AppLayout>
+    );
+  }
+
+  // Page de sélection de symbole
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -34,12 +64,40 @@ const AdvancedAnalysisPage: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h1 className="text-2xl font-bold text-gray-900">📈 Analyses Avancées</h1>
           <p className="mt-2 text-gray-600">
-            Analysez les opportunités d'investissement avec nos outils d'analyse avancés
+            Analysez n'importe quel titre avec nos outils d'analyse avancés (technique, sentiment, marché, bulle)
           </p>
         </div>
 
-        {/* Dashboard d'analyse avancée */}
-        <AdvancedAnalysisDashboard />
+        {/* Sélecteur de symboles */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            Sélection du Titre à Analyser
+          </h2>
+          <DynamicSymbolSelector 
+            onSymbolSelect={handleSymbolSelect}
+            placeholder="Rechercher un symbole ou une entreprise (ex: AAPL, Apple, Microsoft)"
+            className="mb-4"
+          />
+          
+          {selectedSymbol && !showAnalysisDetails && (
+            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-green-600 text-white rounded-lg flex items-center justify-center font-bold text-lg">
+                    {selectedSymbol.charAt(0)}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{selectedSymbol}</h3>
+                    <p className="text-sm text-gray-600">{selectedCompany}</p>
+                  </div>
+                </div>
+                <div className="text-sm text-green-700">
+                  ✅ Prêt pour l'analyse
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </AppLayout>
   );

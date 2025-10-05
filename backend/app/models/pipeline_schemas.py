@@ -19,3 +19,6 @@ class OpportunitiesAnalysisRequest(BaseModel):
     """Requête pour l'analyse des opportunités"""
     symbols: List[str] = Field(..., description="Liste des symboles à analyser")
 
+
+
+
