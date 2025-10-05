@@ -179,18 +179,18 @@ class PositionService:
     ) -> Position:
         """Crée une nouvelle position"""
         
-        cost_basis = quantity * price
+        total_cost = quantity * price
         
         position = Position(
             portfolio_id=portfolio_id,
             symbol=symbol,
             quantity=quantity,
-            average_buy_price=price,
+            average_cost=price,
             current_price=price,
-            cost_basis=cost_basis,
-            market_value=cost_basis,
+            total_cost=total_cost,
+            current_value=total_cost,
             unrealized_pnl=Decimal('0.00'),
-            unrealized_pnl_percent=Decimal('0.00'),
+            unrealized_pnl_percentage=Decimal('0.00'),
             currency=currency
         )
         
@@ -203,22 +203,22 @@ class PositionService:
         """Ajoute des titres à une position existante"""
         
         # Calculer la nouvelle moyenne pondérée
-        total_cost = (position.quantity * position.average_buy_price) + (
+        total_cost = (position.quantity * position.average_cost) + (
             quantity * price
         )
         total_quantity = position.quantity + quantity
         
         # Mettre à jour la position
         position.quantity = total_quantity
-        position.average_buy_price = total_cost / total_quantity
-        position.cost_basis = total_cost
+        position.average_cost = total_cost / total_quantity
+        position.total_cost = total_cost
         position.current_price = price
-        position.market_value = total_quantity * price
-        position.unrealized_pnl = position.market_value - position.cost_basis
+        position.current_value = total_quantity * price
+        position.unrealized_pnl = position.current_value - position.total_cost
         
-        if position.cost_basis > 0:
-            position.unrealized_pnl_percent = (
-                position.unrealized_pnl / position.cost_basis
+        if position.total_cost > 0:
+            position.unrealized_pnl_percentage = (
+                position.unrealized_pnl / position.total_cost
             ) * 100
         
         position.updated_at = datetime.utcnow()
@@ -227,26 +227,26 @@ class PositionService:
         """Réduit une position et calcule le P&L réalisé"""
         
         # Calculer le P&L réalisé
-        realized_pnl = (price - position.average_buy_price) * quantity
+        realized_pnl = (price - position.average_cost) * quantity
         
         # Mettre à jour la position
         position.quantity -= quantity
-        position.cost_basis -= (position.average_buy_price * quantity)
+        position.total_cost -= (position.average_cost * quantity)
         position.current_price = price
-        position.market_value = position.quantity * price
+        position.current_value = position.quantity * price
         position.realized_pnl += realized_pnl
         
         # Recalculer le P&L non réalisé
         if position.quantity > 0:
-            position.unrealized_pnl = position.market_value - position.cost_basis
-            if position.cost_basis > 0:
-                position.unrealized_pnl_percent = (
-                    position.unrealized_pnl / position.cost_basis
+            position.unrealized_pnl = position.current_value - position.total_cost
+            if position.total_cost > 0:
+                position.unrealized_pnl_percentage = (
+                    position.unrealized_pnl / position.total_cost
                 ) * 100
         else:
             # Position fermée
             position.unrealized_pnl = Decimal('0.00')
-            position.unrealized_pnl_percent = Decimal('0.00')
+            position.unrealized_pnl_percentage = Decimal('0.00')
         
         position.updated_at = datetime.utcnow()
         
@@ -325,12 +325,12 @@ class PositionService:
             if position:
                 # Mettre à jour le prix et recalculer les valeurs
                 position.current_price = new_price
-                position.market_value = position.quantity * new_price
-                position.unrealized_pnl = position.market_value - position.cost_basis
+                position.current_value = position.quantity * new_price
+                position.unrealized_pnl = position.current_value - position.total_cost
                 
-                if position.cost_basis > 0:
-                    position.unrealized_pnl_percent = (
-                        position.unrealized_pnl / position.cost_basis
+                if position.total_cost > 0:
+                    position.unrealized_pnl_percentage = (
+                        position.unrealized_pnl / position.total_cost
                     ) * 100
                 
                 position.updated_at = datetime.utcnow()
@@ -350,7 +350,7 @@ class PositionService:
             return False, None
         
         # Calculer le P&L total
-        total_realized_pnl = (sell_price - position.average_buy_price) * position.quantity
+        total_realized_pnl = (sell_price - position.average_cost) * position.quantity
         
         # Créer la transaction de vente
         transaction = self._create_position_transaction(
@@ -360,9 +360,9 @@ class PositionService:
         # Mettre à jour la position
         position.quantity = Decimal('0.00')
         position.current_price = sell_price
-        position.market_value = Decimal('0.00')
+        position.current_value = Decimal('0.00')
         position.unrealized_pnl = Decimal('0.00')
-        position.unrealized_pnl_percent = Decimal('0.00')
+        position.unrealized_pnl_percentage = Decimal('0.00')
         position.realized_pnl += total_realized_pnl
         position.updated_at = datetime.utcnow()
         
@@ -442,29 +442,29 @@ class PositionService:
         
         # Calculer les métriques de base
         current_value = position.quantity * position.current_price
-        unrealized_pnl = current_value - position.cost_basis
-        unrealized_pnl_percent = 0
+        unrealized_pnl = current_value - position.total_cost
+        unrealized_pnl_percentage = 0
         
-        if position.cost_basis > 0:
-            unrealized_pnl_percent = (unrealized_pnl / position.cost_basis) * 100
+        if position.total_cost > 0:
+            unrealized_pnl_percentage = (unrealized_pnl / position.total_cost) * 100
         
         # Calculer le rendement total (réalisé + non réalisé)
         total_pnl = position.realized_pnl + unrealized_pnl
         total_return_percent = 0
         
-        if position.cost_basis > 0:
-            total_return_percent = (total_pnl / position.cost_basis) * 100
+        if position.total_cost > 0:
+            total_return_percent = (total_pnl / position.total_cost) * 100
         
         return {
             "position_id": position_id,
             "symbol": position.symbol,
             "quantity": position.quantity,
-            "average_buy_price": position.average_buy_price,
+            "average_buy_price": position.average_cost,
             "current_price": position.current_price,
-            "cost_basis": position.cost_basis,
+            "cost_basis": position.total_cost,
             "current_value": current_value,
             "unrealized_pnl": unrealized_pnl,
-            "unrealized_pnl_percent": unrealized_pnl_percent,
+            "unrealized_pnl_percent": unrealized_pnl_percentage,
             "realized_pnl": position.realized_pnl,
             "total_pnl": total_pnl,
             "total_return_percent": total_return_percent
@@ -479,14 +479,14 @@ class PositionService:
             return {
                 "total_positions": 0,
                 "total_value": Decimal('0.00'),
-                "total_cost_basis": Decimal('0.00'),
+                "total_cost": Decimal('0.00'),
                 "total_pnl": Decimal('0.00'),
                 "winning_positions": 0,
                 "losing_positions": 0
             }
         
-        total_value = sum(pos.market_value for pos in positions)
-        total_cost_basis = sum(pos.cost_basis for pos in positions)
+        total_value = sum(pos.current_value for pos in positions)
+        total_cost = sum(pos.total_cost for pos in positions)
         total_unrealized_pnl = sum(pos.unrealized_pnl for pos in positions)
         total_realized_pnl = sum(pos.realized_pnl for pos in positions)
         total_pnl = total_unrealized_pnl + total_realized_pnl
@@ -497,7 +497,7 @@ class PositionService:
         return {
             "total_positions": len(positions),
             "total_value": total_value,
-            "total_cost_basis": total_cost_basis,
+            "total_cost": total_cost,
             "total_unrealized_pnl": total_unrealized_pnl,
             "total_realized_pnl": total_realized_pnl,
             "total_pnl": total_pnl,
