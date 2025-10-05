@@ -2,7 +2,7 @@
  * Service API pour la gestion des portefeuilles
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 // Types pour les portefeuilles
 export interface Wallet {
@@ -105,7 +105,7 @@ export async function getPortfolios(): Promise<Portfolio[]> {
   try {
     const headers = getAuthHeaders();
     console.log('DEBUG: Headers being sent:', headers);
-    const response = await fetch(`${API_BASE_URL}/portfolios`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/`, {
       method: 'GET',
       headers,
     });
@@ -126,7 +126,7 @@ export async function getPortfolios(): Promise<Portfolio[]> {
 
 export async function getPortfolio(portfolioId: number): Promise<Portfolio> {
   try {
-    const response = await fetch(`${API_BASE_URL}/portfolios/${portfolioId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/${portfolioId}`, {
       method: 'GET',
       headers: getAuthHeaders(),
     });
@@ -144,7 +144,7 @@ export async function getPortfolio(portfolioId: number): Promise<Portfolio> {
 
 export async function createPortfolio(portfolioData: CreatePortfolioRequest): Promise<Portfolio> {
   try {
-    const response = await fetch(`${API_BASE_URL}/portfolios`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(portfolioData),
@@ -167,7 +167,7 @@ export async function updatePortfolio(
   portfolioData: UpdatePortfolioRequest
 ): Promise<Portfolio> {
   try {
-    const response = await fetch(`${API_BASE_URL}/portfolios/${portfolioId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/${portfolioId}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(portfolioData),
@@ -187,7 +187,7 @@ export async function updatePortfolio(
 
 export async function deletePortfolio(portfolioId: number): Promise<void> {
   try {
-    const response = await fetch(`${API_BASE_URL}/portfolios/${portfolioId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/${portfolioId}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -212,7 +212,7 @@ export async function createWalletTransaction(
   try {
     console.log('DEBUG: Données de transaction envoyées:', transactionData);
     
-    const response = await fetch(`${API_BASE_URL}/portfolios/${portfolioId}/wallets/${walletId}/transactions`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/${portfolioId}/wallets/${walletId}/transactions`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(transactionData),
@@ -240,7 +240,7 @@ export async function getWalletTransactions(
   skip: number = 0
 ): Promise<WalletTransaction[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/portfolios/${portfolioId}/wallets/${walletId}/transactions?limit=${limit}&skip=${skip}`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/${portfolioId}/wallets/${walletId}/transactions?limit=${limit}&skip=${skip}`, {
       method: 'GET',
       headers: getAuthHeaders(),
     });
@@ -264,7 +264,7 @@ export async function createWallet(
   walletData: CreateWalletRequest
 ): Promise<Wallet> {
   try {
-    const response = await fetch(`${API_BASE_URL}/portfolios/${portfolioId}/wallets`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/${portfolioId}/wallets`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(walletData),
@@ -288,7 +288,7 @@ export async function updateWallet(
   walletData: Partial<CreateWalletRequest>
 ): Promise<Wallet> {
   try {
-    const response = await fetch(`${API_BASE_URL}/portfolios/${portfolioId}/wallets/${walletId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/${portfolioId}/wallets/${walletId}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(walletData),
@@ -308,7 +308,7 @@ export async function updateWallet(
 
 export async function deleteWallet(portfolioId: number, walletId: number): Promise<void> {
   try {
-    const response = await fetch(`${API_BASE_URL}/portfolios/${portfolioId}/wallets/${walletId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/${portfolioId}/wallets/${walletId}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -330,7 +330,7 @@ export async function getPortfolioPerformance(
   period?: string
 ): Promise<PortfolioPerformance[]> {
   try {
-    const url = new URL(`${API_BASE_URL}/portfolios/${portfolioId}/performance`);
+    const url = new URL(`${API_BASE_URL}/api/v1/portfolios/${portfolioId}/performance`);
     if (period) {
       url.searchParams.append('period', period);
     }
@@ -355,7 +355,7 @@ export async function getPortfolioPerformance(
 
 export async function getPortfolioSummary(portfolioId: number) {
   try {
-    const response = await fetch(`${API_BASE_URL}/portfolios/${portfolioId}/summary`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/${portfolioId}/summary`, {
       method: 'GET',
       headers: getAuthHeaders(),
     });
