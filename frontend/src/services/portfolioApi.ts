@@ -301,31 +301,6 @@ export async function getWalletTransactions(
   }
 }
 
-// ==================== GESTION DES WALLETS ====================
-
-export async function createWallet(
-  portfolioId: number,
-  walletData: CreateWalletRequest
-): Promise<Wallet> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios/${portfolioId}/wallets`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(walletData),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Erreur ${response.status}: ${response.statusText}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Erreur lors de la création du wallet:', error);
-    throw error;
-  }
-}
-
 export async function updateWallet(
   portfolioId: number,
   walletId: number,
