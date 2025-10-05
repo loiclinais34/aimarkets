@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
 export interface Symbol {
   symbol: string;
@@ -22,7 +22,7 @@ class SymbolsApi {
   private baseURL: string;
 
   constructor() {
-    this.baseURL = `${API_BASE_URL}/api/v1`;
+    this.baseURL = API_BASE_URL;
   }
 
   private async makeRequest<T>(url: string): Promise<T> {
