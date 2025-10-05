@@ -115,12 +115,19 @@ export async function getPricesMap(symbols: string[]): Promise<Record<string, nu
     const pricesMap: Record<string, number> = {};
     
     response.prices.forEach(price => {
-      pricesMap[price.symbol] = price.price;
+      // Vérifier que le prix est valide (nombre fini)
+      const safePrice = isNaN(price.price) || !isFinite(price.price) ? 0 : Number(price.price);
+      pricesMap[price.symbol] = safePrice;
     });
     
     return pricesMap;
   } catch (error) {
     console.error('Erreur lors de la création du dictionnaire de prix:', error);
-    throw error;
+    // Retourner un objet vide avec des prix à 0 en cas d'erreur
+    const fallbackPricesMap: Record<string, number> = {};
+    symbols.forEach(symbol => {
+      fallbackPricesMap[symbol] = 0;
+    });
+    return fallbackPricesMap;
   }
 }

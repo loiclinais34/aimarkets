@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Position, getPositions } from '@/services/tradingApi';
 import PositionCard from './PositionCard';
+import PositionTable from './PositionTable';
 import TradingModal from '@/components/Trading/TradingModal';
 
 interface PositionListProps {
@@ -14,6 +15,7 @@ export default function PositionList({ portfolioId, onRefresh }: PositionListPro
   const [positions, setPositions] = useState<Position[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
   const [buySellModal, setBuySellModal] = useState<{
     isOpen: boolean;
     mode: 'buy' | 'sell';
@@ -128,15 +130,46 @@ export default function PositionList({ portfolioId, onRefresh }: PositionListPro
             {positions.length} position{positions.length !== 1 ? 's' : ''} trouvée{positions.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <button
-          onClick={handleBuyOrder}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Acheter des titres
-        </button>
+        <div className="flex items-center space-x-3">
+          {/* Toggle View Mode */}
+          <div className="flex bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('table')}
+              className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                viewMode === 'table'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0V4a1 1 0 011-1h16a1 1 0 011 1v16a1 1 0 01-1 1H5a1 1 0 01-1-1z" />
+              </svg>
+              Tableau
+            </button>
+            <button
+              onClick={() => setViewMode('cards')}
+              className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                viewMode === 'cards'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+              </svg>
+              Cartes
+            </button>
+          </div>
+          <button
+            onClick={handleBuyOrder}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Acheter des titres
+          </button>
+        </div>
       </div>
 
-      {/* Positions Grid */}
+      {/* Positions Display */}
       {positions.length === 0 ? (
         <div className="text-center py-12">
           <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -158,6 +191,12 @@ export default function PositionList({ portfolioId, onRefresh }: PositionListPro
             </button>
           </div>
         </div>
+      ) : viewMode === 'table' ? (
+        <PositionTable
+          positions={positions}
+          onViewDetails={handleViewDetails}
+          onEdit={(position) => handleSellOrder(position)}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {positions.map((position) => (

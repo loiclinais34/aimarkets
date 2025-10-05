@@ -41,10 +41,11 @@ export function usePortfolioValuation(portfolio: Portfolio): PortfolioValuation 
 
   const calculateValuation = useCallback(async () => {
     if (!portfolio.positions || portfolio.positions.length === 0) {
+      // Pas de positions = P&L à 0
       setValuation(prev => ({
         ...prev,
-        totalValue: portfolio.initial_capital || 0,
-        totalCost: portfolio.initial_capital || 0,
+        totalValue: 0,
+        totalCost: 0,
         totalPnL: 0,
         totalPnLPercent: 0,
         positionsWithValuation: [],
@@ -66,25 +67,44 @@ export function usePortfolioValuation(portfolio: Portfolio): PortfolioValuation 
       // Calculer la valorisation pour chaque position
       const positionsWithValuation: PositionWithValuation[] = portfolio.positions.map(position => {
         const currentPrice = pricesMap[position.symbol] || position.current_price || 0;
-        const currentValuation = position.quantity * currentPrice;
-        const pnl = currentValuation - position.total_cost;
-        const pnlPercent = position.total_cost > 0 ? (pnl / position.total_cost) * 100 : 0;
+        const safeCurrentPrice = isNaN(currentPrice) || !isFinite(currentPrice) ? 0 : Number(currentPrice);
+        const safeQuantity = isNaN(position.quantity) || !isFinite(position.quantity) ? 0 : Number(position.quantity);
+        const safeAverageCost = isNaN(position.average_cost) || !isFinite(position.average_cost) ? 0 : Number(position.average_cost);
+        
+        // Si total_cost est manquant ou 0, le calculer à partir de quantity * average_cost
+        let safeTotalCost = isNaN(position.total_cost) || !isFinite(position.total_cost) ? 0 : Number(position.total_cost);
+        
+        // Si total_cost est manquant ou 0, le calculer à partir de quantity * average_cost
+        if (safeTotalCost === 0 && safeQuantity > 0 && safeAverageCost > 0) {
+          safeTotalCost = safeQuantity * safeAverageCost;
+        }
+        
+        const currentValuation = safeQuantity * safeCurrentPrice;
+        const pnl = currentValuation - safeTotalCost;
+        const pnlPercent = safeTotalCost > 0 ? (pnl / safeTotalCost) * 100 : 0;
 
         return {
           ...position,
-          currentValuation,
-          pnl,
-          pnlPercent,
-          lastPrice: currentPrice,
+          currentValuation: isNaN(currentValuation) ? 0 : currentValuation,
+          pnl: isNaN(pnl) ? 0 : pnl,
+          pnlPercent: isNaN(pnlPercent) ? 0 : pnlPercent,
+          lastPrice: safeCurrentPrice,
           lastPriceDate: new Date().toISOString(),
+          // Mettre à jour total_cost pour la cohérence
+          total_cost: safeTotalCost,
         };
       });
 
       // Calculer les totaux
-      const totalValue = positionsWithValuation.reduce((sum, pos) => sum + pos.currentValuation, 0);
-      const totalCost = positionsWithValuation.reduce((sum, pos) => sum + pos.total_cost, 0);
+      const totalValue = positionsWithValuation.reduce((sum, pos) => sum + (isNaN(pos.currentValuation) ? 0 : pos.currentValuation), 0);
+      
+      // Calculer le coût total des positions (ce qui a été réellement payé pour les titres)
+      const totalCost = positionsWithValuation.reduce((sum, pos) => sum + (isNaN(pos.total_cost) ? 0 : pos.total_cost), 0);
+      
+      // Le P&L est la différence entre la valorisation actuelle et le coût d'achat
       const totalPnL = totalValue - totalCost;
       const totalPnLPercent = totalCost > 0 ? (totalPnL / totalCost) * 100 : 0;
+      
 
       setValuation({
         portfolio,
@@ -151,11 +171,12 @@ export function usePortfoliosValuation(portfolios: Portfolio[]): PortfolioValuat
       for (let i = 0; i < portfolios.length; i++) {
         const portfolio = portfolios[i];
         if (!portfolio.positions || portfolio.positions.length === 0) {
+          // Pas de positions = P&L à 0
           setValuations(prev => prev.map((val, idx) => 
             idx === i ? {
               ...val,
-              totalValue: portfolio.initial_capital || 0,
-              totalCost: portfolio.initial_capital || 0,
+              totalValue: 0,
+              totalCost: 0,
               totalPnL: 0,
               totalPnLPercent: 0,
               positionsWithValuation: [],
@@ -176,22 +197,40 @@ export function usePortfoliosValuation(portfolios: Portfolio[]): PortfolioValuat
           
           const positionsWithValuation: PositionWithValuation[] = portfolio.positions.map(position => {
             const currentPrice = pricesMap[position.symbol] || position.current_price || 0;
-            const currentValuation = position.quantity * currentPrice;
-            const pnl = currentValuation - position.total_cost;
-            const pnlPercent = position.total_cost > 0 ? (pnl / position.total_cost) * 100 : 0;
+            const safeCurrentPrice = isNaN(currentPrice) || !isFinite(currentPrice) ? 0 : Number(currentPrice);
+            const safeQuantity = isNaN(position.quantity) || !isFinite(position.quantity) ? 0 : Number(position.quantity);
+            const safeAverageCost = isNaN(position.average_cost) || !isFinite(position.average_cost) ? 0 : Number(position.average_cost);
+            
+            // Si total_cost est manquant ou 0, le calculer à partir de quantity * average_cost
+            let safeTotalCost = isNaN(position.total_cost) || !isFinite(position.total_cost) ? 0 : Number(position.total_cost);
+            
+            // Si total_cost est manquant ou 0, le calculer à partir de quantity * average_cost
+            if (safeTotalCost === 0 && safeQuantity > 0 && safeAverageCost > 0) {
+              safeTotalCost = safeQuantity * safeAverageCost;
+            }
+            
+            const currentValuation = safeQuantity * safeCurrentPrice;
+            const pnl = currentValuation - safeTotalCost;
+            const pnlPercent = safeTotalCost > 0 ? (pnl / safeTotalCost) * 100 : 0;
 
             return {
               ...position,
-              currentValuation,
-              pnl,
-              pnlPercent,
-              lastPrice: currentPrice,
+              currentValuation: isNaN(currentValuation) ? 0 : currentValuation,
+              pnl: isNaN(pnl) ? 0 : pnl,
+              pnlPercent: isNaN(pnlPercent) ? 0 : pnlPercent,
+              lastPrice: safeCurrentPrice,
               lastPriceDate: new Date().toISOString(),
+              // Mettre à jour total_cost pour la cohérence
+              total_cost: safeTotalCost,
             };
           });
 
-          const totalValue = positionsWithValuation.reduce((sum, pos) => sum + pos.currentValuation, 0);
-          const totalCost = positionsWithValuation.reduce((sum, pos) => sum + pos.total_cost, 0);
+          const totalValue = positionsWithValuation.reduce((sum, pos) => sum + (isNaN(pos.currentValuation) ? 0 : pos.currentValuation), 0);
+          
+          // Calculer le coût total des positions (ce qui a été réellement payé pour les titres)
+          const totalCost = positionsWithValuation.reduce((sum, pos) => sum + (isNaN(pos.total_cost) ? 0 : pos.total_cost), 0);
+          
+          // Le P&L est la différence entre la valorisation actuelle et le coût d'achat
           const totalPnL = totalValue - totalCost;
           const totalPnLPercent = totalCost > 0 ? (totalPnL / totalCost) * 100 : 0;
 

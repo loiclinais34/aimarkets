@@ -77,12 +77,12 @@ class PositionResponse(BaseModel):
     id: int
     symbol: str
     quantity: Decimal
-    average_buy_price: Decimal
+    average_cost: Decimal
     current_price: Decimal
-    cost_basis: Decimal
-    market_value: Decimal
+    total_cost: Decimal
+    current_value: Decimal
     unrealized_pnl: Decimal
-    unrealized_pnl_percent: Decimal
+    unrealized_pnl_percentage: Decimal
     realized_pnl: Decimal
     currency: str
     created_at: str
@@ -119,8 +119,8 @@ class PortfolioListResponse(BaseModel):
 
 class PortfolioPerformanceResponse(BaseModel):
     portfolio_id: int
-    total_cost_basis: Decimal
-    total_market_value: Decimal
+    total_cost: Decimal
+    total_value: Decimal
     total_cash: Decimal
     portfolio_value: Decimal
     total_unrealized_pnl: Decimal
@@ -198,12 +198,12 @@ async def create_portfolio(
                     id=position.id,
                     symbol=position.symbol,
                     quantity=position.quantity,
-                    average_buy_price=position.average_cost,
+                    average_cost=position.average_cost,
                     current_price=position.current_price,
-                    cost_basis=position.total_cost,
-                    market_value=position.current_value,
+                    total_cost=position.total_cost,
+                    current_value=position.current_value,
                     unrealized_pnl=position.unrealized_pnl,
-                    unrealized_pnl_percent=position.unrealized_pnl_percentage,
+                    unrealized_pnl_percentage=position.unrealized_pnl_percentage,
                     realized_pnl=position.realized_pnl,
                     currency=position.currency,
                     created_at=position.created_at.isoformat(),
@@ -280,12 +280,12 @@ async def get_portfolios(
                         id=position.id,
                         symbol=position.symbol,
                         quantity=position.quantity,
-                        average_buy_price=position.average_cost,
+                        average_cost=position.average_cost,
                         current_price=position.current_price,
-                        cost_basis=position.total_cost,
-                        market_value=position.current_value,
+                        total_cost=position.total_cost,
+                        current_value=position.current_value,
                         unrealized_pnl=position.unrealized_pnl,
-                        unrealized_pnl_percent=position.unrealized_pnl_percentage,
+                        unrealized_pnl_percentage=position.unrealized_pnl_percentage,
                         realized_pnl=position.realized_pnl,
                         currency=position.currency,
                         created_at=position.created_at.isoformat(),
@@ -354,12 +354,12 @@ async def get_portfolio(
                 id=position.id,
                 symbol=position.symbol,
                 quantity=position.quantity,
-                average_buy_price=position.average_cost,
+                average_cost=position.average_cost,
                 current_price=position.current_price,
-                cost_basis=position.total_cost,
-                market_value=position.current_value,
+                total_cost=position.total_cost,
+                current_value=position.current_value,
                 unrealized_pnl=position.unrealized_pnl,
-                unrealized_pnl_percent=position.unrealized_pnl_percentage,
+                unrealized_pnl_percentage=position.unrealized_pnl_percentage,
                 realized_pnl=position.realized_pnl,
                 currency=position.currency,
                 created_at=position.created_at.isoformat(),
@@ -436,12 +436,12 @@ async def update_portfolio(
                     id=position.id,
                     symbol=position.symbol,
                     quantity=position.quantity,
-                    average_buy_price=position.average_cost,
+                    average_cost=position.average_cost,
                     current_price=position.current_price,
-                    cost_basis=position.total_cost,
-                    market_value=position.current_value,
+                    total_cost=position.total_cost,
+                    current_value=position.current_value,
                     unrealized_pnl=position.unrealized_pnl,
-                    unrealized_pnl_percent=position.unrealized_pnl_percentage,
+                    unrealized_pnl_percentage=position.unrealized_pnl_percentage,
                     realized_pnl=position.realized_pnl,
                     currency=position.currency,
                     created_at=position.created_at.isoformat(),

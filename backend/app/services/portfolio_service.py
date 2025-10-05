@@ -335,6 +335,13 @@ class PortfolioService:
         self.db.commit()
         self.db.refresh(position)
         
+        # Mettre à jour le capital initial et le total investi du portfolio
+        if not portfolio.initial_capital or portfolio.initial_capital == 0:
+            portfolio.initial_capital = total_cost
+        portfolio.total_invested = (portfolio.total_invested or 0) + total_cost
+        
+        self.db.commit()
+        
         return position
     
     def get_position_by_id(self, position_id: int, portfolio_id: Optional[int] = None) -> Optional[Position]:
@@ -408,6 +415,12 @@ class PortfolioService:
             ) * 100
         
         position.updated_at = datetime.utcnow()
+        
+        # Mettre à jour le total investi du portfolio
+        portfolio = self.get_portfolio_by_id(position.portfolio_id)
+        if portfolio:
+            additional_investment = additional_quantity * purchase_price
+            portfolio.total_invested = (portfolio.total_invested or 0) + additional_investment
         
         self.db.commit()
         return True
