@@ -246,15 +246,15 @@ app.include_router(
 
 # Portfolio Management API
 app.include_router(
-    portfolios.router,
-    prefix="/api/v1/portfolios",
-    tags=["Gestion des Portefeuilles"]
-)
-
-app.include_router(
     positions.router,
     prefix="/api/v1",
     tags=["Gestion des Positions"]
+)
+
+app.include_router(
+    portfolios.router,
+    prefix="/api/v1/portfolios",
+    tags=["Gestion des Portefeuilles"]
 )
 
 if __name__ == "__main__":
