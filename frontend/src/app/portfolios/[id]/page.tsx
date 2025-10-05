@@ -7,6 +7,7 @@ import AppLayout from '@/components/Layout/AppLayout';
 import { Portfolio, getPortfolio, updatePortfolio, UpdatePortfolioRequest } from '@/services/portfolioApi';
 import { EditPortfolioModal } from '@/components/Portfolio/EditPortfolioModal';
 import { WalletManager } from '@/components/Portfolio/WalletManager';
+import PositionList from '@/components/Portfolio/PositionList';
 
 export default function PortfolioDetailPage() {
   console.log('🚀 PortfolioDetailPage MOUNTED');
@@ -261,6 +262,25 @@ export default function PortfolioDetailPage() {
             wallets={portfolio.wallets || []} 
             portfolioId={portfolio.id}
             onWalletUpdate={handleWalletUpdate}
+          />
+        </div>
+
+        {/* Positions */}
+        <div className="mb-8">
+          <PositionList 
+            portfolioId={portfolio.id}
+            onRefresh={() => {
+              // Recharger les données du portefeuille
+              const fetchPortfolio = async () => {
+                try {
+                  const data = await getPortfolio(portfolioId);
+                  setPortfolio(data);
+                } catch (err) {
+                  console.error('Erreur lors du rechargement:', err);
+                }
+              };
+              fetchPortfolio();
+            }}
           />
         </div>
       </div>
