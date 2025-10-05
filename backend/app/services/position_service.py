@@ -311,8 +311,7 @@ class PositionService:
                     unrealized_pnl=quantity * price - total_cost,
                     unrealized_pnl_percentage=((quantity * price - total_cost) / total_cost) * 100 if total_cost > 0 else 0,
                     realized_pnl=Decimal('0.00'),
-                    currency=currency,
-                    position_type="LONG"
+                    currency=currency
                 )
                 
                 self.db.add(position)

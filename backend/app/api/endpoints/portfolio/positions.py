@@ -70,7 +70,6 @@ class PositionResponse(BaseModel):
     unrealized_pnl: Decimal
     unrealized_pnl_percent: Decimal
     realized_pnl: Decimal
-    position_type: str
     created_at: str
     updated_at: str
 
@@ -160,7 +159,6 @@ async def execute_buy_order(
                 unrealized_pnl=position.unrealized_pnl,
                 unrealized_pnl_percent=position.unrealized_pnl_percent,
                 realized_pnl=position.realized_pnl,
-                position_type=position.position_type.value,
                 created_at=position.created_at.isoformat(),
                 updated_at=position.updated_at.isoformat()
             ),
@@ -228,7 +226,6 @@ async def execute_sell_order(
                 unrealized_pnl=position.unrealized_pnl,
                 unrealized_pnl_percent=position.unrealized_pnl_percent,
                 realized_pnl=position.realized_pnl,
-                position_type=position.position_type.value,
                 created_at=position.created_at.isoformat(),
                 updated_at=position.updated_at.isoformat()
             ),
@@ -297,7 +294,6 @@ async def get_portfolio_positions(
             unrealized_pnl_percent=position.unrealized_pnl_percent,
             realized_pnl=position.realized_pnl,
             currency=position.currency,
-            position_type=position.position_type.value,
             created_at=position.created_at.isoformat(),
             updated_at=position.updated_at.isoformat()
         )
