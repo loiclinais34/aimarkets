@@ -634,6 +634,9 @@ async def create_wallet_transaction(
     
     # Effectuer la transaction
     try:
+        print(f"DEBUG API: Données reçues - transaction_data: {transaction_data}")
+        print(f"DEBUG API: exchange_rate reçu: {transaction_data.exchange_rate}")
+        
         # Convertir la string en enum
         try:
             transaction_type_enum = WalletTransactionType(transaction_data.transaction_type)
@@ -643,13 +646,16 @@ async def create_wallet_transaction(
                 detail=f"Type de transaction invalide: {transaction_data.transaction_type}"
             )
         
+        exchange_rate_decimal = Decimal(str(transaction_data.exchange_rate)) if transaction_data.exchange_rate else None
+        print(f"DEBUG API: exchange_rate_decimal converti: {exchange_rate_decimal}")
+        
         transaction = portfolio_service.create_wallet_transaction(
             wallet_id=wallet_id,
             transaction_type=transaction_type_enum,
             amount=Decimal(str(transaction_data.amount)),
             description=transaction_data.description,
             target_wallet_id=transaction_data.target_wallet_id,
-            exchange_rate=Decimal(str(transaction_data.exchange_rate)) if transaction_data.exchange_rate else None
+            exchange_rate=exchange_rate_decimal
         )
         
         return WalletTransactionResponse(

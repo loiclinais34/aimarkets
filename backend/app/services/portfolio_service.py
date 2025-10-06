@@ -657,10 +657,15 @@ class PortfolioService:
             # Calculer le montant à créditer en tenant compte du taux de change
             # Si les devises sont différentes et qu'un taux est fourni, l'utiliser
             # Sinon, utiliser le même montant (même devise)
+            print(f"DEBUG TRANSFER: wallet.currency={wallet.currency}, target_wallet.currency={target_wallet.currency}")
+            print(f"DEBUG TRANSFER: exchange_rate={exchange_rate}, amount={amount}")
+            
             if exchange_rate and wallet.currency != target_wallet.currency:
                 converted_amount = amount * exchange_rate
+                print(f"DEBUG TRANSFER: Conversion appliquée - converted_amount={converted_amount}")
             else:
                 converted_amount = amount
+                print(f"DEBUG TRANSFER: Pas de conversion - converted_amount={converted_amount}")
             
             target_wallet.available_balance += converted_amount
             target_wallet.total_balance += converted_amount
