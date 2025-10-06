@@ -111,7 +111,11 @@ export async function getLatestPricesBatch(symbols: string[]): Promise<LatestPri
  */
 export async function getRealtimePrices(symbols: string[]): Promise<LatestPricesResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/realtime-prices`, {
+    const url = `${API_BASE_URL}/realtime-prices`;
+    console.log('🔍 DEBUG: Calling realtime prices API:', url);
+    console.log('🔍 DEBUG: API_BASE_URL:', API_BASE_URL);
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ symbols }),
