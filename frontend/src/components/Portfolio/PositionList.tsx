@@ -54,8 +54,10 @@ export default function PositionList({ portfolioId, onRefresh }: PositionListPro
 
   // Enrichir les positions avec les cours Polygon en temps réel
   const positionsWithRealtimePrices = useMemo(() => {
-    if (!valuation.positionsWithValuation || valuation.positionsWithValuation.length === 0) {
-      return positions;
+    // Si la valorisation est en cours de chargement ou vide, retourner un tableau vide
+    // pour éviter d'afficher des positions avec des prix N/A ou NaN
+    if (valuation.isLoading || !valuation.positionsWithValuation || valuation.positionsWithValuation.length === 0) {
+      return [];
     }
 
     return positions.map(position => {
@@ -75,7 +77,7 @@ export default function PositionList({ portfolioId, onRefresh }: PositionListPro
 
       return position;
     });
-  }, [positions, valuation.positionsWithValuation]);
+  }, [positions, valuation.positionsWithValuation, valuation.isLoading]);
 
   const handleBuyOrder = () => {
     setBuySellModal({
@@ -116,7 +118,7 @@ export default function PositionList({ portfolioId, onRefresh }: PositionListPro
     console.log('Edit position:', position);
   };
 
-  if (isLoading) {
+  if (isLoading || valuation.isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
