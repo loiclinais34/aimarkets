@@ -107,11 +107,35 @@ export async function getLatestPricesBatch(symbols: string[]): Promise<LatestPri
 }
 
 /**
+ * Récupère les cours en temps réel via Polygon.io (POST)
+ */
+export async function getRealtimePrices(symbols: string[]): Promise<LatestPricesResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/realtime-prices`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ symbols }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Erreur ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Erreur lors de la récupération des cours en temps réel:', error);
+    throw error;
+  }
+}
+
+/**
  * Fonction utilitaire pour créer un dictionnaire de prix à partir d'une liste de symboles
+ * Utilise Polygon.io pour les cours en temps réel
  */
 export async function getPricesMap(symbols: string[]): Promise<Record<string, number>> {
   try {
-    const response = await getLatestPrices(symbols);
+    // Utiliser l'API Polygon pour les cours en temps réel
+    const response = await getRealtimePrices(symbols);
     const pricesMap: Record<string, number> = {};
     
     response.prices.forEach(price => {

@@ -62,6 +62,65 @@ class PolygonService:
         endpoint = f"/v3/reference/tickers/{symbol}"
         return self._make_request(endpoint)
     
+    def get_latest_quote(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """
+        Récupère le dernier cours en temps réel pour un symbole
+        
+        Args:
+            symbol: Symbole du titre (ex: AAPL)
+        
+        Returns:
+            Dictionnaire avec le dernier cours ou None en cas d'erreur
+        """
+        endpoint = f"/v2/last/trade/{symbol}"
+        
+        data = self._make_request(endpoint)
+        
+        if not data or 'results' not in data:
+            logger.warning(f"Aucun cours trouvé pour {symbol}")
+            return None
+        
+        result = data['results']
+        
+        return {
+            'symbol': symbol,
+            'price': Decimal(str(result.get('p', 0))),  # p = price
+            'size': result.get('s', 0),  # s = size
+            'timestamp': datetime.fromtimestamp(result.get('t', 0) / 1000) if result.get('t') else datetime.now(),
+            'exchange': result.get('x', ''),  # x = exchange
+        }
+    
+    def get_previous_close(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """
+        Récupère le cours de clôture précédent pour un symbole
+        
+        Args:
+            symbol: Symbole du titre (ex: AAPL)
+        
+        Returns:
+            Dictionnaire avec le cours de clôture ou None en cas d'erreur
+        """
+        endpoint = f"/v2/aggs/ticker/{symbol}/prev"
+        
+        data = self._make_request(endpoint)
+        
+        if not data or 'results' not in data or len(data['results']) == 0:
+            logger.warning(f"Aucun cours de clôture trouvé pour {symbol}")
+            return None
+        
+        result = data['results'][0]
+        
+        return {
+            'symbol': symbol,
+            'price': Decimal(str(result.get('c', 0))),  # c = close
+            'open': Decimal(str(result.get('o', 0))),
+            'high': Decimal(str(result.get('h', 0))),
+            'low': Decimal(str(result.get('l', 0))),
+            'volume': int(result.get('v', 0)),
+            'vwap': Decimal(str(result.get('vw', 0))) if result.get('vw') else None,
+            'timestamp': datetime.fromtimestamp(result.get('t', 0) / 1000) if result.get('t') else datetime.now(),
+        }
+    
     def get_historical_data(self, symbol: str, from_date: str, to_date: str) -> List[Dict[str, Any]]:
         """
         Récupère les données historiques pour un symbole
