@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Wallet } from '@/services/portfolioApi';
+import { Wallet, getWallets } from '@/services/portfolioApi';
 
 interface TransactionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: TransactionData) => void;
   wallet: Wallet | null;
+  portfolioId: number;
   isLoading?: boolean;
 }
 
@@ -16,6 +17,7 @@ interface TransactionData {
   amount: number;
   description?: string;
   target_wallet_id?: number;
+  exchange_rate?: number;
 }
 
 export const TransactionModal: React.FC<TransactionModalProps> = ({
@@ -23,14 +25,38 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   onClose,
   onSubmit,
   wallet,
+  portfolioId,
   isLoading = false,
 }) => {
   const [formData, setFormData] = useState<TransactionData>({
     transaction_type: 'DEPOSIT',
     amount: 0,
     description: '',
+    exchange_rate: 1.0,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [availableWallets, setAvailableWallets] = useState<Wallet[]>([]);
+  const [loadingWallets, setLoadingWallets] = useState(false);
+
+  // Charger les wallets du portefeuille
+  useEffect(() => {
+    const loadWallets = async () => {
+      if (isOpen && portfolioId) {
+        try {
+          setLoadingWallets(true);
+          const wallets = await getWallets(portfolioId);
+          // Filtrer pour exclure le wallet source
+          setAvailableWallets(wallets.filter(w => w.id !== wallet?.id));
+        } catch (error) {
+          console.error('Erreur lors du chargement des wallets:', error);
+        } finally {
+          setLoadingWallets(false);
+        }
+      }
+    };
+
+    loadWallets();
+  }, [isOpen, portfolioId, wallet?.id]);
 
   useEffect(() => {
     if (isOpen) {
@@ -38,6 +64,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         transaction_type: 'DEPOSIT',
         amount: 0,
         description: '',
+        exchange_rate: 1.0,
       });
       setErrors({});
     }
@@ -77,6 +104,12 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   if (!isOpen || !wallet) {
     return null;
   }
+
+  const selectedTargetWallet = availableWallets.find(w => w.id === formData.target_wallet_id);
+  const isDifferentCurrency = selectedTargetWallet && selectedTargetWallet.currency !== wallet.currency;
+  const convertedAmount = isDifferentCurrency && formData.exchange_rate 
+    ? formData.amount * formData.exchange_rate 
+    : formData.amount;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -151,24 +184,55 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
           {/* Wallet de destination (pour les virements) */}
           {formData.transaction_type === 'TRANSFER' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Wallet de destination
-              </label>
-              <select
-                value={formData.target_wallet_id || ''}
-                onChange={(e) => setFormData({ ...formData, target_wallet_id: parseInt(e.target.value) })}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.target_wallet_id ? 'border-red-500' : 'border-gray-300'
-                }`}
-              >
-                <option value="">Sélectionner un wallet</option>
-                {/* TODO: Charger les autres wallets du portefeuille */}
-              </select>
-              {errors.target_wallet_id && (
-                <p className="mt-1 text-sm text-red-600">{errors.target_wallet_id}</p>
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Wallet de destination
+                </label>
+                <select
+                  value={formData.target_wallet_id || ''}
+                  onChange={(e) => setFormData({ ...formData, target_wallet_id: parseInt(e.target.value) })}
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    errors.target_wallet_id ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  disabled={loadingWallets}
+                >
+                  <option value="">Sélectionner un wallet</option>
+                  {availableWallets.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name} ({w.currency}) - {new Intl.NumberFormat('fr-FR', {
+                        style: 'currency',
+                        currency: w.currency,
+                      }).format(w.available_balance)}
+                    </option>
+                  ))}
+                </select>
+                {errors.target_wallet_id && (
+                  <p className="mt-1 text-sm text-red-600">{errors.target_wallet_id}</p>
+                )}
+              </div>
+
+              {/* Taux de change (pour les virements entre devises différentes) */}
+              {isDifferentCurrency && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Taux de change ({wallet.currency} → {selectedTargetWallet.currency})
+                  </label>
+                  <input
+                    type="number"
+                    step="0.000001"
+                    min="0"
+                    value={formData.exchange_rate || ''}
+                    onChange={(e) => setFormData({ ...formData, exchange_rate: parseFloat(e.target.value) || 1.0 })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="1.0"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    {formData.amount} {wallet.currency} = {convertedAmount.toFixed(2)} {selectedTargetWallet.currency}
+                  </p>
+                </div>
               )}
-            </div>
+            </>
           )}
 
           {/* Description */}
@@ -205,6 +269,25 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                   }).format(formData.amount)}
                 </span>
               </div>
+              {formData.transaction_type === 'TRANSFER' && isDifferentCurrency && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-blue-700">Taux:</span>
+                    <span className="text-blue-900">
+                      1 {wallet.currency} = {formData.exchange_rate?.toFixed(6)} {selectedTargetWallet.currency}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-blue-700">Montant converti:</span>
+                    <span className="text-blue-900 font-semibold">
+                      {new Intl.NumberFormat('fr-FR', {
+                        style: 'currency',
+                        currency: selectedTargetWallet.currency,
+                      }).format(convertedAmount)}
+                    </span>
+                  </div>
+                </>
+              )}
               {formData.transaction_type === 'DEPOSIT' && (
                 <div className="flex justify-between">
                   <span className="text-blue-700">Nouveau solde:</span>

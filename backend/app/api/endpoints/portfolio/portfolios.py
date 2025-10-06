@@ -59,6 +59,7 @@ class WalletTransactionRequest(BaseModel):
     amount: float
     description: Optional[str] = None
     target_wallet_id: Optional[int] = None
+    exchange_rate: Optional[float] = None
 
 
 class WalletTransactionResponse(BaseModel):
@@ -647,7 +648,8 @@ async def create_wallet_transaction(
             transaction_type=transaction_type_enum,
             amount=Decimal(str(transaction_data.amount)),
             description=transaction_data.description,
-            target_wallet_id=transaction_data.target_wallet_id
+            target_wallet_id=transaction_data.target_wallet_id,
+            exchange_rate=Decimal(str(transaction_data.exchange_rate)) if transaction_data.exchange_rate else None
         )
         
         return WalletTransactionResponse(

@@ -197,6 +197,7 @@ export const WalletManager: React.FC<WalletManagerProps> = ({
         onClose={() => setIsTransactionModalOpen(false)}
         onSubmit={handleTransactionSubmit}
         wallet={selectedWallet}
+        portfolioId={portfolioId}
         isLoading={isProcessingTransaction}
       />
 

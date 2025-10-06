@@ -36,6 +36,7 @@ export interface CreateTransactionRequest {
   amount: number;
   description?: string;
   target_wallet_id?: number;
+  exchange_rate?: number;
 }
 
 export interface Portfolio {

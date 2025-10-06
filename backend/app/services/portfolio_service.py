@@ -595,7 +595,8 @@ class PortfolioService:
         transaction_type: WalletTransactionType,
         amount: Decimal,
         description: Optional[str] = None,
-        target_wallet_id: Optional[int] = None
+        target_wallet_id: Optional[int] = None,
+        exchange_rate: Optional[Decimal] = None
     ) -> WalletTransaction:
         """Crée une transaction sur un wallet"""
         
@@ -653,17 +654,25 @@ class PortfolioService:
         
         # Gérer le wallet de destination pour les virements
         if transaction_type == WalletTransactionType.TRANSFER and target_wallet:
-            target_wallet.available_balance += amount
-            target_wallet.total_balance += amount
+            # Calculer le montant à créditer en tenant compte du taux de change
+            # Si les devises sont différentes et qu'un taux est fourni, l'utiliser
+            # Sinon, utiliser le même montant (même devise)
+            if exchange_rate and wallet.currency != target_wallet.currency:
+                converted_amount = amount * exchange_rate
+            else:
+                converted_amount = amount
+            
+            target_wallet.available_balance += converted_amount
+            target_wallet.total_balance += converted_amount
             target_wallet.updated_at = datetime.now()
             
             # Créer la transaction correspondante pour le wallet de destination
             target_transaction = WalletTransaction(
                 wallet_id=target_wallet_id,
                 transaction_type=WalletTransactionType.DEPOSIT,
-                amount=amount,
+                amount=converted_amount,
                 balance_after=target_wallet.available_balance,
-                description=f"Virement reçu depuis {wallet.name}",
+                description=f"Virement reçu depuis {wallet.name}" + (f" (taux: {exchange_rate})" if exchange_rate and wallet.currency != target_wallet.currency else ""),
                 reference=transaction.reference,
                 target_wallet_id=wallet_id
             )
