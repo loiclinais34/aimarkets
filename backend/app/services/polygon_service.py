@@ -65,6 +65,7 @@ class PolygonService:
     def get_latest_quote(self, symbol: str) -> Optional[Dict[str, Any]]:
         """
         Récupère le dernier cours en temps réel pour un symbole
+        Utilise l'endpoint /v2/snapshot pour obtenir les données les plus récentes
         
         Args:
             symbol: Symbole du titre (ex: AAPL)
@@ -72,23 +73,52 @@ class PolygonService:
         Returns:
             Dictionnaire avec le dernier cours ou None en cas d'erreur
         """
-        endpoint = f"/v2/last/trade/{symbol}"
+        endpoint = f"/v2/snapshot/locale/us/markets/stocks/tickers/{symbol}"
         
         data = self._make_request(endpoint)
         
-        if not data or 'results' not in data:
-            logger.warning(f"Aucun cours trouvé pour {symbol}")
+        if not data or 'ticker' not in data:
+            logger.warning(f"Aucun snapshot trouvé pour {symbol}")
             return None
         
-        result = data['results']
+        ticker = data['ticker']
         
-        return {
-            'symbol': symbol,
-            'price': Decimal(str(result.get('p', 0))),  # p = price
-            'size': result.get('s', 0),  # s = size
-            'timestamp': datetime.fromtimestamp(result.get('t', 0) / 1000) if result.get('t') else datetime.now(),
-            'exchange': result.get('x', ''),  # x = exchange
-        }
+        # Essayer d'abord le dernier trade (plus récent)
+        if 'lastTrade' in ticker and ticker['lastTrade']:
+            last_trade = ticker['lastTrade']
+            return {
+                'symbol': symbol,
+                'price': Decimal(str(last_trade.get('p', 0))),  # p = price
+                'size': last_trade.get('s', 0),  # s = size
+                'timestamp': datetime.fromtimestamp(last_trade.get('t', 0) / 1000000) if last_trade.get('t') else datetime.now(),  # timestamp en nanosecondes
+                'exchange': last_trade.get('x', ''),  # x = exchange
+                'source': 'snapshot_last_trade'
+            }
+        
+        # Sinon, utiliser le dernier cours de clôture du jour
+        elif 'day' in ticker and ticker['day']:
+            day = ticker['day']
+            return {
+                'symbol': symbol,
+                'price': Decimal(str(day.get('c', 0))),  # c = close
+                'volume': day.get('v', 0),
+                'timestamp': datetime.now(),
+                'source': 'snapshot_day_close'
+            }
+        
+        # Fallback : utiliser le cours précédent
+        elif 'prevDay' in ticker and ticker['prevDay']:
+            prev_day = ticker['prevDay']
+            return {
+                'symbol': symbol,
+                'price': Decimal(str(prev_day.get('c', 0))),  # c = close
+                'volume': prev_day.get('v', 0),
+                'timestamp': datetime.now(),
+                'source': 'snapshot_prev_day'
+            }
+        
+        logger.warning(f"Aucune donnée de prix disponible pour {symbol}")
+        return None
     
     def get_previous_close(self, symbol: str) -> Optional[Dict[str, Any]]:
         """

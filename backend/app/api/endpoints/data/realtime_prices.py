@@ -59,26 +59,26 @@ async def get_realtime_prices(
         
         for symbol in request.symbols:
             try:
-                # Essayer d'abord le cours de clôture précédent (plus fiable)
-                quote_data = polygon_service.get_previous_close(symbol)
+                # Essayer d'abord le snapshot (cours le plus récent disponible - 15min delay)
+                quote_data = polygon_service.get_latest_quote(symbol)
                 
                 if quote_data:
                     prices.append(RealtimePriceResponse(
                         symbol=symbol,
                         price=float(quote_data['price']),
                         timestamp=quote_data['timestamp'].isoformat(),
-                        source="polygon_previous_close"
+                        source=quote_data.get('source', 'polygon_snapshot')
                     ))
                     found_count += 1
                 else:
-                    # Fallback : essayer le dernier trade
-                    trade_data = polygon_service.get_latest_quote(symbol)
-                    if trade_data:
+                    # Fallback : essayer le cours de clôture précédent
+                    close_data = polygon_service.get_previous_close(symbol)
+                    if close_data:
                         prices.append(RealtimePriceResponse(
                             symbol=symbol,
-                            price=float(trade_data['price']),
-                            timestamp=trade_data['timestamp'].isoformat(),
-                            source="polygon_last_trade"
+                            price=float(close_data['price']),
+                            timestamp=close_data['timestamp'].isoformat(),
+                            source="polygon_previous_close"
                         ))
                         found_count += 1
                     else:
