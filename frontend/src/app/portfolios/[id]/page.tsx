@@ -8,6 +8,7 @@ import { Portfolio, getPortfolio, updatePortfolio, UpdatePortfolioRequest } from
 import { EditPortfolioModal } from '@/components/Portfolio/EditPortfolioModal';
 import { WalletManager } from '@/components/Portfolio/WalletManager';
 import PositionList from '@/components/Portfolio/PositionList';
+import { usePortfolioValuation } from '@/hooks/usePortfolioValuation';
 import Link from 'next/link';
 
 export default function PortfolioDetailPage() {
@@ -22,6 +23,9 @@ export default function PortfolioDetailPage() {
   const [isUpdating, setIsUpdating] = useState(false);
 
   const portfolioId = parseInt(params.id as string);
+  
+  // Utiliser le hook de valorisation pour calculer la valeur en temps réel
+  const valuation = usePortfolioValuation(portfolio);
 
   useEffect(() => {
     const fetchPortfolio = async () => {
@@ -231,39 +235,58 @@ export default function PortfolioDetailPage() {
           {/* Valeur du portefeuille */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Valeur du portefeuille</h2>
-            {portfolio.total_value !== undefined ? (
+            {valuation.isLoading ? (
+              <div className="space-y-3">
+                <div className="animate-pulse">
+                  <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+                  <div className="h-8 bg-gray-200 rounded w-32"></div>
+                </div>
+              </div>
+            ) : valuation.error ? (
+              <div className="text-red-600 text-sm">
+                Erreur de valorisation: {valuation.error}
+              </div>
+            ) : (
               <div className="space-y-3">
                 <div>
-                  <p className="text-sm text-gray-500">Valeur totale</p>
+                  <p className="text-sm text-gray-500">Valeur des positions</p>
                   <p className="text-2xl font-bold text-gray-900">
                     {new Intl.NumberFormat('fr-FR', {
                       style: 'currency',
                       currency: 'EUR',
-                    }).format(portfolio.total_value)}
+                    }).format(valuation.totalValue || 0)}
                   </p>
                 </div>
-                {portfolio.total_pnl !== undefined && (
-                  <div>
-                    <p className="text-sm text-gray-500">P&L</p>
-                    <p className={`text-lg font-semibold ${
-                      portfolio.total_pnl >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {new Intl.NumberFormat('fr-FR', {
-                        style: 'currency',
-                        currency: 'EUR',
-                      }).format(portfolio.total_pnl)}
-                      {portfolio.total_pnl_percent !== undefined && (
-                        <span className="ml-2 text-sm">
-                          ({portfolio.total_pnl_percent >= 0 ? '+' : ''}
-                          {portfolio.total_pnl_percent.toFixed(2)}%)
-                        </span>
-                      )}
-                    </p>
-                  </div>
+                <div>
+                  <p className="text-sm text-gray-500">Coût d'acquisition</p>
+                  <p className="text-lg font-medium text-gray-700">
+                    {new Intl.NumberFormat('fr-FR', {
+                      style: 'currency',
+                      currency: 'EUR',
+                    }).format(valuation.totalCost || 0)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">P&L non réalisé</p>
+                  <p className={`text-lg font-semibold ${
+                    (valuation.totalPnL || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {new Intl.NumberFormat('fr-FR', {
+                      style: 'currency',
+                      currency: 'EUR',
+                    }).format(valuation.totalPnL || 0)}
+                    <span className="ml-2 text-sm">
+                      ({(valuation.totalPnL || 0) >= 0 ? '+' : ''}
+                      {(valuation.totalPnLPercent || 0).toFixed(2)}%)
+                    </span>
+                  </p>
+                </div>
+                {valuation.lastUpdated && (
+                  <p className="text-xs text-gray-400 mt-2">
+                    Mis à jour: {new Date(valuation.lastUpdated).toLocaleString('fr-FR')}
+                  </p>
                 )}
               </div>
-            ) : (
-              <p className="text-gray-500">Aucune donnée de valeur disponible</p>
             )}
           </div>
         </div>
