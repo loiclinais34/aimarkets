@@ -40,6 +40,16 @@ export function usePortfolioValuation(portfolio: Portfolio): PortfolioValuation 
   });
 
   const calculateValuation = useCallback(async () => {
+    // Vérifier que le portfolio existe
+    if (!portfolio) {
+      setValuation(prev => ({
+        ...prev,
+        isLoading: false,
+        error: null,
+      }));
+      return;
+    }
+
     if (!portfolio.positions || portfolio.positions.length === 0) {
       // Pas de positions = P&L à 0
       setValuation(prev => ({
