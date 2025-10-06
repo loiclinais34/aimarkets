@@ -40,7 +40,7 @@ function getAuthHeaders(): HeadersInit {
  */
 export async function getLatestPrice(symbol: string): Promise<LatestPrice> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/test-prices/${symbol}`, {
+    const response = await fetch(`${API_BASE_URL}/test-prices/${symbol}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -63,7 +63,7 @@ export async function getLatestPrice(symbol: string): Promise<LatestPrice> {
  */
 export async function getLatestPrices(symbols: string[]): Promise<LatestPricesResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/latest-prices`, {
+    const response = await fetch(`${API_BASE_URL}/latest-prices`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -88,7 +88,7 @@ export async function getLatestPrices(symbols: string[]): Promise<LatestPricesRe
 export async function getLatestPricesBatch(symbols: string[]): Promise<LatestPricesResponse> {
   try {
     const symbolsParam = symbols.join(',');
-    const response = await fetch(`${API_BASE_URL}/api/v1/latest-prices/batch?symbols=${symbolsParam}`, {
+    const response = await fetch(`${API_BASE_URL}/latest-prices/batch?symbols=${symbolsParam}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
