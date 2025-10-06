@@ -43,7 +43,7 @@ class SymbolsApi {
     if (search) params.append('search', search);
     params.append('limit', limit.toString());
     
-    const url = `${this.baseURL}/symbols?${params.toString()}`;
+    const url = `${this.baseURL}/data/symbols?${params.toString()}`;
     return this.makeRequest<Symbol[]>(url);
   }
 
@@ -51,7 +51,7 @@ class SymbolsApi {
    * Récupère les détails d'un symbole spécifique
    */
   async getSymbolDetails(symbol: string): Promise<SymbolApiResponse> {
-    const url = `${this.baseURL}/symbols/${symbol}`;
+    const url = `${this.baseURL}/data/symbols/${symbol}`;
     return this.makeRequest<SymbolApiResponse>(url);
   }
 
