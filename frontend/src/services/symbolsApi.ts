@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+// Utiliser le même base URL que les autres services (sans localhost)
+const API_BASE_URL = '/api/v1';
 
 export interface Symbol {
   symbol: string;
@@ -19,15 +20,15 @@ export interface SymbolApiResponse {
 }
 
 class SymbolsApi {
-  private baseURL: string;
-
-  constructor() {
-    this.baseURL = API_BASE_URL;
-  }
-
-  private async makeRequest<T>(url: string): Promise<T> {
+  /**
+   * Récupère la liste des symboles disponibles
+   */
+  async getSymbols(search?: string, limit: number = 100): Promise<Symbol[]> {
     try {
-      const response = await axios.get<T>(url);
+      const params: any = { limit };
+      if (search) params.search = search;
+      
+      const response = await axios.get(`${API_BASE_URL}/data/symbols`, { params });
       return response.data;
     } catch (error) {
       console.error('Symbols API Error:', error);
@@ -36,23 +37,16 @@ class SymbolsApi {
   }
 
   /**
-   * Récupère la liste des symboles disponibles
-   */
-  async getSymbols(search?: string, limit: number = 100): Promise<Symbol[]> {
-    const params = new URLSearchParams();
-    if (search) params.append('search', search);
-    params.append('limit', limit.toString());
-    
-    const url = `${this.baseURL}/data/symbols?${params.toString()}`;
-    return this.makeRequest<Symbol[]>(url);
-  }
-
-  /**
    * Récupère les détails d'un symbole spécifique
    */
   async getSymbolDetails(symbol: string): Promise<SymbolApiResponse> {
-    const url = `${this.baseURL}/data/symbols/${symbol}`;
-    return this.makeRequest<SymbolApiResponse>(url);
+    try {
+      const response = await axios.get(`${API_BASE_URL}/data/symbols/${symbol}`);
+      return response.data;
+    } catch (error) {
+      console.error('Symbol Details API Error:', error);
+      throw error;
+    }
   }
 
   /**
