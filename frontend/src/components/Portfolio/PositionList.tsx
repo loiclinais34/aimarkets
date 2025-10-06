@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Position, getPositions } from '@/services/tradingApi';
+import { Portfolio, getPortfolio } from '@/services/portfolioApi';
+import { usePortfolioValuation } from '@/hooks/usePortfolioValuation';
 import PositionCard from './PositionCard';
 import PositionTable from './PositionTable';
 import TradingModal from '@/components/Trading/TradingModal';
@@ -12,6 +14,7 @@ interface PositionListProps {
 }
 
 export default function PositionList({ portfolioId, onRefresh }: PositionListProps) {
+  const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -27,12 +30,17 @@ export default function PositionList({ portfolioId, onRefresh }: PositionListPro
     mode: 'buy'
   });
 
+  // Utiliser le hook de valorisation pour obtenir les cours Polygon en temps réel
+  const valuation = usePortfolioValuation(portfolio);
+
   const fetchPositions = async () => {
     try {
       setIsLoading(true);
       setError('');
-      const data = await getPositions(portfolioId);
-      setPositions(data);
+      // Charger le portfolio complet pour avoir accès aux positions avec valorisation
+      const portfolioData = await getPortfolio(portfolioId);
+      setPortfolio(portfolioData);
+      setPositions(portfolioData.positions || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors du chargement des positions');
     } finally {
@@ -43,6 +51,31 @@ export default function PositionList({ portfolioId, onRefresh }: PositionListPro
   useEffect(() => {
     fetchPositions();
   }, [portfolioId]);
+
+  // Enrichir les positions avec les cours Polygon en temps réel
+  const positionsWithRealtimePrices = useMemo(() => {
+    if (!valuation.positionsWithValuation || valuation.positionsWithValuation.length === 0) {
+      return positions;
+    }
+
+    return positions.map(position => {
+      const valuationData = valuation.positionsWithValuation.find(
+        v => v.symbol === position.symbol
+      );
+
+      if (valuationData) {
+        return {
+          ...position,
+          current_price: valuationData.currentPrice,
+          current_value: valuationData.currentValuation,
+          unrealized_pnl: valuationData.unrealizedPnl,
+          unrealized_pnl_percentage: valuationData.unrealizedPnlPercent
+        };
+      }
+
+      return position;
+    });
+  }, [positions, valuation.positionsWithValuation]);
 
   const handleBuyOrder = () => {
     setBuySellModal({
@@ -193,13 +226,13 @@ export default function PositionList({ portfolioId, onRefresh }: PositionListPro
         </div>
       ) : viewMode === 'table' ? (
         <PositionTable
-          positions={positions}
+          positions={positionsWithRealtimePrices}
           onViewDetails={handleViewDetails}
           onEdit={(position) => handleSellOrder(position)}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {positions.map((position) => (
+          {positionsWithRealtimePrices.map((position) => (
             <PositionCard
               key={position.id}
               position={position}
