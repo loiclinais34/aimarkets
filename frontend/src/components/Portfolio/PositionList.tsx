@@ -54,29 +54,47 @@ export default function PositionList({ portfolioId, onRefresh }: PositionListPro
 
   // Enrichir les positions avec les cours Polygon en temps réel
   const positionsWithRealtimePrices = useMemo(() => {
+    console.log('🔍 DEBUG PositionList - valuation:', {
+      isLoading: valuation.isLoading,
+      positionsCount: valuation.positionsWithValuation?.length || 0,
+      positionsData: valuation.positionsWithValuation
+    });
+
     // Si la valorisation est en cours de chargement ou vide, retourner un tableau vide
     // pour éviter d'afficher des positions avec des prix N/A ou NaN
     if (valuation.isLoading || !valuation.positionsWithValuation || valuation.positionsWithValuation.length === 0) {
+      console.log('🔍 DEBUG PositionList - Returning empty array (loading or no valuation)');
       return [];
     }
 
-    return positions.map(position => {
+    const enrichedPositions = positions.map(position => {
       const valuationData = valuation.positionsWithValuation.find(
         v => v.symbol === position.symbol
       );
 
+      console.log(`🔍 DEBUG PositionList - Position ${position.symbol}:`, {
+        valuationData,
+        hasValuation: !!valuationData
+      });
+
       if (valuationData) {
-        return {
+        const enriched = {
           ...position,
           current_price: valuationData.currentPrice,
           current_value: valuationData.currentValuation,
-          unrealized_pnl: valuationData.unrealizedPnl,
-          unrealized_pnl_percentage: valuationData.unrealizedPnlPercent
+          unrealized_pnl: valuationData.unrealizedPnL,
+          unrealized_pnl_percentage: valuationData.unrealizedPnLPercent
         };
+        console.log(`🔍 DEBUG PositionList - Enriched ${position.symbol}:`, enriched);
+        return enriched;
       }
 
+      console.log(`🔍 DEBUG PositionList - No valuation for ${position.symbol}, returning original`);
       return position;
     });
+
+    console.log('🔍 DEBUG PositionList - Final enriched positions:', enrichedPositions);
+    return enrichedPositions;
   }, [positions, valuation.positionsWithValuation, valuation.isLoading]);
 
   const handleBuyOrder = () => {
