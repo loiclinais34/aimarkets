@@ -2,7 +2,8 @@
  * Service API pour récupérer les derniers cours des titres
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+// Toujours utiliser le proxy Next.js, jamais localhost directement
+const API_BASE_URL = '/api/v1';
 
 // Types pour les cours
 export interface LatestPrice {
