@@ -24,6 +24,11 @@ export interface PositionWithValuation extends Position {
   pnlPercent: number;
   lastPrice?: number;
   lastPriceDate?: string;
+  // Champs supplémentaires pour compatibilité avec PositionTable
+  currentPrice: number;
+  unrealizedPnL: number;
+  unrealizedPnLPercent: number;
+  current_value: number;
 }
 
 export function usePortfolioValuation(portfolio: Portfolio): PortfolioValuation {
@@ -102,6 +107,11 @@ export function usePortfolioValuation(portfolio: Portfolio): PortfolioValuation 
           lastPriceDate: new Date().toISOString(),
           // Mettre à jour total_cost pour la cohérence
           total_cost: safeTotalCost,
+          // Ajouter les champs utilisés par PositionTable
+          currentPrice: safeCurrentPrice,
+          unrealizedPnL: isNaN(pnl) ? 0 : pnl,
+          unrealizedPnLPercent: isNaN(pnlPercent) ? 0 : pnlPercent,
+          current_value: isNaN(currentValuation) ? 0 : currentValuation,
         };
       });
 

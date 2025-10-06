@@ -32,6 +32,9 @@ export default function PositionList({ portfolioId, onRefresh }: PositionListPro
 
   // Utiliser le hook de valorisation pour obtenir les cours Polygon en temps réel
   const valuation = usePortfolioValuation(portfolio);
+  
+  console.log('🔍 DEBUG PositionList - Portfolio state:', portfolio);
+  console.log('🔍 DEBUG PositionList - Valuation state:', valuation);
 
   const fetchPositions = async () => {
     try {
