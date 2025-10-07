@@ -8,13 +8,15 @@ import {
   ExclamationTriangleIcon,
   ArrowTrendingUpIcon,
   Cog6ToothIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  BrainIcon
 } from '@heroicons/react/24/outline';
 import TechnicalSignalsChart from './TechnicalSignalsChart';
 import SentimentAnalysisPanel from './SentimentAnalysisPanel';
 import MarketIndicatorsWidget from './MarketIndicatorsWidget';
 import BubbleRiskPanel from './BubbleRiskPanel';
 import HybridOpportunityCard from './HybridOpportunityCard';
+import { AgentAnalysisModal } from './AgentAnalysisModal';
 import { advancedAnalysisApi, HybridAnalysisRequest, HybridAnalysisResponse, AdvancedSearchFilters, GenerateDailyOpportunitiesRequest, GenerateDailyOpportunitiesResponse } from '@/services/advancedAnalysisApi';
 
 interface OpportunitiesDashboardProps {
@@ -33,6 +35,15 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
     limit_symbols: 50,
     time_horizon: 30,
     include_ml: true
+  });
+  
+  // État pour la modale d'analyse agent
+  const [agentAnalysisModal, setAgentAnalysisModal] = useState<{
+    isOpen: boolean;
+    symbol: string;
+  }>({
+    isOpen: false,
+    symbol: ''
   });
   
   // Filtres
@@ -313,9 +324,9 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
   const [showFiltersAndSort, setShowFiltersAndSort] = useState(false);
   const [selectedOpportunity, setSelectedOpportunity] = useState<{
     symbol: string;
-    tab: 'technical' | 'sentiment' | 'market' | 'bubble' | 'hybrid';
+    tab: 'technical' | 'sentiment' | 'market' | 'bubble' | 'hybrid' | 'agent';
   } | null>(null);
-  const [activeTab, setActiveTab] = useState<'technical' | 'sentiment' | 'market' | 'bubble' | 'hybrid'>('technical');
+  const [activeTab, setActiveTab] = useState<'technical' | 'sentiment' | 'market' | 'bubble' | 'hybrid' | 'agent'>('technical');
 
   useEffect(() => {
     loadDefaultOpportunities();
@@ -391,9 +402,23 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
     // No longer needed
   };
 
-  const handleViewDetails = (symbol: string, tab: 'technical' | 'sentiment' | 'market' | 'bubble' | 'hybrid') => {
+  const handleViewDetails = (symbol: string, tab: 'technical' | 'sentiment' | 'market' | 'bubble' | 'hybrid' | 'agent') => {
     setSelectedOpportunity({ symbol, tab });
     setActiveTab(tab);
+  };
+
+  const handleAgentAnalysis = (symbol: string) => {
+    setAgentAnalysisModal({
+      isOpen: true,
+      symbol
+    });
+  };
+
+  const handleCloseAgentAnalysis = () => {
+    setAgentAnalysisModal({
+      isOpen: false,
+      symbol: ''
+    });
   };
 
   const handleBackToSearch = () => {
@@ -406,7 +431,8 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
     { id: 'sentiment', name: 'Sentiment', icon: ExclamationTriangleIcon },
     { id: 'market', name: 'Marché', icon: ChartBarIcon },
     { id: 'bubble', name: 'Bulle', icon: ExclamationTriangleIcon },
-    { id: 'hybrid', name: 'Composite', icon: Cog6ToothIcon }
+    { id: 'hybrid', name: 'Composite', icon: Cog6ToothIcon },
+    { id: 'agent', name: 'La rubrique de l\'agent', icon: BrainIcon }
   ];
 
   // Si une opportunité est sélectionnée, afficher les détails
@@ -498,6 +524,66 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
                 
                 <div className="mt-6">
                   <MarketIndicatorsWidget symbol={selectedOpportunity.symbol} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'agent' && (
+            <div className="space-y-8">
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex items-center space-x-3 mb-6">
+                  <BrainIcon className="w-8 h-8 text-purple-600" />
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      La rubrique de l'agent - {selectedOpportunity.symbol}
+                    </h3>
+                    <p className="text-gray-600">
+                      Analyse intelligente basée sur les données de sentiment et de cours
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-6 mb-6">
+                  <h4 className="text-md font-semibold text-gray-900 mb-4">
+                    🤖 Analyse Agent IA
+                  </h4>
+                  <p className="text-gray-700 mb-4">
+                    Notre agent IA analyse en temps réel les données de sentiment, les cours historiques 
+                    et les actualités pour vous fournir des insights détaillés sur {selectedOpportunity.symbol}.
+                  </p>
+                  <div className="flex items-center space-x-4 text-sm text-gray-600">
+                    <div className="flex items-center space-x-1">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span>Données de sentiment</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <span>Cours historiques</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                      <span>Actualités récentes</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-center py-8">
+                  <BrainIcon className="w-16 h-16 text-purple-600 mx-auto mb-4" />
+                  <h4 className="text-lg font-medium text-gray-900 mb-2">
+                    Générer l'analyse agent pour {selectedOpportunity.symbol}
+                  </h4>
+                  <p className="text-gray-600 mb-6">
+                    Cliquez sur le bouton ci-dessous pour obtenir une analyse complète basée sur 
+                    les dernières données de sentiment et de cours.
+                  </p>
+                  <button
+                    onClick={() => handleAgentAnalysis(selectedOpportunity.symbol)}
+                    className="bg-purple-600 text-white px-8 py-3 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 mx-auto"
+                  >
+                    <BrainIcon className="w-5 h-5" />
+                    <span>Lancer l'analyse agent</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -816,12 +902,20 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
                   opportunity={opportunity}
                   onAnalyze={handleAnalyzeSymbol}
                   onViewDetails={handleViewDetails}
+                  onAgentAnalysis={handleAgentAnalysis}
                 />
               ))}
             </div>
           </div>
         
       </div>
+
+      {/* Modale d'analyse agent */}
+      <AgentAnalysisModal
+        isOpen={agentAnalysisModal.isOpen}
+        onClose={handleCloseAgentAnalysis}
+        symbol={agentAnalysisModal.symbol}
+      />
     </div>
   );
 };

@@ -8,7 +8,8 @@ import {
   ExclamationTriangleIcon,
   CheckCircleIcon,
   XCircleIcon,
-  InformationCircleIcon
+  InformationCircleIcon,
+  BrainIcon
 } from '@heroicons/react/24/outline';
 
 interface HybridOpportunityCardProps {
@@ -39,6 +40,7 @@ interface HybridOpportunityCardProps {
   };
   onAnalyze?: (symbol: string) => void;
   onViewDetails?: (symbol: string, tab: 'technical' | 'sentiment' | 'market' | 'hybrid' | 'bubble') => void;
+  onAgentAnalysis?: (symbol: string) => void;
   className?: string;
 }
 
@@ -46,6 +48,7 @@ const HybridOpportunityCard: React.FC<HybridOpportunityCardProps> = ({
   opportunity, 
   onAnalyze,
   onViewDetails,
+  onAgentAnalysis,
   className = '' 
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -487,6 +490,15 @@ const HybridOpportunityCard: React.FC<HybridOpportunityCardProps> = ({
             >
               Réduire
             </button>
+            {onAgentAnalysis && (
+              <button
+                onClick={() => onAgentAnalysis(opportunity.symbol)}
+                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+              >
+                <BrainIcon className="w-4 h-4" />
+                <span>Analyse Agent</span>
+              </button>
+            )}
             {onAnalyze && (
               <button
                 onClick={() => onAnalyze(opportunity.symbol)}
@@ -500,15 +512,26 @@ const HybridOpportunityCard: React.FC<HybridOpportunityCardProps> = ({
         </div>
       )}
 
-      {/* Bouton d'expansion */}
+      {/* Boutons d'action */}
       {!isExpanded && (
         <div className="p-4 border-t border-gray-200">
-          <button
-            onClick={() => onViewDetails && onViewDetails(opportunity.symbol, 'technical')}
-            className="w-full text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
-          >
-            Voir les détails →
-          </button>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => onViewDetails && onViewDetails(opportunity.symbol, 'technical')}
+              className="flex-1 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+            >
+              Voir les détails →
+            </button>
+            {onAgentAnalysis && (
+              <button
+                onClick={() => onAgentAnalysis(opportunity.symbol)}
+                className="px-3 py-1 text-sm font-medium text-white bg-purple-600 rounded hover:bg-purple-700 transition-colors flex items-center space-x-1"
+              >
+                <BrainIcon className="w-4 h-4" />
+                <span>Analyse Agent</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

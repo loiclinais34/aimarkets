@@ -186,6 +186,14 @@ app.include_router(
     tags=["Cours en Temps Réel (Polygon)"]
 )
 
+# Router pour l'analyse agent
+from app.api.endpoints.analysis import agent_analysis
+app.include_router(
+    agent_analysis.router,
+    prefix="/api/v1/analysis",
+    tags=["Analyse Agent"]
+)
+
 # Import du router backtesting
 from app.api.endpoints.ml import backtesting
 
