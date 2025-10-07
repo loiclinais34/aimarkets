@@ -9,7 +9,7 @@ import {
   ArrowTrendingUpIcon,
   Cog6ToothIcon,
   ArrowPathIcon,
-  BrainIcon
+  CpuChipIcon
 } from '@heroicons/react/24/outline';
 import TechnicalSignalsChart from './TechnicalSignalsChart';
 import SentimentAnalysisPanel from './SentimentAnalysisPanel';
@@ -432,7 +432,7 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
     { id: 'market', name: 'Marché', icon: ChartBarIcon },
     { id: 'bubble', name: 'Bulle', icon: ExclamationTriangleIcon },
     { id: 'hybrid', name: 'Composite', icon: Cog6ToothIcon },
-    { id: 'agent', name: 'La rubrique de l\'agent', icon: BrainIcon }
+    { id: 'agent', name: 'La rubrique de l\'agent', icon: CpuChipIcon }
   ];
 
   // Si une opportunité est sélectionnée, afficher les détails
@@ -533,7 +533,7 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
             <div className="space-y-8">
               <div className="bg-white rounded-lg shadow-md p-6">
                 <div className="flex items-center space-x-3 mb-6">
-                  <BrainIcon className="w-8 h-8 text-purple-600" />
+                  <CpuChipIcon className="w-8 h-8 text-purple-600" />
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">
                       La rubrique de l'agent - {selectedOpportunity.symbol}
@@ -569,7 +569,7 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
                 </div>
 
                 <div className="text-center py-8">
-                  <BrainIcon className="w-16 h-16 text-purple-600 mx-auto mb-4" />
+                  <CpuChipIcon className="w-16 h-16 text-purple-600 mx-auto mb-4" />
                   <h4 className="text-lg font-medium text-gray-900 mb-2">
                     Générer l'analyse agent pour {selectedOpportunity.symbol}
                   </h4>
@@ -581,7 +581,7 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
                     onClick={() => handleAgentAnalysis(selectedOpportunity.symbol)}
                     className="bg-purple-600 text-white px-8 py-3 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 mx-auto"
                   >
-                    <BrainIcon className="w-5 h-5" />
+                    <CpuChipIcon className="w-5 h-5" />
                     <span>Lancer l'analyse agent</span>
                   </button>
                 </div>

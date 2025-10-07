@@ -9,7 +9,7 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   InformationCircleIcon,
-  BrainIcon
+  CpuChipIcon
 } from '@heroicons/react/24/outline';
 
 interface HybridOpportunityCardProps {
@@ -495,7 +495,7 @@ const HybridOpportunityCard: React.FC<HybridOpportunityCardProps> = ({
                 onClick={() => onAgentAnalysis(opportunity.symbol)}
                 className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
               >
-                <BrainIcon className="w-4 h-4" />
+                <CpuChipIcon className="w-4 h-4" />
                 <span>Analyse Agent</span>
               </button>
             )}
@@ -527,7 +527,7 @@ const HybridOpportunityCard: React.FC<HybridOpportunityCardProps> = ({
                 onClick={() => onAgentAnalysis(opportunity.symbol)}
                 className="px-3 py-1 text-sm font-medium text-white bg-purple-600 rounded hover:bg-purple-700 transition-colors flex items-center space-x-1"
               >
-                <BrainIcon className="w-4 h-4" />
+                <CpuChipIcon className="w-4 h-4" />
                 <span>Analyse Agent</span>
               </button>
             )}

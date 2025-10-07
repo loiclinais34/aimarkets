@@ -353,3 +353,14 @@ class AuthApiService {
 
 export const authApi = new AuthApiService();
 export default authApi;
+
+/**
+ * Fonction utilitaire pour obtenir les headers d'authentification
+ */
+export function getAuthHeaders(): HeadersInit {
+  const token = localStorage.getItem('auth_token');
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+  };
+}
