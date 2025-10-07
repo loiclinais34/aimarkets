@@ -115,7 +115,7 @@ async def generate_agent_analysis(
         recommendations = generate_recommendations(symbol, sentiment_evolution, price_evolution, correlation_analysis)
         
         # Résumé exécutif amélioré
-        summary = generate_executive_summary(symbol, sentiment_data, price_evolution, correlation_analysis, days_back)
+        summary = generate_executive_summary(symbol, sentiment_evolution, price_evolution, correlation_analysis, days_back)
         
         return AgentAnalysisResponse(
             symbol=symbol,
@@ -130,6 +130,8 @@ async def generate_agent_analysis(
         )
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erreur lors de la génération de l'analyse: {str(e)}"
@@ -230,9 +232,9 @@ def generate_executive_summary(symbol: str, sentiment_data: List[Dict], price_da
     price_change_pct = ((latest_price - oldest_price) / oldest_price) * 100 if oldest_price > 0 else 0
     
     # Calculs pour le récit
-    total_news = sum(data.news_count for data in sentiment_data)
-    positive_news = sum(data.positive_count for data in sentiment_data)
-    negative_news = sum(data.negative_count for data in sentiment_data)
+    total_news = sum(data["news_count"] for data in sentiment_data)
+    positive_news = sum(data["positive_count"] for data in sentiment_data)
+    negative_news = sum(data["negative_count"] for data in sentiment_data)
     volatility = calculate_volatility(price_data)
     
     # Génération du récit exécutif
