@@ -591,24 +591,50 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
                   </div>
                 </div>
 
-                <div className="text-center py-8">
-                  <CpuChipIcon className="w-16 h-16 text-purple-600 mx-auto mb-4" />
-                  <h4 className="text-lg font-medium text-gray-900 mb-2">
-                    Générer l'analyse agent pour {selectedOpportunity.symbol}
-                  </h4>
-                  <p className="text-gray-600 mb-6">
-                    Cliquez sur le bouton ci-dessous pour obtenir une analyse complète basée sur 
-                    les dernières données de sentiment et de cours.
-                  </p>
-                  <button
-                    onClick={() => handleAgentAnalysisInTab(selectedOpportunity.symbol)}
-                    disabled={agentAnalysisLoading}
-                    className="bg-purple-600 text-white px-8 py-3 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <CpuChipIcon className="w-5 h-5" />
-                    <span>{agentAnalysisLoading ? 'Génération en cours...' : 'Lancer l\'analyse agent'}</span>
-                  </button>
-                </div>
+                {!agentAnalysisLoading && !agentAnalysisData && (
+                  <div className="text-center py-8">
+                    <CpuChipIcon className="w-16 h-16 text-purple-600 mx-auto mb-4" />
+                    <h4 className="text-lg font-medium text-gray-900 mb-2">
+                      Générer l'analyse agent pour {selectedOpportunity.symbol}
+                    </h4>
+                    <p className="text-gray-600 mb-6">
+                      Cliquez sur le bouton ci-dessous pour obtenir une analyse complète basée sur 
+                      les dernières données de sentiment et de cours.
+                    </p>
+                    <button
+                      onClick={() => handleAgentAnalysisInTab(selectedOpportunity.symbol)}
+                      className="bg-purple-600 text-white px-8 py-3 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 mx-auto"
+                    >
+                      <CpuChipIcon className="w-5 h-5" />
+                      <span>Lancer l'analyse agent</span>
+                    </button>
+                  </div>
+                )}
+
+                {agentAnalysisLoading && (
+                  <div className="text-center py-12">
+                    <div className="flex flex-col items-center space-y-4">
+                      {/* Spinner animé */}
+                      <div className="relative">
+                        <div className="w-16 h-16 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
+                        <CpuChipIcon className="w-8 h-8 text-purple-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+                      </div>
+                      <div className="text-center">
+                        <h4 className="text-lg font-medium text-gray-900 mb-2">
+                          🤖 L'agent analyse {selectedOpportunity.symbol}...
+                        </h4>
+                        <p className="text-gray-600">
+                          Analyse des données de sentiment, cours historiques et actualités récentes
+                        </p>
+                        <div className="mt-4 flex justify-center space-x-1">
+                          <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                          <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                          <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Affichage de l'analyse */}
                 {agentAnalysisError && (
@@ -619,10 +645,12 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
 
                 {agentAnalysisData && (
                   <div className="mt-6 space-y-6">
-                    {/* Résumé exécutif */}
+                    {/* Résumé exécutif amélioré */}
                     <div className="bg-white border border-gray-200 rounded-lg p-6">
                       <h4 className="text-lg font-semibold text-gray-900 mb-4">📊 Résumé Exécutif</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      
+                      {/* Métriques clés */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                         <div className="text-center">
                           <div className="text-2xl font-bold text-gray-900">${agentAnalysisData.summary.current_price}</div>
                           <div className="text-sm text-gray-600">Prix actuel</div>
@@ -644,6 +672,16 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
                           <div className="text-sm text-gray-600">News analysées</div>
                         </div>
                       </div>
+
+                      {/* Récit exécutif */}
+                      {agentAnalysisData.executive_narrative && (
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6">
+                          <h5 className="text-md font-semibold text-gray-900 mb-3">🎯 Analyse Contextuelle</h5>
+                          <p className="text-gray-700 leading-relaxed text-justify">
+                            {agentAnalysisData.executive_narrative}
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     {/* Insights clés */}

@@ -31,6 +31,7 @@ class AgentAnalysisResponse(BaseModel):
     correlation_analysis: Dict[str, Any]
     key_insights: List[str]
     recommendations: List[str]
+    executive_narrative: str
 
 
 @router.post("/agent-analysis", response_model=AgentAnalysisResponse)
@@ -113,18 +114,8 @@ async def generate_agent_analysis(
         # Générer les recommandations
         recommendations = generate_recommendations(symbol, sentiment_evolution, price_evolution, correlation_analysis)
         
-        # Résumé exécutif
-        summary = {
-            "symbol": symbol,
-            "analysis_period": f"{days_back} derniers jours",
-            "current_price": latest_price,
-            "price_change": price_change,
-            "price_change_pct": price_change_pct,
-            "sentiment_trend": correlation_analysis.get("sentiment_trend", "neutre"),
-            "news_impact": correlation_analysis.get("news_impact", "limité"),
-            "volatility": calculate_volatility(price_evolution),
-            "total_news_analyzed": sum(data.news_count for data in sentiment_data)
-        }
+        # Résumé exécutif amélioré
+        summary = generate_executive_summary(symbol, sentiment_data, price_evolution, correlation_analysis, days_back)
         
         return AgentAnalysisResponse(
             symbol=symbol,
@@ -134,7 +125,8 @@ async def generate_agent_analysis(
             price_evolution=price_evolution,
             correlation_analysis=correlation_analysis,
             key_insights=key_insights,
-            recommendations=recommendations
+            recommendations=recommendations,
+            executive_narrative=summary.get("executive_narrative", "")
         )
         
     except Exception as e:
@@ -214,6 +206,93 @@ def generate_key_insights(symbol: str, sentiment_data: List[Dict], price_data: L
             insights.append(f"Volatilité faible ({volatility:.1%})")
     
     return insights
+
+
+def generate_executive_summary(symbol: str, sentiment_data: List[Dict], price_data: List[Dict], correlation: Dict, days_back: int) -> Dict:
+    """Génère un résumé exécutif humain et informatif"""
+    if not price_data:
+        return {
+            "symbol": symbol,
+            "analysis_period": f"{days_back} derniers jours",
+            "current_price": 0,
+            "price_change": 0,
+            "price_change_pct": 0,
+            "sentiment_trend": "neutre",
+            "news_impact": "limité",
+            "volatility": 0,
+            "total_news_analyzed": 0,
+            "executive_narrative": "Données insuffisantes pour générer une analyse complète."
+        }
+    
+    latest_price = price_data[0]["close"]
+    oldest_price = price_data[-1]["close"]
+    price_change = latest_price - oldest_price
+    price_change_pct = ((latest_price - oldest_price) / oldest_price) * 100 if oldest_price > 0 else 0
+    
+    # Calculs pour le récit
+    total_news = sum(data.news_count for data in sentiment_data)
+    positive_news = sum(data.positive_count for data in sentiment_data)
+    negative_news = sum(data.negative_count for data in sentiment_data)
+    volatility = calculate_volatility(price_data)
+    
+    # Génération du récit exécutif
+    narrative_parts = []
+    
+    # Introduction contextuelle
+    narrative_parts.append(f"Sur les {days_back} derniers jours, {symbol} a affiché une performance {'positive' if price_change_pct > 0 else 'négative' if price_change_pct < 0 else 'stable'}, avec une variation de {price_change_pct:+.2f}%.")
+    
+    # Analyse de la performance
+    if abs(price_change_pct) > 10:
+        narrative_parts.append(f"Cette évolution {'marquée' if price_change_pct > 0 else 'significative'} reflète une {'forte dynamique haussière' if price_change_pct > 0 else 'pression baissière importante'} sur la période.")
+    elif abs(price_change_pct) > 5:
+        narrative_parts.append(f"Cette performance {'solide' if price_change_pct > 0 else 'décevante'} indique une {'tendance constructive' if price_change_pct > 0 else 'faiblesse relative'} du titre.")
+    else:
+        narrative_parts.append("Cette évolution modérée suggère une phase de consolidation ou d'attente.")
+    
+    # Analyse du sentiment
+    if total_news > 0:
+        sentiment_ratio = positive_news / (positive_news + negative_news) if (positive_news + negative_news) > 0 else 0.5
+        if sentiment_ratio > 0.7:
+            narrative_parts.append(f"L'analyse de {total_news} articles de presse révèle un sentiment très positif ({positive_news} positives vs {negative_news} négatives), ce qui soutient la dynamique du titre.")
+        elif sentiment_ratio > 0.6:
+            narrative_parts.append(f"Le sentiment médiatique est favorable ({positive_news} positives vs {negative_news} négatives sur {total_news} articles), créant un environnement propice.")
+        elif sentiment_ratio < 0.3:
+            narrative_parts.append(f"Le sentiment est préoccupant ({negative_news} négatives vs {positive_news} positives sur {total_news} articles), ce qui pourrait peser sur les perspectives.")
+        else:
+            narrative_parts.append(f"Le sentiment médiatique est mitigé ({positive_news} positives vs {negative_news} négatives), reflétant une incertitude sur les perspectives.")
+    
+    # Analyse de la volatilité
+    if volatility > 0.05:
+        narrative_parts.append(f"La volatilité élevée ({volatility:.1%}) indique une période d'incertitude ou d'opportunités de trading importantes.")
+    elif volatility < 0.02:
+        narrative_parts.append(f"La faible volatilité ({volatility:.1%}) suggère une phase de stabilité relative, favorable aux investisseurs prudents.")
+    else:
+        narrative_parts.append(f"La volatilité modérée ({volatility:.1%}) offre un équilibre entre risque et opportunité.")
+    
+    # Conclusion contextuelle
+    if price_change_pct > 5 and sentiment_ratio > 0.6:
+        narrative_parts.append("Cette combinaison de performance positive et de sentiment favorable crée un environnement propice à une poursuite de la hausse.")
+    elif price_change_pct < -5 and sentiment_ratio < 0.4:
+        narrative_parts.append("La convergence entre performance décevante et sentiment négatif suggère une prudence accrue.")
+    elif abs(price_change_pct) < 3 and volatility < 0.03:
+        narrative_parts.append("Cette phase de stabilité pourrait être l'occasion d'accumuler en vue d'un mouvement directionnel futur.")
+    else:
+        narrative_parts.append("Les signaux mixtes nécessitent une surveillance attentive des prochaines évolutions.")
+    
+    executive_narrative = " ".join(narrative_parts)
+    
+    return {
+        "symbol": symbol,
+        "analysis_period": f"{days_back} derniers jours",
+        "current_price": latest_price,
+        "price_change": price_change,
+        "price_change_pct": price_change_pct,
+        "sentiment_trend": correlation.get("sentiment_trend", "neutre"),
+        "news_impact": correlation.get("news_impact", "limité"),
+        "volatility": volatility,
+        "total_news_analyzed": total_news,
+        "executive_narrative": executive_narrative
+    }
 
 
 def generate_recommendations(symbol: str, sentiment_data: List[Dict], price_data: List[Dict], correlation: Dict) -> List[str]:

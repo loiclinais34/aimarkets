@@ -24,6 +24,7 @@ export interface AgentAnalysisResponse {
     news_impact: string;
     volatility: number;
     total_news_analyzed: number;
+    executive_narrative?: string;
   };
   sentiment_evolution: Array<{
     date: string;
@@ -52,6 +53,7 @@ export interface AgentAnalysisResponse {
   };
   key_insights: string[];
   recommendations: string[];
+  executive_narrative: string;
 }
 
 class AgentAnalysisApi {
