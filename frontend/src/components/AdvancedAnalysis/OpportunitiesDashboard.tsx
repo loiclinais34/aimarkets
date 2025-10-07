@@ -18,6 +18,7 @@ import BubbleRiskPanel from './BubbleRiskPanel';
 import HybridOpportunityCard from './HybridOpportunityCard';
 import { AgentAnalysisModal } from './AgentAnalysisModal';
 import { advancedAnalysisApi, HybridAnalysisRequest, HybridAnalysisResponse, AdvancedSearchFilters, GenerateDailyOpportunitiesRequest, GenerateDailyOpportunitiesResponse } from '@/services/advancedAnalysisApi';
+import { agentAnalysisApi } from '../../services/agentAnalysisApi';
 
 interface OpportunitiesDashboardProps {
   className?: string;
@@ -45,6 +46,10 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
     isOpen: false,
     symbol: ''
   });
+
+  const [agentAnalysisData, setAgentAnalysisData] = useState<any>(null);
+  const [agentAnalysisLoading, setAgentAnalysisLoading] = useState(false);
+  const [agentAnalysisError, setAgentAnalysisError] = useState<string | null>(null);
   
   // Filtres
   const [filters, setFilters] = useState({
@@ -414,6 +419,24 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
     });
   };
 
+  const handleAgentAnalysisInTab = async (symbol: string) => {
+    setAgentAnalysisLoading(true);
+    setAgentAnalysisError(null);
+    
+    try {
+      const response = await agentAnalysisApi.generateAnalysis({
+        symbol,
+        days_back: 7
+      });
+      setAgentAnalysisData(response);
+    } catch (error) {
+      console.error('Erreur lors de la génération de l\'analyse agent:', error);
+      setAgentAnalysisError('Erreur lors de la génération de l\'analyse');
+    } finally {
+      setAgentAnalysisLoading(false);
+    }
+  };
+
   const handleCloseAgentAnalysis = () => {
     setAgentAnalysisModal({
       isOpen: false,
@@ -578,13 +601,78 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
                     les dernières données de sentiment et de cours.
                   </p>
                   <button
-                    onClick={() => handleAgentAnalysis(selectedOpportunity.symbol)}
-                    className="bg-purple-600 text-white px-8 py-3 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 mx-auto"
+                    onClick={() => handleAgentAnalysisInTab(selectedOpportunity.symbol)}
+                    disabled={agentAnalysisLoading}
+                    className="bg-purple-600 text-white px-8 py-3 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <CpuChipIcon className="w-5 h-5" />
-                    <span>Lancer l'analyse agent</span>
+                    <span>{agentAnalysisLoading ? 'Génération en cours...' : 'Lancer l\'analyse agent'}</span>
                   </button>
                 </div>
+
+                {/* Affichage de l'analyse */}
+                {agentAnalysisError && (
+                  <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-red-600">{agentAnalysisError}</p>
+                  </div>
+                )}
+
+                {agentAnalysisData && (
+                  <div className="mt-6 space-y-6">
+                    {/* Résumé exécutif */}
+                    <div className="bg-white border border-gray-200 rounded-lg p-6">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4">📊 Résumé Exécutif</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-gray-900">${agentAnalysisData.summary.current_price}</div>
+                          <div className="text-sm text-gray-600">Prix actuel</div>
+                        </div>
+                        <div className="text-center">
+                          <div className={`text-2xl font-bold ${agentAnalysisData.summary.price_change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {agentAnalysisData.summary.price_change >= 0 ? '+' : ''}{agentAnalysisData.summary.price_change.toFixed(2)}
+                          </div>
+                          <div className="text-sm text-gray-600">Variation</div>
+                        </div>
+                        <div className="text-center">
+                          <div className={`text-2xl font-bold ${agentAnalysisData.summary.price_change_pct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {agentAnalysisData.summary.price_change_pct >= 0 ? '+' : ''}{agentAnalysisData.summary.price_change_pct.toFixed(2)}%
+                          </div>
+                          <div className="text-sm text-gray-600">Variation %</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-purple-600">{agentAnalysisData.summary.total_news_analyzed}</div>
+                          <div className="text-sm text-gray-600">News analysées</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Insights clés */}
+                    <div className="bg-white border border-gray-200 rounded-lg p-6">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4">💡 Insights Clés</h4>
+                      <ul className="space-y-2">
+                        {agentAnalysisData.key_insights.map((insight: string, index: number) => (
+                          <li key={index} className="flex items-start space-x-2">
+                            <div className="w-2 h-2 bg-purple-600 rounded-full mt-2 flex-shrink-0"></div>
+                            <span className="text-gray-700">{insight}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Recommandations */}
+                    <div className="bg-white border border-gray-200 rounded-lg p-6">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4">🎯 Recommandations</h4>
+                      <ul className="space-y-2">
+                        {agentAnalysisData.recommendations.map((recommendation: string, index: number) => (
+                          <li key={index} className="flex items-start space-x-2">
+                            <div className="w-2 h-2 bg-green-600 rounded-full mt-2 flex-shrink-0"></div>
+                            <span className="text-gray-700">{recommendation}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
