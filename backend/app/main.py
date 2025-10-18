@@ -9,12 +9,15 @@ from .core.database import init_db, close_db
 from .api.endpoints.auth import auth, users
 from .api.endpoints.portfolio import portfolios
 from .api.endpoints import trading
-from .api.endpoints.analysis import advanced_analysis, technical_analysis, sentiment_analysis, market_indicators, bubble_detection
-from .api.endpoints.search import screener, signals, advanced_signals
-from .api.endpoints.ml import ml_models, ml_backtesting, model_comparison, async_model_comparison, backtesting
-from .api.endpoints.data import data, data_update, financial_ratios, indicators, correlations, latest_prices, realtime_prices
-from .api.endpoints.management import symbol_metadata, target_parameters, trading_strategies, celery_management
+from .api.endpoints import analysis as analysis_endpoints
+from .api.endpoints import data as data_endpoints
+from .api.endpoints import search as search_endpoints
+from .api.endpoints import ml as ml_endpoints
+from .api.endpoints import management as management_endpoints
 from .api.endpoints.symbols import router as symbols_router
+from .api.endpoints.management.target_parameters import router as target_parameters_router
+from .api.endpoints.ml.ml_models import router as ml_models_router
+from .api.endpoints.management.symbol_metadata import router as symbol_metadata_router
 
 
 @asynccontextmanager
@@ -83,113 +86,126 @@ async def health_check():
 
 # Inclusion des routes des endpoints
 app.include_router(
-    data.router,
+    data_endpoints.data,
     prefix="/api/v1",
     tags=["Données"]
 )
 
+from .api.endpoints.analysis.opportunity_performance import router as opportunity_performance_router
 app.include_router(
-    target_parameters.router,
+    opportunity_performance_router,
+    prefix="/api/v1/analysis/opportunities",
+    tags=["Performance des Opportunités"]
+)
+
+from .api.endpoints.analysis.sophisticated_ml import router as sophisticated_ml_router
+app.include_router(
+    sophisticated_ml_router,
+    prefix="/api/v1/analysis/sophisticated-ml",
+    tags=["ML Sophistiqué"]
+)
+
+from .api.endpoints.analysis.ml_opportunities import router as ml_opportunities_router
+app.include_router(
+    ml_opportunities_router,
+    prefix="/api/v1/analysis",
+    tags=["ML Opportunities"]
+)
+
+from .api.endpoints.analysis.ml_test import router as ml_test_router
+app.include_router(
+    ml_test_router,
+    prefix="/api/v1/analysis",
+    tags=["ML Test"]
+)
+
+app.include_router(
+    target_parameters_router,
     prefix="/api/v1",
     tags=["Paramètres de Cible"]
 )
 
 app.include_router(
-    ml_models.router,
+    ml_models_router,
     prefix="/api/v1",
     tags=["Modèles ML"]
 )
 
 app.include_router(
-    symbol_metadata.router,
+    symbol_metadata_router,
     prefix="/api/v1/symbol-metadata",
     tags=["Métadonnées des Symboles"]
 )
 
 # Import du router screener
-from app.api.endpoints.search import screener
+from .api.endpoints.search.screener import router as screener_router
 
 app.include_router(
-    screener.router,
+    screener_router,
     prefix="/api/v1/screener",
     tags=["Screener"]
 )
 
-# Import du router data_update
-from app.api.endpoints.data import data_update
-
 app.include_router(
-    data_update.router,
+    data_endpoints.data_update,
     prefix="/api/v1/data-update",
     tags=["Mise à jour des Données"]
 )
 
-# Import du router celery_management
-from app.api.endpoints.management import celery_management
-
+from .api.endpoints.management.celery_management import router as celery_management_router
 app.include_router(
-    celery_management.router,
+    celery_management_router,
     prefix="/api/v1",
     tags=["Gestion de Celery"]
 )
 
-# Import du router financial_ratios
-from app.api.endpoints.data import financial_ratios
-
 app.include_router(
-    financial_ratios.router,
+    data_endpoints.financial_ratios,
     prefix="/api/v1",
     tags=["Ratios Financiers"]
 )
 
-# Import du router advanced_analysis
-from app.api.endpoints.analysis import advanced_analysis
-
+# Endpoints d'analyse
 app.include_router(
-    advanced_analysis.router,
+    analysis_endpoints.advanced_analysis,
     prefix="/api/v1/advanced-analysis",
     tags=["Analyse Avancée"]
 )
 
-# Endpoints d'analyse technique, sentiment et marché
 app.include_router(
-    technical_analysis.router,
+    analysis_endpoints.technical_analysis,
     prefix="/api/v1/technical-analysis",
     tags=["Analyse Technique"]
 )
 
 app.include_router(
-    sentiment_analysis.router,
+    analysis_endpoints.sentiment_analysis,
     prefix="/api/v1/sentiment-analysis",
     tags=["Analyse de Sentiment"]
 )
 
 app.include_router(
-    market_indicators.router,
+    analysis_endpoints.market_indicators,
     prefix="/api/v1/market-indicators",
     tags=["Indicateurs de Marché"]
 )
 
-# Import du router indicators_recalculation
-from app.api.endpoints.data import indicators_recalculation
-
+# Endpoints de données
 app.include_router(
-    indicators_recalculation.router,
+    data_endpoints.indicators_recalculation,
     prefix="/api/v1",
     tags=["Recalcul des Indicateurs"]
 )
 
-# Router pour les cours en temps réel (Polygon)
 app.include_router(
-    realtime_prices.router,
+    data_endpoints.realtime_prices,
     prefix="/api/v1",
     tags=["Cours en Temps Réel (Polygon)"]
 )
 
-# Router pour l'analyse agent
-from app.api.endpoints.analysis import agent_analysis
+from .api.endpoints.analysis.agent_analysis import router as agent_analysis_router
 app.include_router(
-    agent_analysis.router,
+    agent_analysis_router,
     prefix="/api/v1/analysis",
     tags=["Analyse Agent"]
 )
@@ -240,10 +256,8 @@ app.include_router(
 )
 
 # Bubble Detection API
-from app.api.endpoints.analysis import bubble_detection
-
 app.include_router(
-    bubble_detection.router,
+    analysis_endpoints.bubble_detection,
     prefix="/api/v1/bubble-detection",
     tags=["Bubble Detection"]
 )
@@ -282,10 +296,10 @@ app.include_router(
 )
 
 # Import du router latest_prices
-from app.api.endpoints.data import latest_prices
+from .api.endpoints.data.latest_prices import router as latest_prices_router
 
 app.include_router(
-    latest_prices.router,
+    latest_prices_router,
     prefix="/api/v1",
     tags=["Cours en Temps Réel"]
 )
