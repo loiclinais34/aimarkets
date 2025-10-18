@@ -24,6 +24,9 @@ warnings.filterwarnings('ignore')
 # Add the backend directory to Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+# Import TA-Lib integration
+from talib_indicators import TALibIndicators
+
 # Database imports
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -286,6 +289,9 @@ class EnsembleMLSystem:
         
         self.feature_engineer = AdvancedFeatureEngineer()
         
+        # TA-Lib integration
+        self.talib_calculator = TALibIndicators()
+        
         # Ensemble models
         self.ensemble_classifier = None
         self.ensemble_regressor = None
@@ -347,69 +353,46 @@ class EnsembleMLSystem:
         return df['symbol'].tolist()
 
     def calculate_technical_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Calculate comprehensive technical indicators."""
-        if len(df) < 100:
+        """Calculate comprehensive technical indicators using TA-Lib integration."""
+        if len(df) < 50:  # Minimum required for most TA-Lib indicators
+            logger.warning(f"DataFrame too small ({len(df)} rows) for technical indicators")
             return df
         
         df = df.sort_values('date').reset_index(drop=True)
         
-        high = df['high'].values.astype(float)
-        low = df['low'].values.astype(float)
-        close = df['close'].values.astype(float)
-        volume = df['volume'].values.astype(float)
-        
         try:
-            # Moving averages
-            df['sma_5'] = talib.SMA(close, timeperiod=5)
-            df['sma_10'] = talib.SMA(close, timeperiod=10)
-            df['sma_20'] = talib.SMA(close, timeperiod=20)
-            df['sma_50'] = talib.SMA(close, timeperiod=50)
-            df['sma_200'] = talib.SMA(close, timeperiod=200)
+            # Use our comprehensive TA-Lib integration
+            logger.info(f"Calculating technical indicators for {len(df)} rows")
+            df = self.talib_calculator.calculate_all_indicators(df)
             
-            df['ema_5'] = talib.EMA(close, timeperiod=5)
-            df['ema_10'] = talib.EMA(close, timeperiod=10)
-            df['ema_20'] = talib.EMA(close, timeperiod=20)
-            df['ema_50'] = talib.EMA(close, timeperiod=50)
-            df['ema_200'] = talib.EMA(close, timeperiod=200)
+            # Add custom features based on TA-Lib indicators
+            df = self.talib_calculator.calculate_custom_features(df)
             
-            # Momentum indicators
-            df['rsi_14'] = talib.RSI(close, timeperiod=14)
-            df['rsi_21'] = talib.RSI(close, timeperiod=21)
-            df['rsi_50'] = talib.RSI(close, timeperiod=50)
-            
-            macd, macd_signal, macd_hist = talib.MACD(close)
-            df['macd_line'] = macd
-            df['macd_signal'] = macd_signal
-            df['macd_histogram'] = macd_hist
-            
-            # Volatility indicators
-            bb_upper, bb_middle, bb_lower = talib.BBANDS(close)
-            df['bollinger_upper'] = bb_upper
-            df['bollinger_middle'] = bb_middle
-            df['bollinger_lower'] = bb_lower
-            df['bollinger_width'] = (bb_upper - bb_lower) / bb_middle
-            
-            df['atr_14'] = talib.ATR(high, low, close, timeperiod=14)
-            df['atr_21'] = talib.ATR(high, low, close, timeperiod=21)
-            
-            # Volume indicators
-            df['volume_sma_20'] = talib.SMA(volume, timeperiod=20)
-            df['obv'] = talib.OBV(close, volume)
-            df['mfi'] = talib.MFI(high, low, close, volume, timeperiod=14)
-            
-            # Additional indicators
-            df['stochastic_k'], df['stochastic_d'] = talib.STOCH(high, low, close)
-            df['williams_r'] = talib.WILLR(high, low, close)
-            df['cci'] = talib.CCI(high, low, close)
-            df['adx'] = talib.ADX(high, low, close, timeperiod=14)
-            
-            # Support/Resistance
-            df['support_level'] = df['low'].rolling(20).min()
-            df['resistance_level'] = df['high'].rolling(20).max()
-            df['pivot_point'] = (df['high'] + df['low'] + df['close']) / 3
+            logger.info(f"Technical indicators calculated successfully. Shape: {df.shape}")
             
         except Exception as e:
-            logger.warning(f"Error calculating technical indicators: {e}")
+            logger.error(f"Error calculating technical indicators with TA-Lib integration: {e}")
+            # Fallback to basic indicators if TA-Lib integration fails
+            try:
+                logger.info("Falling back to basic TA-Lib indicators")
+                high = df['high'].values.astype(float)
+                low = df['low'].values.astype(float)
+                close = df['close'].values.astype(float)
+                volume = df['volume'].values.astype(float)
+                
+                # Basic indicators as fallback
+                df['sma_20'] = talib.SMA(close, timeperiod=20)
+                df['sma_50'] = talib.SMA(close, timeperiod=50)
+                df['ema_20'] = talib.EMA(close, timeperiod=20)
+                df['rsi_14'] = talib.RSI(close, timeperiod=14)
+                df['macd'], df['macd_signal'], df['macd_hist'] = talib.MACD(close)
+                df['atr_14'] = talib.ATR(high, low, close, timeperiod=14)
+                df['obv'] = talib.OBV(close, volume)
+                
+                logger.info("Basic technical indicators calculated as fallback")
+                
+            except Exception as fallback_error:
+                logger.error(f"Fallback technical indicators also failed: {fallback_error}")
         
         return df
 
