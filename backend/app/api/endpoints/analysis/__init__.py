@@ -7,6 +7,7 @@ from .market_indicators import router as market_indicators
 from .bubble_detection import router as bubble_detection
 from .sophisticated_ml import router as sophisticated_ml
 from .ml_opportunities import router as ml_opportunities
+from .ml_performance import router as ml_performance
 
 __all__ = [
     "opportunity_performance",
@@ -16,5 +17,6 @@ __all__ = [
     "market_indicators",
     "bubble_detection",
     "sophisticated_ml",
-    "ml_opportunities"
+    "ml_opportunities",
+    "ml_performance"
 ]

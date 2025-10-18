@@ -7,9 +7,10 @@ interface PositionTableProps {
   positions: Position[];
   onViewDetails?: (position: Position) => void;
   onEdit?: (position: Position) => void;
+  onSymbolClick?: (position: Position) => void;
 }
 
-export default function PositionTable({ positions, onViewDetails, onEdit }: PositionTableProps) {
+export default function PositionTable({ positions, onViewDetails, onEdit, onSymbolClick }: PositionTableProps) {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
@@ -75,12 +76,26 @@ export default function PositionTable({ positions, onViewDetails, onEdit }: Posi
               <tr key={position.id} className="hover:bg-gray-50">
                 {/* Titre */}
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div>
-                    <div className="text-sm font-medium text-gray-900">{position.symbol}</div>
-                    {position.company_name && (
-                      <div className="text-sm text-gray-500">{position.company_name}</div>
-                    )}
-                  </div>
+                  {onSymbolClick ? (
+                    <button
+                      onClick={() => onSymbolClick(position)}
+                      className="text-left hover:text-blue-600 transition-colors"
+                    >
+                      <div className="text-sm font-medium text-gray-900 hover:underline cursor-pointer">
+                        {position.symbol}
+                      </div>
+                      {position.company_name && (
+                        <div className="text-sm text-gray-500">{position.company_name}</div>
+                      )}
+                    </button>
+                  ) : (
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">{position.symbol}</div>
+                      {position.company_name && (
+                        <div className="text-sm text-gray-500">{position.company_name}</div>
+                      )}
+                    </div>
+                  )}
                 </td>
 
                 {/* Quantité */}
@@ -136,9 +151,9 @@ export default function PositionTable({ positions, onViewDetails, onEdit }: Posi
                     {onEdit && (
                       <button
                         onClick={() => onEdit(position)}
-                        className="text-blue-600 hover:text-blue-900 hover:bg-blue-50 px-2 py-1 rounded-md transition-colors"
+                        className="text-red-600 hover:text-red-900 hover:bg-red-50 px-2 py-1 rounded-md transition-colors"
                       >
-                        Modifier
+                        Vendre
                       </button>
                     )}
                     {onViewDetails && (

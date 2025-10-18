@@ -113,7 +113,8 @@ class TradingService:
         quantity: Decimal,
         price: Decimal,
         fees: Decimal = Decimal('0.00'),
-        description: str = None
+        description: str = None,
+        target_wallet_id: Optional[int] = None
     ) -> Tuple[WalletTransaction, Position]:
         """Vendre des titres - crée une transaction et met à jour la position"""
         
@@ -138,6 +139,21 @@ class TradingService:
                 detail="Wallet non trouvé ou inactif"
             )
         
+        # 2.1. Vérifier le wallet de destination si spécifié
+        target_wallet = None
+        if target_wallet_id:
+            target_wallet = self.db.query(Wallet).filter(
+                Wallet.id == target_wallet_id,
+                Wallet.portfolio_id == portfolio_id,
+                Wallet.status == WalletStatus.ACTIVE
+            ).first()
+            
+            if not target_wallet:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Wallet de destination non trouvé ou inactif"
+                )
+        
         # 3. Vérifier que la position existe
         position = self.db.query(Position).filter(
             Position.portfolio_id == portfolio_id,
@@ -160,11 +176,15 @@ class TradingService:
         # 4. Calculer le produit net
         net_proceeds = (quantity * price) - fees
         
-        # 5. Créer la transaction de wallet
-        new_balance = wallet.available_balance + net_proceeds
+        # 5. Déterminer le wallet de destination (celui spécifié ou celui de la position)
+        destination_wallet = target_wallet if target_wallet else wallet
+        print(f"DEBUG SELL: target_wallet_id={target_wallet_id}, target_wallet={target_wallet}, destination_wallet_id={destination_wallet.id}")
+        
+        # 6. Créer la transaction de wallet sur le wallet de destination
+        new_balance = destination_wallet.available_balance + net_proceeds
         
         wallet_transaction = WalletTransaction(
-            wallet_id=wallet_id,
+            wallet_id=destination_wallet.id,
             transaction_type=WalletTransactionType.SELL_STOCK,
             amount=net_proceeds,  # Positif car c'est un crédit
             balance_after=new_balance,
@@ -178,10 +198,10 @@ class TradingService:
         self.db.add(wallet_transaction)
         self.db.flush()  # Pour obtenir l'ID
         
-        # 6. Mettre à jour le balance du wallet
-        wallet.available_balance = new_balance
-        wallet.total_balance = new_balance
-        wallet.updated_at = datetime.utcnow()
+        # 7. Mettre à jour le balance du wallet de destination
+        destination_wallet.available_balance = new_balance
+        destination_wallet.total_balance = new_balance
+        destination_wallet.updated_at = datetime.utcnow()
         
         # 7. Mettre à jour la position
         position = self._update_position_after_sell(

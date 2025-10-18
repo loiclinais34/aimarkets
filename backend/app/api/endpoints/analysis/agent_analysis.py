@@ -252,6 +252,7 @@ def generate_executive_summary(symbol: str, sentiment_data: List[Dict], price_da
         narrative_parts.append("Cette évolution modérée suggère une phase de consolidation ou d'attente.")
     
     # Analyse du sentiment
+    sentiment_ratio = 0.5  # Valeur par défaut neutre
     if total_news > 0:
         sentiment_ratio = positive_news / (positive_news + negative_news) if (positive_news + negative_news) > 0 else 0.5
         if sentiment_ratio > 0.7:
@@ -262,6 +263,8 @@ def generate_executive_summary(symbol: str, sentiment_data: List[Dict], price_da
             narrative_parts.append(f"Le sentiment est préoccupant ({negative_news} négatives vs {positive_news} positives sur {total_news} articles), ce qui pourrait peser sur les perspectives.")
         else:
             narrative_parts.append(f"Le sentiment médiatique est mitigé ({positive_news} positives vs {negative_news} négatives), reflétant une incertitude sur les perspectives.")
+    else:
+        narrative_parts.append("Aucune donnée de sentiment disponible pour cette période.")
     
     # Analyse de la volatilité
     if volatility > 0.05:

@@ -12,6 +12,8 @@ import AppLayout from '@/components/Layout/AppLayout';
 import { Portfolio, getPortfolios } from '@/services/portfolioApi';
 import { usePortfoliosValuation } from '@/hooks/usePortfolioValuation';
 import { advancedAnalysisApi, AdvancedSearchFilters } from '@/services/advancedAnalysisApi';
+import MLPerformanceKPIs from '@/components/MLPerformanceKPIs';
+import MLTopPerformers from '@/components/MLTopPerformers';
 
 export default function DashboardPage() {
   const { isAuthenticated, isLoading } = useRequireAuth();
@@ -66,22 +68,21 @@ export default function DashboardPage() {
     }
   }, [isAuthenticated]);
 
-  // Charger les opportunités Buy Strong des 2 derniers jours
+  // Charger les opportunités Buy Strong d'aujourd'hui (dernière analyse)
   useEffect(() => {
     const fetchOpportunities = async () => {
       try {
         setOpportunitiesLoading(true);
         
-        // Calculer la date d'il y a 2 jours
-        const twoDaysAgo = new Date();
-        twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-        const dateFrom = twoDaysAgo.toISOString().split('T')[0]; // Format YYYY-MM-DD
+        // Utiliser la date d'aujourd'hui pour obtenir uniquement les opportunités de la dernière analyse
+        const today = new Date();
+        const dateFrom = today.toISOString().split('T')[0]; // Format YYYY-MM-DD (aujourd'hui)
         
         const filters: AdvancedSearchFilters = {
           recommendations: 'BUY_STRONG',
           date_from: dateFrom,
           limit: 100, // Limite maximale autorisée
-          sort_by: 'analysis_date',
+          sort_by: 'composite_score', // Trier par score composite (meilleur d'abord)
           sort_order: 'desc'
           // Ne pas spécifier min_score pour utiliser la valeur par défaut du backend (0.5)
         };
@@ -232,6 +233,16 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Performance des Opportunités ML */}
+          <div className="mb-6">
+            <MLPerformanceKPIs />
+          </div>
+
+          {/* Meilleurs Symboles ML */}
+          <div className="mb-6">
+            <MLTopPerformers />
           </div>
 
           {/* Actions rapides */}

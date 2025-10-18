@@ -8,8 +8,11 @@ class Settings(BaseSettings):
     # Configuration de l'application
     app_name: str = "AIMarkets API"
     app_version: str = "1.0.0"
-    debug: bool = False
+    debug: bool = True  # Active le mode debug en développement
     environment: str = "development"
+    
+    # Configuration CORS
+    allowed_origins: List[str] = ["http://localhost:3000"]
     
     # Configuration de la base de données
     db_host: str = "localhost"

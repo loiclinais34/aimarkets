@@ -33,7 +33,7 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
   const [generationMessage, setGenerationMessage] = useState<string | null>(null);
   const [showGenerationForm, setShowGenerationForm] = useState(false);
   const [generationParams, setGenerationParams] = useState<GenerateDailyOpportunitiesRequest>({
-    limit_symbols: 50,
+    limit_symbols: 101,
     time_horizon: 30,
     include_ml: true
   });
@@ -71,9 +71,11 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
     setError(null);
     
     try {
+      // Charger toutes les opportunités BUY_STRONG et quelques autres pour avoir un échantillon représentatif
       const searchFilters: AdvancedSearchFilters = {
-        limit: 50,
-        sort_by: 'composite_score',
+        recommendations: 'BUY_STRONG', // Filtrer directement sur BUY_STRONG
+        limit: 100, // Augmenter la limite pour s'assurer d'avoir toutes les BUY_STRONG
+        sort_by: 'analysis_date', // Trier par date d'analyse pour avoir les plus récentes
         sort_order: 'desc'
       };
       
@@ -89,106 +91,81 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
   };
 
   // Fonction pour appliquer les filtres
-  const applyFilters = () => {
+  const applyFilters = async () => {
     console.log('Applying filters:', filters);
-    console.log('Original opportunities count:', hybridOpportunities.length);
+    console.log('Sort by:', sortBy, 'Sort order:', sortOrder);
     
-    let filtered = [...hybridOpportunities];
+    setLoading(true);
+    setError(null);
     
-    // Filtre par symbole
-    if (filters.symbol) {
-      filtered = filtered.filter(opp => 
-        opp.symbol.toLowerCase().includes(filters.symbol.toLowerCase())
-      );
-      console.log('After symbol filter:', filtered.length);
+    try {
+      // Construire les filtres pour l'API avec TOUS les filtres actuels
+      const apiFilters: AdvancedSearchFilters = {
+        limit: 100,
+        sort_by: sortBy === 'analysis_date' ? 'analysis_date' : 'composite_score',
+        sort_order: sortOrder,
+        min_score: filters.minScore ? parseFloat(filters.minScore) : undefined,
+        max_score: filters.maxScore ? parseFloat(filters.maxScore) : undefined,
+        date_from: filters.startDate || undefined,
+        date_to: filters.endDate || undefined,
+        symbols: filters.symbol || undefined,
+        recommendations: filters.recommendation || undefined
+      };
+      
+      console.log('API filters being sent:', apiFilters);
+      
+      // Appeler l'API avec les filtres
+      const response = await advancedAnalysisApi.searchStoredOpportunities(apiFilters);
+      setHybridOpportunities(response.opportunities);
+      setFilteredOpportunities(response.opportunities);
+      
+      console.log('API response count:', response.opportunities.length);
+      console.log('First few recommendations:', response.opportunities.slice(0, 5).map(op => ({ symbol: op.symbol, recommendation: op.recommendation })));
+    } catch (err) {
+      console.error('Erreur lors de l\'application des filtres:', err);
+      setError('Erreur lors de l\'application des filtres');
+    } finally {
+      setLoading(false);
     }
-    
-    // Filtre par recommandation
-    if (filters.recommendation) {
-      filtered = filtered.filter(opp => opp.recommendation === filters.recommendation);
-      console.log('After recommendation filter:', filtered.length);
-    }
-    
-    // Filtre par score minimum
-    if (filters.minScore) {
-      const minScore = parseFloat(filters.minScore);
-      filtered = filtered.filter(opp => opp.hybrid_score >= minScore);
-      console.log('After min score filter:', filtered.length);
-    }
-    
-    // Filtre par score maximum
-    if (filters.maxScore) {
-      const maxScore = parseFloat(filters.maxScore);
-      filtered = filtered.filter(opp => opp.hybrid_score <= maxScore);
-      console.log('After max score filter:', filtered.length);
-    }
-    
-    // Filtre par date
-    if (filters.startDate) {
-      const startDate = new Date(filters.startDate);
-      filtered = filtered.filter(opp => new Date(opp.updated_at || '') >= startDate);
-      console.log('After start date filter:', filtered.length);
-    }
-    
-    if (filters.endDate) {
-      const endDate = new Date(filters.endDate);
-      filtered = filtered.filter(opp => new Date(opp.updated_at || '') <= endDate);
-      console.log('After end date filter:', filtered.length);
-    }
-    
-    console.log('Final filtered count:', filtered.length);
-    setFilteredOpportunities(filtered);
   };
 
   // Fonction pour trier les opportunités
-  const sortOpportunities = () => {
-    setFilteredOpportunities(prevFiltered => {
-      const sorted = [...prevFiltered].sort((a, b) => {
-        let aValue: any, bValue: any;
-        
-        switch (sortBy) {
-          case 'composite_score':
-            aValue = a.hybrid_score;
-            bValue = b.hybrid_score;
-            break;
-          case 'technical_score':
-            aValue = a.technical_score;
-            bValue = b.technical_score;
-            break;
-          case 'sentiment_score':
-            aValue = a.sentiment_score;
-            bValue = b.sentiment_score;
-            break;
-          case 'market_score':
-            aValue = a.market_score;
-            bValue = b.market_score;
-            break;
-          case 'confidence_level':
-            aValue = a.confidence;
-            bValue = b.confidence;
-            break;
-          case 'analysis_date':
-            aValue = new Date(a.updated_at || '');
-            bValue = new Date(b.updated_at || '');
-            break;
-          default:
-            aValue = a.hybrid_score;
-            bValue = b.hybrid_score;
-        }
-        
-        if (sortOrder === 'asc') {
-          return aValue > bValue ? 1 : -1;
-        } else {
-          return aValue < bValue ? 1 : -1;
-        }
-      });
+  const sortOpportunities = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Construire les filtres pour l'API avec TOUS les filtres actuels ET le tri
+      const apiFilters: AdvancedSearchFilters = {
+        limit: 100,
+        sort_by: sortBy === 'analysis_date' ? 'analysis_date' : 'composite_score',
+        sort_order: sortOrder,
+        min_score: filters.minScore ? parseFloat(filters.minScore) : undefined,
+        max_score: filters.maxScore ? parseFloat(filters.maxScore) : undefined,
+        date_from: filters.startDate || undefined,
+        date_to: filters.endDate || undefined,
+        symbols: filters.symbol || undefined,
+        recommendations: filters.recommendation || undefined
+      };
       
-      return sorted;
-    });
+      console.log('Sort API filters being sent:', apiFilters);
+      
+      // Appeler l'API avec le tri et tous les filtres
+      const response = await advancedAnalysisApi.searchStoredOpportunities(apiFilters);
+      setHybridOpportunities(response.opportunities);
+      setFilteredOpportunities(response.opportunities);
+      
+      console.log('Sorted opportunities count:', response.opportunities.length);
+    } catch (err) {
+      console.error('Erreur lors du tri des opportunités:', err);
+      setError('Erreur lors du tri des opportunités');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Fonction pour réinitialiser les filtres
-  const resetFilters = () => {
+  const resetFilters = async () => {
     setFilters({
       symbol: '',
       recommendation: '',
@@ -197,7 +174,8 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
       startDate: '',
       endDate: ''
     });
-    setFilteredOpportunities(hybridOpportunities);
+    // Recharger les opportunités par défaut
+    await loadDefaultOpportunities();
   };
 
   // Fonction pour obtenir le nom de l'entreprise à partir du symbole
@@ -337,9 +315,16 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
     loadDefaultOpportunities();
   }, []);
 
+  // Ne pas déclencher automatiquement le tri pour éviter les conflits avec les filtres
+  // Le tri sera appliqué via les boutons ou via applyFilters
+
+  // Réinitialiser l'analyse agent quand on change de symbole
   useEffect(() => {
-    sortOpportunities();
-  }, [sortBy, sortOrder]);
+    if (selectedOpportunity) {
+      setAgentAnalysisData(null);
+      setAgentAnalysisError(null);
+    }
+  }, [selectedOpportunity?.symbol]);
 
   const performHybridSearch = async () => {
     try {
@@ -410,6 +395,12 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
   const handleViewDetails = (symbol: string, tab: 'technical' | 'sentiment' | 'market' | 'bubble' | 'hybrid' | 'agent') => {
     setSelectedOpportunity({ symbol, tab });
     setActiveTab(tab);
+    
+    // Réinitialiser l'analyse agent quand on change de symbole
+    if (tab === 'agent') {
+      setAgentAnalysisData(null);
+      setAgentAnalysisError(null);
+    }
   };
 
   const handleAgentAnalysis = (symbol: string) => {
@@ -765,15 +756,14 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
                   <input
                     type="number"
                     min="1"
-                    max="200"
                     value={generationParams.limit_symbols}
                     onChange={(e) => setGenerationParams({
                       ...generationParams,
-                      limit_symbols: parseInt(e.target.value) || 50
+                      limit_symbols: parseInt(e.target.value) || 0
                     })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Entre 1 et 200 symboles</p>
+                  <p className="text-xs text-gray-500 mt-1">0 pour analyser tous les titres disponibles</p>
                 </div>
                 
                 <div>

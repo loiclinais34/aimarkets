@@ -18,6 +18,12 @@ from typing import List, Optional
 import logging
 from datetime import datetime
 import argparse
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
+
+from data_validation import validate_input_data
+from monitoring import SystemMonitor
+from checkpoints import CheckpointManager
 
 from app.core.database import get_db
 
@@ -53,6 +59,8 @@ def recompute_all(
     skip_opportunities: bool = False,
     time_horizon: int = 30,
     include_ml: bool = True,
+    max_workers: int = 4,
+    enable_checkpoints: bool = True,
     db: Session = None
 ) -> dict:
     """
@@ -83,12 +91,30 @@ def recompute_all(
     try:
         logger.info("Starting complete recompute process")
         
+        # Initialisation des gestionnaires
+        monitor = SystemMonitor()
+        checkpoint_manager = CheckpointManager() if enable_checkpoints else None
+        
         # Si aucun symbole n'est spécifié, récupérer tous les symboles de la base
         if symbols is None:
             from app.models.database import HistoricalData
             distinct_symbols = db.query(HistoricalData.symbol).distinct().all()
             symbols = [s[0] for s in distinct_symbols]
             logger.info(f"Retrieved {len(symbols)} symbols from database")
+            
+        # Validation des données
+        validation_results = validate_input_data(symbols, db)
+        if not validation_results["valid"]:
+            logger.error("Data validation failed")
+            return {
+                "error": "Data validation failed",
+                "details": validation_results["errors"],
+                "success": False
+            }
+            
+        # Vérification des ressources initiales
+        metrics = monitor.check_resources()
+        monitor.log_if_critical(metrics)
         
         overall_results = {
             "start_time": datetime.now().isoformat(),

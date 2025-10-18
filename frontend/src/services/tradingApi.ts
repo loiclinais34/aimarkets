@@ -32,6 +32,7 @@ export interface Position {
 
 export interface WalletTransaction {
   id: number;
+  wallet_id: number;
   transaction_type: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER' | 'BUY_STOCK' | 'SELL_STOCK';
   amount: number;
   balance_after: number;
@@ -59,6 +60,7 @@ export interface SellStockRequest {
   price: number;
   fees?: number;
   description?: string;
+  target_wallet_id?: number;  // Wallet de destination pour le produit de la vente
 }
 
 export interface TradingResponse {

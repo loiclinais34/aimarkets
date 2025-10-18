@@ -1,7 +1,8 @@
 // frontend/src/app/advanced-analysis/page.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useRequireAuth } from '@/contexts/AuthContext';
 import AppLayout from '@/components/Layout/AppLayout';
 import DynamicSymbolSelector from '@/components/AdvancedAnalysis/DynamicSymbolSelector';
@@ -9,9 +10,19 @@ import AnalysisDetailsView from '@/components/AdvancedAnalysis/AnalysisDetailsVi
 
 const AdvancedAnalysisPage: React.FC = () => {
   const { isAuthenticated, isLoading } = useRequireAuth();
+  const searchParams = useSearchParams();
+  const urlSymbol = searchParams.get('symbol');
   const [selectedSymbol, setSelectedSymbol] = useState<string>('');
   const [selectedCompany, setSelectedCompany] = useState<string>('');
   const [showAnalysisDetails, setShowAnalysisDetails] = useState<boolean>(false);
+
+  // Gérer le symbole passé en paramètre URL
+  useEffect(() => {
+    if (urlSymbol && !selectedSymbol) {
+      setSelectedSymbol(urlSymbol);
+      setShowAnalysisDetails(true);
+    }
+  }, [urlSymbol]);
 
   const handleSymbolSelect = (symbol: string, companyName: string) => {
     setSelectedSymbol(symbol);

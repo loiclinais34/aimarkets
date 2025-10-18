@@ -344,6 +344,52 @@ async def composite_analysis(
             detail=f"Erreur lors de l'analyse composite: {str(e)}"
         )
 
+@router.get("/opportunities/search-test")
+async def search_opportunities_test(
+    recommendations: str = Query("BUY_WEAK", description="Test recommendations"),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """Endpoint de test pour vérifier le filtrage des recommandations"""
+    try:
+        from app.models.advanced_opportunities import AdvancedOpportunity
+        
+        # Test simple
+        query = db.query(AdvancedOpportunity)
+        
+        # Filtre de recommandation
+        if recommendations:
+            rec_list = [rec.strip().upper() for rec in recommendations.split(",")]
+            valid_recommendations = ["BUY", "SELL", "HOLD", "STRONG_BUY", "STRONG_SELL", "BUY_WEAK", "BUY_MODERATE", "SELL_WEAK", "SELL_MODERATE", "SELL_STRONG"]
+            rec_list = [rec for rec in rec_list if rec in valid_recommendations]
+            logger.info(f"TEST - Filtering by recommendations: {rec_list}")
+            if rec_list:
+                query = query.filter(AdvancedOpportunity.recommendation.in_(rec_list))
+                logger.info(f"TEST - Applied recommendation filter: {rec_list}")
+        
+        # Limiter à 3 résultats
+        opportunities = query.limit(3).all()
+        
+        results = []
+        for opp in opportunities:
+            results.append({
+                "symbol": opp.symbol,
+                "recommendation": opp.recommendation,
+                "composite_score": float(opp.composite_score)
+            })
+        
+        return {
+            "total_found": len(results),
+            "recommendations_requested": recommendations,
+            "opportunities": results
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in test endpoint: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur dans l'endpoint de test: {str(e)}"
+        )
+
 @router.get("/opportunities/search")
 async def search_opportunities(
     # Filtres de base
@@ -468,11 +514,16 @@ async def search_opportunities(
         if recommendations:
             try:
                 rec_list = [rec.strip().upper() for rec in recommendations.split(",")]
-                valid_recommendations = ["BUY", "SELL", "HOLD", "STRONG_BUY", "STRONG_SELL"]
+                valid_recommendations = ["BUY", "SELL", "HOLD", "STRONG_BUY", "STRONG_SELL", "BUY_WEAK", "BUY_MODERATE", "SELL_WEAK", "SELL_MODERATE", "SELL_STRONG"]
                 rec_list = [rec for rec in rec_list if rec in valid_recommendations]
+                logger.info(f"Filtering by recommendations: {rec_list}")
                 if rec_list:
                     query = query.filter(AdvancedOpportunity.recommendation.in_(rec_list))
-            except Exception:
+                    logger.info(f"Applied recommendation filter: {rec_list}")
+                else:
+                    logger.warning(f"No valid recommendations found in: {recommendations}")
+            except Exception as e:
+                logger.error(f"Error parsing recommendations {recommendations}: {e}")
                 pass  # Ignorer les erreurs de parsing
         
         # Filtres de confiance
@@ -598,7 +649,7 @@ async def search_opportunities(
 @router.post("/generate-daily-opportunities")
 async def generate_daily_opportunities(
     symbols: Optional[List[str]] = Query(None, description="Liste des symboles à analyser (optionnel)"),
-    limit_symbols: int = Query(50, ge=1, le=200, description="Nombre maximum de symboles à analyser"),
+    limit_symbols: int = Query(50, ge=0, description="Nombre maximum de symboles à analyser (0 pour tous les titres)"),
     time_horizon: int = Query(30, ge=1, le=365, description="Horizon temporel en jours"),
     include_ml: bool = Query(True, description="Inclure l'analyse ML"),
     db: Session = Depends(get_db)
@@ -629,7 +680,9 @@ async def generate_daily_opportunities(
             available_symbols = [sym.upper() for sym in symbols]
         else:
             # Récupérer tous les symboles disponibles depuis la base de données
-            symbol_query = db.query(HistoricalData.symbol).distinct().limit(limit_symbols)
+            symbol_query = db.query(HistoricalData.symbol).distinct()
+            if limit_symbols > 0:  # Si une limite est spécifiée
+                symbol_query = symbol_query.limit(limit_symbols)
             available_symbols = [row.symbol for row in symbol_query.all()]
         
         if not available_symbols:

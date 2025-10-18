@@ -31,9 +31,9 @@ export interface PositionWithValuation extends Position {
   current_value: number;
 }
 
-export function usePortfolioValuation(portfolio: Portfolio): PortfolioValuation {
+export function usePortfolioValuation(portfolio: Portfolio | null): PortfolioValuation {
   const [valuation, setValuation] = useState<PortfolioValuation>({
-    portfolio,
+    portfolio: portfolio!,
     totalValue: 0,
     totalCost: 0,
     totalPnL: 0,

@@ -30,7 +30,7 @@ const AdvancedAnalysisDashboard: React.FC<AdvancedAnalysisDashboardProps> = ({ c
   const [generationMessage, setGenerationMessage] = useState<string | null>(null);
   const [showGenerationForm, setShowGenerationForm] = useState(false);
   const [generationParams, setGenerationParams] = useState<GenerateDailyOpportunitiesRequest>({
-    limit_symbols: 50,
+    limit_symbols: 101,
     time_horizon: 30,
     include_ml: true
   });
@@ -576,7 +576,7 @@ const AdvancedAnalysisDashboard: React.FC<AdvancedAnalysisDashboardProps> = ({ c
                     value={generationParams.limit_symbols}
                     onChange={(e) => setGenerationParams({
                       ...generationParams,
-                      limit_symbols: parseInt(e.target.value) || 50
+                      limit_symbols: parseInt(e.target.value) || 101
                     })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />

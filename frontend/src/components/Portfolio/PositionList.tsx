@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Position, getPositions } from '@/services/tradingApi';
 import { Portfolio, getPortfolio } from '@/services/portfolioApi';
 import { usePortfolioValuation } from '@/hooks/usePortfolioValuation';
@@ -14,6 +15,7 @@ interface PositionListProps {
 }
 
 export default function PositionList({ portfolioId, onRefresh }: PositionListProps) {
+  const router = useRouter();
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -127,6 +129,10 @@ export default function PositionList({ portfolioId, onRefresh }: PositionListPro
   const handleOrderSuccess = () => {
     fetchPositions();
     if (onRefresh) onRefresh();
+  };
+
+  const handleSymbolClick = (position: Position) => {
+    router.push(`/advanced-analysis?symbol=${position.symbol}`);
   };
 
   const handleViewDetails = (position: Position) => {
@@ -252,6 +258,7 @@ export default function PositionList({ portfolioId, onRefresh }: PositionListPro
           positions={positionsWithRealtimePrices}
           onViewDetails={handleViewDetails}
           onEdit={(position) => handleSellOrder(position)}
+          onSymbolClick={handleSymbolClick}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -261,6 +268,7 @@ export default function PositionList({ portfolioId, onRefresh }: PositionListPro
               position={position}
               onViewDetails={handleViewDetails}
               onEdit={() => handleSellOrder(position)}
+              onSymbolClick={handleSymbolClick}
             />
           ))}
         </div>

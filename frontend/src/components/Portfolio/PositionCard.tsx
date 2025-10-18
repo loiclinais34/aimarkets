@@ -7,9 +7,10 @@ interface PositionCardProps {
   position: Position;
   onViewDetails?: (position: Position) => void;
   onEdit?: (position: Position) => void;
+  onSymbolClick?: (position: Position) => void;
 }
 
-export default function PositionCard({ position, onViewDetails, onEdit }: PositionCardProps) {
+export default function PositionCard({ position, onViewDetails, onEdit, onSymbolClick }: PositionCardProps) {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
@@ -43,12 +44,26 @@ export default function PositionCard({ position, onViewDetails, onEdit }: Positi
       <div className="p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">{position.symbol}</h3>
-            {position.company_name && (
-              <p className="text-sm text-gray-600">{position.company_name}</p>
-            )}
-          </div>
+          {onSymbolClick ? (
+            <button
+              onClick={() => onSymbolClick(position)}
+              className="text-left hover:text-blue-600 transition-colors"
+            >
+              <h3 className="text-lg font-semibold text-gray-900 hover:underline cursor-pointer">
+                {position.symbol}
+              </h3>
+              {position.company_name && (
+                <p className="text-sm text-gray-600">{position.company_name}</p>
+              )}
+            </button>
+          ) : (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">{position.symbol}</h3>
+              {position.company_name && (
+                <p className="text-sm text-gray-600">{position.company_name}</p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Position Details */}

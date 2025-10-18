@@ -32,9 +32,11 @@ class SellStockRequest(BaseModel):
     price: Decimal
     fees: Decimal = Decimal('0.00')
     description: Optional[str] = None
+    target_wallet_id: Optional[int] = None  # Wallet de destination pour le produit de la vente
 
 class WalletTransactionResponse(BaseModel):
     id: int
+    wallet_id: int
     transaction_type: str
     amount: Decimal
     balance_after: Decimal
@@ -179,12 +181,14 @@ async def sell_stock(
             quantity=request.quantity,
             price=request.price,
             fees=request.fees,
-            description=request.description
+            description=request.description,
+            target_wallet_id=request.target_wallet_id
         )
         
         return TradingResponse(
             transaction=WalletTransactionResponse(
                 id=transaction.id,
+                wallet_id=transaction.wallet_id,
                 transaction_type=transaction.transaction_type.value,
                 amount=transaction.amount,
                 balance_after=transaction.balance_after,

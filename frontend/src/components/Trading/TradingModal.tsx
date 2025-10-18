@@ -41,7 +41,8 @@ export default function TradingModal({
     quantity: 0,
     price: currentPrice,
     fees: 0,
-    description: ''
+    description: '',
+    target_wallet_id: 0  // Wallet de destination pour les ventes
   });
 
   // Charger les wallets
@@ -58,15 +59,16 @@ export default function TradingModal({
       setFormData({
         wallet_id: wallets[0]?.id || 0,
         symbol: symbol,
-        quantity: 0,
+        quantity: mode === 'sell' ? (availableQuantity || 0) : 0,
         price: currentPrice,
         fees: 0,
-        description: ''
+        description: '',
+        target_wallet_id: wallets.find(w => w.currency === 'USD')?.id || wallets[0]?.id || 0
       });
       setError(null);
       setSuccess(null);
     }
-  }, [isOpen, symbol, currentPrice, wallets]);
+  }, [isOpen, symbol, currentPrice, wallets, mode, availableQuantity]);
 
   const loadWallets = async () => {
     try {
@@ -141,7 +143,8 @@ export default function TradingModal({
           quantity: formData.quantity,
           price: formData.price,
           fees: formData.fees,
-          description: formData.description
+          description: formData.description,
+          target_wallet_id: formData.target_wallet_id || undefined
         };
 
         const result = await sellStock(portfolioId, request);
@@ -198,7 +201,7 @@ export default function TradingModal({
             {/* Wallet Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Wallet
+                {mode === 'sell' ? 'Wallet de la position' : 'Wallet'}
               </label>
               <select
                 name="wallet_id"
@@ -216,24 +219,57 @@ export default function TradingModal({
               </select>
             </div>
 
+            {/* Target Wallet Selection (only for sell mode) */}
+            {mode === 'sell' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Wallet de destination
+                </label>
+                <select
+                  name="target_wallet_id"
+                  value={formData.target_wallet_id}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value={0}>Sélectionner un wallet de destination</option>
+                  {wallets.map(wallet => (
+                    <option key={wallet.id} value={wallet.id}>
+                      {wallet.currency} - {formatCurrency(wallet.available_balance, wallet.currency)} disponible
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Le produit de la vente sera crédité sur ce wallet
+                </p>
+              </div>
+            )}
+
             {/* Symbol */}
             <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Symbole
             </label>
             
-            {/* Search Input */}
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Rechercher un symbole..."
-                value={symbolSearch}
-                onChange={(e) => setSymbolSearch(e.target.value)}
-                className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                onFocus={() => setShowSymbolSearch(true)}
-              />
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-            </div>
+            {mode === 'sell' ? (
+              /* En mode vente, afficher le symbole en lecture seule */
+              <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-900">
+                {symbol || 'Aucun symbole sélectionné'}
+              </div>
+            ) : (
+              /* En mode achat, permettre la recherche */
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Rechercher un symbole..."
+                  value={symbolSearch}
+                  onChange={(e) => setSymbolSearch(e.target.value)}
+                  className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onFocus={() => setShowSymbolSearch(true)}
+                />
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+              </div>
+            )}
 
             {/* Symbol Dropdown */}
             {showSymbolSearch && (
@@ -323,8 +359,40 @@ export default function TradingModal({
                 required
               />
               <p className="text-xs text-gray-500 mt-1">
-                Max: ∞
+                {mode === 'sell' ? `Disponible: ${availableQuantity?.toLocaleString('fr-FR', { maximumFractionDigits: 6 }) || 0}` : 'Max: ∞'}
               </p>
+              {mode === 'sell' && availableQuantity && availableQuantity > 0 && (
+                <div className="flex space-x-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, quantity: availableQuantity * 0.25 }))}
+                    className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                  >
+                    25%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, quantity: availableQuantity * 0.5 }))}
+                    className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                  >
+                    50%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, quantity: availableQuantity * 0.75 }))}
+                    className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                  >
+                    75%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, quantity: availableQuantity }))}
+                    className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                  >
+                    100%
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Price */}
@@ -431,7 +499,7 @@ export default function TradingModal({
             </button>
             <button
               type="submit"
-              disabled={isLoading || formData.wallet_id === 0 || formData.quantity <= 0}
+              disabled={isLoading || formData.wallet_id === 0 || formData.quantity <= 0 || (mode === 'sell' && formData.target_wallet_id === 0)}
               className={`flex-1 px-4 py-2 rounded-md text-white transition-colors ${
                 mode === 'buy' 
                   ? 'bg-green-600 hover:bg-green-700 disabled:bg-green-300' 

@@ -119,6 +119,13 @@ app.include_router(
     tags=["ML Test"]
 )
 
+from .api.endpoints.analysis.ml_performance import router as ml_performance_router
+app.include_router(
+    ml_performance_router,
+    prefix="/api/v1/analysis",
+    tags=["ML Performance"]
+)
+
 app.include_router(
     target_parameters_router,
     prefix="/api/v1",
