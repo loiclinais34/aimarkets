@@ -47,6 +47,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     { name: 'Dashboard', href: '/dashboard', icon: '📊' },
     { name: 'Portefeuille', href: '/portfolios', icon: '💼' },
     { name: 'Analyses Avancées', href: '/advanced-analysis', icon: '📈' },
+    { name: 'Analyse des Performances', href: '/performance-analysis', icon: '🚀' },
     { name: 'Opportunités', href: '/opportunities', icon: '🎯' },
   ];
 

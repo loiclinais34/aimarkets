@@ -8,6 +8,8 @@ from .bubble_detection import router as bubble_detection
 from .sophisticated_ml import router as sophisticated_ml
 from .ml_opportunities import router as ml_opportunities
 from .ml_performance import router as ml_performance
+from .xgboost_opportunities import router as xgboost_opportunities
+from .xgboost_performance import router as xgboost_performance
 
 __all__ = [
     "opportunity_performance",
@@ -18,5 +20,7 @@ __all__ = [
     "bubble_detection",
     "sophisticated_ml",
     "ml_opportunities",
-    "ml_performance"
+    "ml_performance",
+    "xgboost_opportunities",
+    "xgboost_performance"
 ]

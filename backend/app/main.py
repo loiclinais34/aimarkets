@@ -126,6 +126,20 @@ app.include_router(
     tags=["ML Performance"]
 )
 
+from .api.endpoints.analysis.xgboost_opportunities import router as xgboost_opportunities_router
+app.include_router(
+    xgboost_opportunities_router,
+    prefix="/api/v1/analysis",
+    tags=["XGBoost Opportunities"]
+)
+
+from .api.endpoints.analysis.xgboost_performance import router as xgboost_performance_router
+app.include_router(
+    xgboost_performance_router,
+    prefix="/api/v1/analysis",
+    tags=["XGBoost Performance"]
+)
+
 app.include_router(
     target_parameters_router,
     prefix="/api/v1",

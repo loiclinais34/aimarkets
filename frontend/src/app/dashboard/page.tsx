@@ -12,8 +12,7 @@ import AppLayout from '@/components/Layout/AppLayout';
 import { Portfolio, getPortfolios } from '@/services/portfolioApi';
 import { usePortfoliosValuation } from '@/hooks/usePortfolioValuation';
 import { advancedAnalysisApi, AdvancedSearchFilters } from '@/services/advancedAnalysisApi';
-import MLPerformanceKPIs from '@/components/MLPerformanceKPIs';
-import MLTopPerformers from '@/components/MLTopPerformers';
+import SimplifiedXGBoostKPIs from '@/components/SimplifiedXGBoostKPIs';
 
 export default function DashboardPage() {
   const { isAuthenticated, isLoading } = useRequireAuth();
@@ -235,14 +234,9 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Performance des Opportunités ML */}
+          {/* Performance des Opportunités XGBoost - Version Simplifiée */}
           <div className="mb-6">
-            <MLPerformanceKPIs />
-          </div>
-
-          {/* Meilleurs Symboles ML */}
-          <div className="mb-6">
-            <MLTopPerformers />
+            <SimplifiedXGBoostKPIs />
           </div>
 
           {/* Actions rapides */}
