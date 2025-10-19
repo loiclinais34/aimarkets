@@ -914,6 +914,153 @@ async def get_support_resistance_levels(
         )
 
 
+@router.get("/advanced-indicators/{symbol}")
+async def get_advanced_technical_indicators(
+    symbol: str,
+    period: str = "1m",
+    db: Session = Depends(get_db)
+):
+    """
+    Récupère les indicateurs techniques avancés TA-Lib pour un symbole.
+    
+    Args:
+        symbol: Symbole à analyser
+        period: Période de calcul (5d, 10d, 1m, 3m, 6m, 1y)
+        db: Session de base de données
+        
+    Returns:
+        Dictionnaire contenant les indicateurs techniques avancés TA-Lib
+    """
+    try:
+        # Récupérer les données depuis la table advanced_technical_indicators
+        from app.models.advanced_technical_indicators import AdvancedTechnicalIndicators as AdvancedTechnicalIndicatorsModel
+        
+        # Convertir la période en jours
+        period_days = {
+            "5d": 5,
+            "10d": 10,
+            "1m": 30,
+            "3m": 90,
+            "6m": 180,
+            "1y": 365
+        }.get(period, 30)
+        
+        # Récupérer les données historiques depuis la base de données
+        from app.models.database import HistoricalData
+        
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=period_days)
+        
+        # Récupérer les indicateurs avancés
+        advanced_indicators = db.query(AdvancedTechnicalIndicatorsModel).filter(
+            AdvancedTechnicalIndicatorsModel.symbol == symbol,
+            AdvancedTechnicalIndicatorsModel.date >= start_date,
+            AdvancedTechnicalIndicatorsModel.date <= end_date
+        ).order_by(AdvancedTechnicalIndicatorsModel.date).all()
+        
+        if not advanced_indicators:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Aucun indicateur technique avancé trouvé pour {symbol}"
+            )
+        
+        # Récupérer les données de prix historiques
+        historical_records = db.query(HistoricalData).filter(
+            HistoricalData.symbol == symbol,
+            HistoricalData.date >= start_date,
+            HistoricalData.date <= end_date
+        ).order_by(HistoricalData.date).all()
+        
+        if not historical_records:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Aucune donnée historique trouvée pour {symbol}"
+            )
+        
+        # Créer un dictionnaire des prix pour correspondance
+        price_data = {}
+        for record in historical_records:
+            price_data[record.date] = {
+                'open': float(record.open),
+                'high': float(record.high),
+                'low': float(record.low),
+                'close': float(record.close),
+                'volume': int(record.volume)
+            }
+        
+        # Préparer les données pour le frontend
+        indicators_data = []
+        
+        for indicator in advanced_indicators:
+            # Récupérer les données de prix correspondantes
+            price_info = price_data.get(indicator.date)
+            
+            if price_info:
+                indicator_data = {
+                    'date': indicator.date.strftime('%Y-%m-%d'),
+                    'symbol': indicator.symbol,
+                    'open': price_info['open'],
+                    'high': price_info['high'],
+                    'low': price_info['low'],
+                    'close': price_info['close'],
+                    'volume': price_info['volume'],
+                    # Indicateurs TA-Lib (using correct column names from the database)
+                    'rsi': float(indicator.rsi_14) if indicator.rsi_14 is not None else None,
+                    'macd': float(indicator.macd) if indicator.macd is not None else None,
+                    'macd_signal': float(indicator.macd_signal) if indicator.macd_signal is not None else None,
+                    'macd_hist': float(indicator.macd_hist) if indicator.macd_hist is not None else None,
+                    'upper_band': float(indicator.bb_upper) if indicator.bb_upper is not None else None,
+                    'middle_band': float(indicator.bb_middle) if indicator.bb_middle is not None else None,
+                    'lower_band': float(indicator.bb_lower) if indicator.bb_lower is not None else None,
+                    'cci': float(indicator.cci_14) if indicator.cci_14 is not None else None,
+                    'stoch_k': float(indicator.stoch_k) if indicator.stoch_k is not None else None,
+                    'stoch_d': float(indicator.stoch_d) if indicator.stoch_d is not None else None,
+                    'atr': float(indicator.atr_14) if indicator.atr_14 is not None else None,
+                    'obv': float(indicator.obv) if indicator.obv is not None else None,
+                    'sma_20': float(indicator.sma_20) if indicator.sma_20 is not None else None,
+                    'sma_50': float(indicator.sma_50) if indicator.sma_50 is not None else None,
+                    'ema_20': float(indicator.ema_20) if indicator.ema_20 is not None else None,
+                    'ema_50': float(indicator.ema_50) if indicator.ema_50 is not None else None,
+                    'williams_r': float(indicator.willr_14) if indicator.willr_14 is not None else None,
+                    'adx': float(indicator.adx_14) if indicator.adx_14 is not None else None,
+                    'plus_di': float(indicator.plus_di) if indicator.plus_di is not None else None,
+                    'minus_di': float(indicator.minus_di) if indicator.minus_di is not None else None,
+                    'sar': float(indicator.sar) if indicator.sar is not None else None,
+                    'mfi': float(indicator.mfi_14) if indicator.mfi_14 is not None else None,
+                    'midpoint_20': float(indicator.midpoint_20) if indicator.midpoint_20 is not None else None,
+                    'midprice_20': float(indicator.midprice_20) if indicator.midprice_20 is not None else None,
+                    'obv_price_divergence': float(indicator.obv_price_divergence) if indicator.obv_price_divergence is not None else None,
+                    't3_20': float(indicator.t3_20) if indicator.t3_20 is not None else None,
+                    'vpt': float(indicator.vpt) if indicator.vpt is not None else None,
+                    'wad': float(indicator.wad) if indicator.wad is not None else None,
+                    'momentum_composite': float(indicator.momentum_composite) if indicator.momentum_composite is not None else None,
+                    'volatility_composite': float(indicator.volatility_composite) if indicator.volatility_composite is not None else None,
+                    'trend_strength': float(indicator.trend_strength) if indicator.trend_strength is not None else None,
+                    'bb_width': float(indicator.bb_width) if indicator.bb_width is not None else None,
+                    'bb_percent': float(indicator.bb_percent) if indicator.bb_percent is not None else None,
+                    'bb_position': float(indicator.bb_position) if indicator.bb_position is not None else None,
+                    'bb_squeeze': float(indicator.bb_squeeze) if indicator.bb_squeeze is not None else None,
+                    'price': price_info['close']
+                }
+                indicators_data.append(indicator_data)
+        
+        return {
+            "symbol": symbol,
+            "period": period,
+            "data": indicators_data,
+            "count": len(indicators_data),
+            "analysis_date": datetime.now().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la récupération des indicateurs avancés: {str(e)}"
+        )
+
+
 @router.get("/analysis/{symbol}")
 async def get_comprehensive_technical_analysis(
     symbol: str,
