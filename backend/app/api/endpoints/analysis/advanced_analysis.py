@@ -715,117 +715,117 @@ async def generate_daily_opportunities(
                         db=db
                     )
                 
-                # Sauvegarder l'opportunité en base de données
-                from app.models.advanced_opportunities import AdvancedOpportunity
-                from sqlalchemy import func
+                    # Sauvegarder l'opportunité en base de données
+                    from app.models.advanced_opportunities import AdvancedOpportunity
+                    from sqlalchemy import func
                 
-                # Vérifier si une opportunité existe déjà pour ce symbole et cet horizon aujourd'hui
-                existing_opportunity = db.query(AdvancedOpportunity).filter(
-                    AdvancedOpportunity.symbol == symbol,
-                    AdvancedOpportunity.time_horizon == horizon,
-                    func.date(AdvancedOpportunity.updated_at) == date.today()
-                ).first()
+                    # Vérifier si une opportunité existe déjà pour ce symbole et cet horizon aujourd'hui
+                    existing_opportunity = db.query(AdvancedOpportunity).filter(
+                        AdvancedOpportunity.symbol == symbol,
+                        AdvancedOpportunity.time_horizon == horizon,
+                        func.date(AdvancedOpportunity.updated_at) == date.today()
+                    ).first()
                 
-                if existing_opportunity:
-                    # Mettre à jour l'opportunité existante
-                    existing_opportunity.analysis_date = result.analysis_date
-                    existing_opportunity.recommendation = result.recommendation
-                    existing_opportunity.risk_level = result.risk_level
-                    existing_opportunity.composite_score = result.composite_score
-                    existing_opportunity.confidence_level = result.confidence_level
-                    existing_opportunity.technical_score = result.technical_score
-                    existing_opportunity.sentiment_score = result.sentiment_score
-                    existing_opportunity.market_score = result.market_score
-                    existing_opportunity.ml_score = result.ml_score
-                    existing_opportunity.candlestick_score = result.candlestick_score
-                    existing_opportunity.garch_score = result.garch_score
-                    existing_opportunity.monte_carlo_score = result.monte_carlo_score
-                    existing_opportunity.markov_score = result.markov_score
-                    existing_opportunity.volatility_score = result.volatility_score
-                    
-                    # Mettre à jour les analyses détaillées
-                    existing_opportunity.technical_analysis = result.technical_analysis
-                    existing_opportunity.sentiment_analysis = result.sentiment_analysis
-                    existing_opportunity.market_analysis = result.market_indicators
-                    existing_opportunity.ml_analysis = result.ml_analysis
-                    existing_opportunity.candlestick_analysis = result.candlestick_analysis
-                    existing_opportunity.garch_analysis = result.garch_analysis
-                    existing_opportunity.monte_carlo_analysis = result.monte_carlo_analysis
-                    existing_opportunity.markov_analysis = result.markov_analysis
-                    existing_opportunity.volatility_analysis = result.volatility_analysis
-                    existing_opportunity.analysis_types = ['technical', 'sentiment', 'market', 'ml', 'candlestick', 'garch', 'monte_carlo', 'markov', 'volatility']
-                    existing_opportunity.time_horizon = horizon
-                    
-                    existing_opportunity.updated_at = datetime.now()
-                else:
-                    # Créer une nouvelle opportunité
-                    new_opportunity = AdvancedOpportunity(
-                        symbol=symbol,
-                        analysis_date=result.analysis_date,
-                        recommendation=result.recommendation,
-                        risk_level=result.risk_level,
-                        composite_score=result.composite_score,
-                        confidence_level=result.confidence_level,
-                        technical_score=result.technical_score,
-                        sentiment_score=result.sentiment_score,
-                        market_score=result.market_score,
-                        ml_score=result.ml_score,
-                        candlestick_score=result.candlestick_score,
-                        garch_score=result.garch_score,
-                        monte_carlo_score=result.monte_carlo_score,
-                        markov_score=result.markov_score,
-                        volatility_score=result.volatility_score,
+                    if existing_opportunity:
+                        # Mettre à jour l'opportunité existante
+                        existing_opportunity.analysis_date = result.analysis_date
+                        existing_opportunity.recommendation = result.recommendation
+                        existing_opportunity.risk_level = result.risk_level
+                        existing_opportunity.composite_score = result.composite_score
+                        existing_opportunity.confidence_level = result.confidence_level
+                        existing_opportunity.technical_score = result.technical_score
+                        existing_opportunity.sentiment_score = result.sentiment_score
+                        existing_opportunity.market_score = result.market_score
+                        existing_opportunity.ml_score = result.ml_score
+                        existing_opportunity.candlestick_score = result.candlestick_score
+                        existing_opportunity.garch_score = result.garch_score
+                        existing_opportunity.monte_carlo_score = result.monte_carlo_score
+                        existing_opportunity.markov_score = result.markov_score
+                        existing_opportunity.volatility_score = result.volatility_score
                         
-                        # Analyses détaillées
-                        technical_analysis=result.technical_analysis,
-                        sentiment_analysis=result.sentiment_analysis,
-                        market_analysis=result.market_indicators,
-                        ml_analysis=result.ml_analysis,
-                        candlestick_analysis=result.candlestick_analysis,
-                        garch_analysis=result.garch_analysis,
-                        monte_carlo_analysis=result.monte_carlo_analysis,
-                        markov_analysis=result.markov_analysis,
-                        volatility_analysis=result.volatility_analysis,
-                        analysis_types=['technical', 'sentiment', 'market', 'ml', 'candlestick', 'garch', 'monte_carlo', 'markov', 'volatility'],
-                        time_horizon=horizon,
+                        # Mettre à jour les analyses détaillées
+                        existing_opportunity.technical_analysis = result.technical_analysis
+                        existing_opportunity.sentiment_analysis = result.sentiment_analysis
+                        existing_opportunity.market_analysis = result.market_indicators
+                        existing_opportunity.ml_analysis = result.ml_analysis
+                        existing_opportunity.candlestick_analysis = result.candlestick_analysis
+                        existing_opportunity.garch_analysis = result.garch_analysis
+                        existing_opportunity.monte_carlo_analysis = result.monte_carlo_analysis
+                        existing_opportunity.markov_analysis = result.markov_analysis
+                        existing_opportunity.volatility_analysis = result.volatility_analysis
+                        existing_opportunity.analysis_types = ['technical', 'sentiment', 'market', 'ml', 'candlestick', 'garch', 'monte_carlo', 'markov', 'volatility']
+                        existing_opportunity.time_horizon = horizon
                         
-                        created_at=datetime.now(),
-                        updated_at=datetime.now()
-                    )
-                    db.add(new_opportunity)
-                
-                # Ajouter l'opportunité à la liste de réponse
-                opportunities.append({
-                    "symbol": symbol,
-                    "horizon": horizon,
-                    "analysis_date": result.analysis_date,
-                    "recommendation": result.recommendation,
-                    "risk_level": result.risk_level,
-                    "composite_score": result.composite_score,
-                    "confidence_level": result.confidence_level,
-                    "scores": {
-                        "technical": result.technical_score,
-                        "sentiment": result.sentiment_score,
-                        "market": result.market_score,
-                        "ml": result.ml_score,
-                        "candlestick": result.candlestick_score,
-                        "garch": result.garch_score,
-                        "monte_carlo": result.monte_carlo_score,
-                        "markov": result.markov_score,
-                        "volatility": result.volatility_score
-                    },
-                    "analysis_details": {
-                        "technical": result.technical_analysis,
-                        "sentiment": result.sentiment_analysis,
-                        "market": result.market_indicators,
-                        "ml": result.ml_analysis,
-                        "candlestick": result.candlestick_analysis,
-                        "garch": result.garch_analysis,
-                        "monte_carlo": result.monte_carlo_analysis,
-                        "markov": result.markov_analysis,
-                        "volatility": result.volatility_analysis
-                    }
-                })
+                        existing_opportunity.updated_at = datetime.now()
+                    else:
+                        # Créer une nouvelle opportunité
+                        new_opportunity = AdvancedOpportunity(
+                            symbol=symbol,
+                            analysis_date=result.analysis_date,
+                            recommendation=result.recommendation,
+                            risk_level=result.risk_level,
+                            composite_score=result.composite_score,
+                            confidence_level=result.confidence_level,
+                            technical_score=result.technical_score,
+                            sentiment_score=result.sentiment_score,
+                            market_score=result.market_score,
+                            ml_score=result.ml_score,
+                            candlestick_score=result.candlestick_score,
+                            garch_score=result.garch_score,
+                            monte_carlo_score=result.monte_carlo_score,
+                            markov_score=result.markov_score,
+                            volatility_score=result.volatility_score,
+                        
+                            # Analyses détaillées
+                            technical_analysis=result.technical_analysis,
+                            sentiment_analysis=result.sentiment_analysis,
+                            market_analysis=result.market_indicators,
+                            ml_analysis=result.ml_analysis,
+                            candlestick_analysis=result.candlestick_analysis,
+                            garch_analysis=result.garch_analysis,
+                            monte_carlo_analysis=result.monte_carlo_analysis,
+                            markov_analysis=result.markov_analysis,
+                            volatility_analysis=result.volatility_analysis,
+                            analysis_types=['technical', 'sentiment', 'market', 'ml', 'candlestick', 'garch', 'monte_carlo', 'markov', 'volatility'],
+                            time_horizon=horizon,
+                            
+                            created_at=datetime.now(),
+                            updated_at=datetime.now()
+                        )
+                        db.add(new_opportunity)
+                    
+                    # Ajouter l'opportunité à la liste de réponse
+                    opportunities.append({
+                        "symbol": symbol,
+                        "horizon": horizon,
+                        "analysis_date": result.analysis_date,
+                        "recommendation": result.recommendation,
+                        "risk_level": result.risk_level,
+                        "composite_score": result.composite_score,
+                        "confidence_level": result.confidence_level,
+                        "scores": {
+                            "technical": result.technical_score,
+                            "sentiment": result.sentiment_score,
+                            "market": result.market_score,
+                            "ml": result.ml_score,
+                            "candlestick": result.candlestick_score,
+                            "garch": result.garch_score,
+                            "monte_carlo": result.monte_carlo_score,
+                            "markov": result.markov_score,
+                            "volatility": result.volatility_score
+                        },
+                        "analysis_details": {
+                            "technical": result.technical_analysis,
+                            "sentiment": result.sentiment_analysis,
+                            "market": result.market_indicators,
+                            "ml": result.ml_analysis,
+                            "candlestick": result.candlestick_analysis,
+                            "garch": result.garch_analysis,
+                            "monte_carlo": result.monte_carlo_analysis,
+                            "markov": result.markov_analysis,
+                            "volatility": result.volatility_analysis
+                        }
+                    })
                 
                 except Exception as e:
                     error_msg = f"Erreur lors de l'analyse de {symbol} (horizon {horizon}j): {str(e)}"
