@@ -15,9 +15,11 @@ import TechnicalSignalsChart from './TechnicalSignalsChart';
 import SentimentAnalysisPanel from './SentimentAnalysisPanel';
 import MarketIndicatorsWidget from './MarketIndicatorsWidget';
 import BubbleRiskPanel from './BubbleRiskPanel';
-import HybridOpportunityCard from './HybridOpportunityCard';
+import XGBoostOpportunityCard from './XGBoostOpportunityCard';
+import AdvancedTechnicalIndicators from './AdvancedTechnicalIndicators';
 import { AgentAnalysisModal } from './AgentAnalysisModal';
 import { advancedAnalysisApi, HybridAnalysisRequest, HybridAnalysisResponse, AdvancedSearchFilters, GenerateDailyOpportunitiesRequest, GenerateDailyOpportunitiesResponse } from '@/services/advancedAnalysisApi';
+import { xgboostOpportunitiesApi, XGBoostOpportunity, XGBoostOpportunitiesResponse } from '@/services/xgboostOpportunitiesApi';
 import { agentAnalysisApi } from '../../services/agentAnalysisApi';
 
 interface OpportunitiesDashboardProps {
@@ -25,8 +27,8 @@ interface OpportunitiesDashboardProps {
 }
 
 const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ className = '' }) => {
-  const [hybridOpportunities, setHybridOpportunities] = useState<HybridAnalysisResponse['opportunities']>([]);
-  const [filteredOpportunities, setFilteredOpportunities] = useState<HybridAnalysisResponse['opportunities']>([]);
+  const [xgboostOpportunities, setXGBoostOpportunities] = useState<XGBoostOpportunity[]>([]);
+  const [filteredOpportunities, setFilteredOpportunities] = useState<XGBoostOpportunity[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [generatingOpportunities, setGeneratingOpportunities] = useState(false);
@@ -62,29 +64,28 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
   });
   
   // Tri
-  const [sortBy, setSortBy] = useState('composite_score');
+  const [sortBy, setSortBy] = useState('confidence_level');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  // Fonction pour charger les opportunités par défaut
+  // Fonction pour charger les opportunités XGBoost par défaut
   const loadDefaultOpportunities = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      // Charger toutes les opportunités BUY_STRONG et quelques autres pour avoir un échantillon représentatif
-      const searchFilters: AdvancedSearchFilters = {
-        recommendations: 'BUY_STRONG', // Filtrer directement sur BUY_STRONG
-        limit: 100, // Augmenter la limite pour s'assurer d'avoir toutes les BUY_STRONG
-        sort_by: 'analysis_date', // Trier par date d'analyse pour avoir les plus récentes
+      // Charger les opportunités XGBoost avec une confiance minimale élevée
+      const response = await xgboostOpportunitiesApi.getOpportunities({
+        limit: 100,
+        min_confidence: 0.7, // Confiance minimale de 70%
+        sort_by: 'confidence_level',
         sort_order: 'desc'
-      };
+      });
       
-      const response = await advancedAnalysisApi.searchStoredOpportunities(searchFilters);
-      setHybridOpportunities(response.opportunities);
+      setXGBoostOpportunities(response.opportunities);
       setFilteredOpportunities(response.opportunities);
     } catch (err) {
-      console.error('Erreur lors du chargement des opportunités:', err);
-      setError('Erreur lors du chargement des opportunités');
+      console.error('Erreur lors du chargement des opportunités XGBoost:', err);
+      setError('Erreur lors du chargement des opportunités XGBoost');
     } finally {
       setLoading(false);
     }
@@ -99,30 +100,33 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
     setError(null);
     
     try {
-      // Construire les filtres pour l'API avec TOUS les filtres actuels
-      const apiFilters: AdvancedSearchFilters = {
-        limit: 100,
-        sort_by: sortBy === 'analysis_date' ? 'analysis_date' : 'composite_score',
-        sort_order: sortOrder,
-        min_score: filters.minScore ? parseFloat(filters.minScore) : undefined,
+      // Construire les filtres pour l'API XGBoost
+      const apiFilters = {
+        symbol: filters.symbol || undefined,
+        recommendation: filters.recommendation || undefined,
+        min_confidence: filters.minScore ? parseFloat(filters.minScore) : undefined,
+        max_confidence: filters.maxScore ? parseFloat(filters.maxScore) : undefined,
         date_from: filters.startDate || undefined,
         date_to: filters.endDate || undefined,
-        symbols: filters.symbol || undefined,
-        recommendations: filters.recommendation || undefined
+        limit: 100,
+        sort_by: sortBy === 'analysis_date' ? 'date' : 
+                 sortBy === 'composite_score' ? 'confidence_level' : 
+                 sortBy === 'confidence_level' ? 'confidence_level' : 'confidence_level',
+        sort_order: sortOrder
       };
       
-      console.log('API filters being sent:', apiFilters);
+      console.log('XGBoost API filters being sent:', apiFilters);
       
-      // Appeler l'API avec les filtres
-      const response = await advancedAnalysisApi.searchStoredOpportunities(apiFilters);
-      setHybridOpportunities(response.opportunities);
+      // Appeler l'API XGBoost avec les filtres
+      const response = await xgboostOpportunitiesApi.searchOpportunities(apiFilters);
+      setXGBoostOpportunities(response.opportunities);
       setFilteredOpportunities(response.opportunities);
       
-      console.log('API response count:', response.opportunities.length);
+      console.log('XGBoost API response count:', response.opportunities.length);
       console.log('First few recommendations:', response.opportunities.slice(0, 5).map(op => ({ symbol: op.symbol, recommendation: op.recommendation })));
     } catch (err) {
-      console.error('Erreur lors de l\'application des filtres:', err);
-      setError('Erreur lors de l\'application des filtres');
+      console.error('Erreur lors de l\'application des filtres XGBoost:', err);
+      setError('Erreur lors de l\'application des filtres XGBoost');
     } finally {
       setLoading(false);
     }
@@ -134,29 +138,32 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
     setError(null);
     
     try {
-      // Construire les filtres pour l'API avec TOUS les filtres actuels ET le tri
-      const apiFilters: AdvancedSearchFilters = {
-        limit: 100,
-        sort_by: sortBy === 'analysis_date' ? 'analysis_date' : 'composite_score',
-        sort_order: sortOrder,
-        min_score: filters.minScore ? parseFloat(filters.minScore) : undefined,
+      // Construire les filtres pour l'API XGBoost avec TOUS les filtres actuels ET le tri
+      const apiFilters = {
+        symbol: filters.symbol || undefined,
+        recommendation: filters.recommendation || undefined,
+        min_confidence: filters.minScore ? parseFloat(filters.minScore) : undefined,
+        max_confidence: filters.maxScore ? parseFloat(filters.maxScore) : undefined,
         date_from: filters.startDate || undefined,
         date_to: filters.endDate || undefined,
-        symbols: filters.symbol || undefined,
-        recommendations: filters.recommendation || undefined
+        limit: 100,
+        sort_by: sortBy === 'analysis_date' ? 'date' : 
+                 sortBy === 'composite_score' ? 'confidence_level' : 
+                 sortBy === 'confidence_level' ? 'confidence_level' : 'confidence_level',
+        sort_order: sortOrder
       };
       
-      console.log('Sort API filters being sent:', apiFilters);
+      console.log('Sort XGBoost API filters being sent:', apiFilters);
       
-      // Appeler l'API avec le tri et tous les filtres
-      const response = await advancedAnalysisApi.searchStoredOpportunities(apiFilters);
-      setHybridOpportunities(response.opportunities);
+      // Appeler l'API XGBoost avec le tri et tous les filtres
+      const response = await xgboostOpportunitiesApi.searchOpportunities(apiFilters);
+      setXGBoostOpportunities(response.opportunities);
       setFilteredOpportunities(response.opportunities);
       
-      console.log('Sorted opportunities count:', response.opportunities.length);
+      console.log('Sorted XGBoost opportunities count:', response.opportunities.length);
     } catch (err) {
-      console.error('Erreur lors du tri des opportunités:', err);
-      setError('Erreur lors du tri des opportunités');
+      console.error('Erreur lors du tri des opportunités XGBoost:', err);
+      setError('Erreur lors du tri des opportunités XGBoost');
     } finally {
       setLoading(false);
     }
@@ -305,9 +312,9 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
   const [showFiltersAndSort, setShowFiltersAndSort] = useState(false);
   const [selectedOpportunity, setSelectedOpportunity] = useState<{
     symbol: string;
-    tab: 'technical' | 'sentiment' | 'market' | 'bubble' | 'hybrid' | 'agent';
+    tab: 'technical' | 'sentiment' | 'market' | 'bubble' | 'hybrid' | 'agent' | 'advanced';
   } | null>(null);
-  const [activeTab, setActiveTab] = useState<'technical' | 'sentiment' | 'market' | 'bubble' | 'hybrid' | 'agent'>('technical');
+  const [activeTab, setActiveTab] = useState<'technical' | 'sentiment' | 'market' | 'bubble' | 'hybrid' | 'agent' | 'advanced'>('technical');
 
   useEffect(() => {
     loadDefaultOpportunities();
@@ -390,7 +397,7 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
     // No longer needed
   };
 
-  const handleViewDetails = (symbol: string, tab: 'technical' | 'sentiment' | 'market' | 'bubble' | 'hybrid' | 'agent') => {
+  const handleViewDetails = (symbol: string, tab: 'technical' | 'sentiment' | 'market' | 'bubble' | 'hybrid' | 'agent' | 'advanced') => {
     setSelectedOpportunity({ symbol, tab });
     setActiveTab(tab);
     
@@ -444,6 +451,7 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
     { id: 'market', name: 'Marché', icon: ChartBarIcon },
     { id: 'bubble', name: 'Bulle', icon: ExclamationTriangleIcon },
     { id: 'hybrid', name: 'Composite', icon: Cog6ToothIcon },
+    { id: 'advanced', name: 'Indicateurs Avancés', icon: CpuChipIcon },
     { id: 'agent', name: 'La rubrique de l\'agent', icon: CpuChipIcon }
   ];
 
@@ -539,6 +547,10 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
                 </div>
               </div>
             </div>
+          )}
+
+          {activeTab === 'advanced' && (
+            <AdvancedTechnicalIndicators symbol={selectedOpportunity.symbol} />
           )}
 
           {activeTab === 'agent' && (
@@ -717,10 +729,10 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
           <div className="py-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
-                🎯 Opportunités d'Investissement
+                🎯 Opportunités XGBoost ML
               </h1>
               <p className="mt-2 text-gray-600">
-                Découvrez les meilleures opportunités basées sur l'analyse avancée et le machine learning
+                Découvrez les meilleures opportunités basées sur l'intelligence artificielle XGBoost et les indicateurs techniques avancés TA-Lib
               </p>
             </div>
           </div>
@@ -732,7 +744,7 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
         <div className="mb-8 p-6 bg-white border border-gray-200 rounded-lg shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-gray-900">
-              Génération d'Opportunités
+              Génération d'Opportunités XGBoost ML
             </h2>
             <button
               onClick={() => setShowGenerationForm(!showGenerationForm)}
@@ -816,7 +828,7 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
           
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-600">
-              Générez de nouvelles opportunités d'investissement basées sur l'analyse avancée
+              Générez de nouvelles opportunités d'investissement basées sur les modèles XGBoost ML optimisés
             </div>
             <button
               onClick={generateDailyOpportunities}
@@ -882,17 +894,15 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
               >
                 <option value="">Toutes</option>
                 <option value="BUY_STRONG">BUY_STRONG</option>
-                <option value="BUY_MODERATE">BUY_MODERATE</option>
                 <option value="BUY_WEAK">BUY_WEAK</option>
                 <option value="HOLD">HOLD</option>
                 <option value="SELL_WEAK">SELL_WEAK</option>
-                <option value="SELL_MODERATE">SELL_MODERATE</option>
                 <option value="SELL_STRONG">SELL_STRONG</option>
               </select>
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Score minimum</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Confiance minimale</label>
               <input
                 type="number"
                 min="0"
@@ -906,7 +916,7 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Score maximum</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Confiance maximale</label>
               <input
                 type="number"
                 min="0"
@@ -949,12 +959,11 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
                 onChange={(e) => setSortBy(e.target.value)}
                 className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="composite_score">Score composite</option>
-                <option value="technical_score">Score technique</option>
-                <option value="sentiment_score">Score sentiment</option>
-                <option value="market_score">Score marché</option>
-                <option value="confidence_level">Niveau de confiance</option>
-                <option value="analysis_date">Date d'analyse</option>
+                <option value="confidence_level">Confiance ML</option>
+                <option value="potential_return">Retour potentiel</option>
+                <option value="risk_score">Score de risque</option>
+                <option value="date">Date d'analyse</option>
+                <option value="symbol">Symbole</option>
               </select>
             </div>
             
@@ -1011,8 +1020,8 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
             
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
               {filteredOpportunities.map((opportunity, index) => (
-                <HybridOpportunityCard
-                  key={`${opportunity.symbol}-${opportunity.updated_at || index}`}
+                <XGBoostOpportunityCard
+                  key={`${opportunity.symbol}-${opportunity.date}-${index}`}
                   opportunity={opportunity}
                   onAnalyze={handleAnalyzeSymbol}
                   onViewDetails={handleViewDetails}
