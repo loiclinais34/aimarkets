@@ -278,7 +278,7 @@ class AdvancedAnalysisApi {
 
 export interface GenerateDailyOpportunitiesRequest {
   limit_symbols?: number;
-  time_horizon?: number;
+  time_horizon?: number; // Déprécié - les opportunités sont maintenant générées pour les 3 horizons (1d, 7d, 30d)
   include_ml?: boolean;
 }
 

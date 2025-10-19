@@ -36,7 +36,6 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
   const [showGenerationForm, setShowGenerationForm] = useState(false);
   const [generationParams, setGenerationParams] = useState<GenerateDailyOpportunitiesRequest>({
     limit_symbols: 101,
-    time_horizon: 30,
     include_ml: true
   });
   
@@ -778,20 +777,26 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Horizon temporel (jours)
+                    Horizons de prédiction
                   </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="365"
-                    value={generationParams.time_horizon}
-                    onChange={(e) => setGenerationParams({
-                      ...generationParams,
-                      time_horizon: parseInt(e.target.value) || 30
-                    })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Entre 1 et 365 jours</p>
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                    <p className="text-sm text-blue-800 font-medium mb-2">Horizons automatiques :</p>
+                    <div className="flex space-x-4 text-sm text-blue-700">
+                      <div className="flex items-center space-x-1">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <span>1 jour</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <span>7 jours</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <span>30 jours</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-2">Les opportunités seront générées pour les 3 horizons simultanément</p>
+                  </div>
                 </div>
                 
                 <div>
@@ -819,7 +824,7 @@ const OpportunitiesDashboard: React.FC<OpportunitiesDashboardProps> = ({ classNa
               <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
                 <p className="text-sm text-blue-800">
                   <strong>Résumé de la configuration :</strong> Analyse de {generationParams.limit_symbols} symboles 
-                  sur un horizon de {generationParams.time_horizon} jours 
+                  sur les horizons 1j, 7j et 30j 
                   {generationParams.include_ml ? ' avec analyse ML' : ' sans analyse ML'}.
                 </p>
               </div>
